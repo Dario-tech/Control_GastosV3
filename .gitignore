@@ -1,0 +1,17 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/.env
+
+# Node
+controlGastosMovil/node_modules/
+controlGastosMovil/dist/
+
+# General
+.DS_Store
+*.log
+check-*.mjs
+debug-*.mjs
+screenshot.mjs
