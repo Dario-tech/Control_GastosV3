@@ -9,7 +9,7 @@ app = FastAPI(title="Control Gastos API", version="1.0.0")
 # CORS_ORIGINS en producción: "https://tu-app.vercel.app,https://otro-dominio.com"
 _raw_origins = os.getenv(
     "CORS_ORIGINS",
-    "http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173"
+    "http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173,https://control-beta-ten.vercel.app"
 )
 origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
