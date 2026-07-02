@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+const BASE = import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com'
 
 export async function fetchPrices() {
   const res = await fetch(`${BASE}/api/investments/prices`, { signal: AbortSignal.timeout(15000) })
