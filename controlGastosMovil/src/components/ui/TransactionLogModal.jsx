@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { deleteTransaction } from '../../services/api'
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import { fmt } from '../../utils'
 
 const MONTH_NAMES = [
@@ -9,6 +10,7 @@ const MONTH_NAMES = [
 ]
 
 export default function TransactionLogModal({ concept, emoji, monthIndex, onClose }) {
+  useLockBodyScroll()
   const { transactions, refresh } = useFinanceData()
   const [deletedRows, setDeletedRows] = useState(new Set())
   const [deleting, setDeleting]       = useState(null)

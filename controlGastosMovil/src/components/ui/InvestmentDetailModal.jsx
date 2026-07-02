@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -59,6 +60,7 @@ function StatTile({ label, value, colored }) {
 
 /* ── Main modal ── */
 export default function InvestmentDetailModal({ inv, priceData, valueData, onClose }) {
+  useLockBodyScroll()
   const [selectedDays, setSelectedDays] = useState(365)
   const { points, source } = useHistory(inv, priceData?.price, selectedDays)
   const { tick, grid } = useChartColors()

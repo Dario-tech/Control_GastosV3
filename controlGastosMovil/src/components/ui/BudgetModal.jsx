@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 
 const QUICK_EMOJIS = [
   '🏃','🍽️','🏠','🚗','💊','✈️','🛍️','📱','🎉','☕',
@@ -7,6 +8,7 @@ const QUICK_EMOJIS = [
 ]
 
 export default function BudgetModal({ item, onSave, onClose, onDelete }) {
+  useLockBodyScroll()
   const isEdit = !!item
   const [emoji, setEmoji] = useState(item?.emoji || '💰')
   const [name,  setName]  = useState(item?.name  || '')
