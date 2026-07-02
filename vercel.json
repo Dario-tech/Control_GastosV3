@@ -1,0 +1,5 @@
+{
+  "buildCommand": "cd controlGastosMovil && npm install && npm run build",
+  "outputDirectory": "controlGastosMovil/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
