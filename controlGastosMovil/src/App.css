@@ -1050,12 +1050,15 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
 .modal-sheet {
   width: 100%;
   max-width: 430px;
+  max-height: 90vh;
   margin: 0 auto;
   background: #161626;
   border-radius: 26px 26px 0 0;
   padding: 12px 20px calc(32px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--border2);
   animation: sheetUp 0.3s cubic-bezier(0.34,1.2,0.64,1);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 @keyframes sheetUp {
   from { transform: translateY(100%); }
