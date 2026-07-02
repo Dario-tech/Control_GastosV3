@@ -1,13 +1,9 @@
 import { createContext, useContext, useState, useCallback } from 'react'
-import { getActiveMonths } from '../utils'
-import { DATA as MOCK_DATA } from '../data/mockData'
 
 const AppContext = createContext(null)
 
 export function AppProvider({ children }) {
-  const active = getActiveMonths(MOCK_DATA)
-  const lastActive = active[active.length - 1]?.index ?? 0
-  const [selectedMonth, setSelectedMonth] = useState(lastActive)
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
   const [activeTab, setActiveTab] = useState('year')
   const [toast, setToast] = useState(null)
 
