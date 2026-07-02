@@ -1,16 +1,40 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
-import { DATA as MOCK_DATA } from '../data/mockData'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { fetchFinanceData } from '../services/api'
+
+const LS_KEY = 'mi-economia-finance-cache-v1'
+
+const EMPTY = {
+  year:             new Date().getFullYear(),
+  activeMonths:     Array(12).fill(false),
+  income:           [],
+  fixedExpenses:    [],
+  variableExpenses: [],
+  transactions:     [],
+}
+
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function saveCache(data) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(data))
+  } catch {}
+}
 
 const Ctx = createContext(null)
 
 export function FinanceDataProvider({ children }) {
-  const [data, setData] = useState(MOCK_DATA)
-  const [transactions, setTransactions] = useState([])
-  const [status, setStatus] = useState('idle')
+  const [data, setData]               = useState(() => loadCache() ?? EMPTY)
+  const [transactions, setTransactions] = useState(() => loadCache()?.transactions ?? [])
+  const [status, setStatus]           = useState('idle')
   const [lastUpdated, setLastUpdated] = useState(null)
-  const [errorMsg, setErrorMsg] = useState('')
-  const hasRealData = useRef(false) // una vez que llegan datos reales, no volver a mock
+  const [errorMsg, setErrorMsg]       = useState('')
 
   const refresh = useCallback(async () => {
     setStatus('loading')
@@ -26,10 +50,9 @@ export function FinanceDataProvider({ children }) {
       setLastUpdated(new Date())
       setStatus('live')
       setErrorMsg('')
-      hasRealData.current = true
+      saveCache(result)
     } catch (err) {
-      // Si ya teníamos datos reales, los conservamos — solo mostramos el estado de error
-      if (!hasRealData.current) setData(MOCK_DATA)
+      // Mantiene los últimos datos guardados — no borra ni pone datos de ejemplo
       setStatus('offline')
       setErrorMsg(err.message)
       console.warn('[FinanceData] error al refrescar:', err.message)
@@ -38,7 +61,7 @@ export function FinanceDataProvider({ children }) {
 
   useEffect(() => {
     refresh()
-    const interval = setInterval(refresh, 10_000) // refresca cada 10 s
+    const interval = setInterval(refresh, 10_000)
     return () => clearInterval(interval)
   }, [refresh])
 
