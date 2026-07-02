@@ -61,7 +61,7 @@ export function FinanceDataProvider({ children }) {
 
   useEffect(() => {
     refresh()
-    const interval = setInterval(refresh, 10_000)
+    const interval = setInterval(refresh, 60_000)
     return () => clearInterval(interval)
   }, [refresh])
 
