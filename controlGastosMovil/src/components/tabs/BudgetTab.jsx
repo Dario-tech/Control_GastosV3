@@ -1,4 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
+
+const NOTIF_LS_KEY = 'mi-economia-notif-v1'
+
+function getNotifCache() {
+  try { return JSON.parse(localStorage.getItem(NOTIF_LS_KEY) || '{}') }
+  catch { return {} }
+}
+function setNotifCache(cache) {
+  localStorage.setItem(NOTIF_LS_KEY, JSON.stringify(cache))
+}
 import { useBudget } from '../../hooks/useBudget'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useApp } from '../../context/AppContext'
@@ -110,7 +120,6 @@ export default function BudgetTab() {
   const { settings } = useSettings()
   const [showModal, setShowModal] = useState(false)
   const [editItem,  setEditItem]  = useState(null)
-  const notifiedRef = useRef(new Set())
 
   // Busca el gasto real de una categoría en variableExpenses del mes actual
   function getRealSpent(name) {
@@ -137,26 +146,37 @@ export default function BudgetTab() {
     }
   }, [])
 
-  // Disparar notificación cuando se supera el umbral
+  // Notificar solo cuando el gasto real haya cambiado y supere el umbral
   useEffect(() => {
     if (!settings.budgetAlerts) return
     if (notifPermission !== 'granted') return
 
-    items.forEach(item => {
-      const spent = getRealSpent(item.name)
-      const pct   = item.limit > 0 ? (spent / item.limit) * 100 : 0
-      const key   = `${item.id}-${selectedMonth}-${Math.floor(pct / 10)}`
+    const cache = getNotifCache()
+    let changed  = false
 
-      if (pct >= settings.alertThreshold && !notifiedRef.current.has(key)) {
-        notifiedRef.current.add(key)
-        new Notification(`⚠️ Presupuesto: ${item.emoji} ${item.name}`, {
-          body: `Has gastado el ${Math.round(pct)}% de tu límite (${fmt(spent)} de ${fmt(item.limit)})`,
-          icon: '/icons/icon-192.png',
-          tag: key,
-          renotify: true,
-        })
+    items.forEach(item => {
+      const spent     = getRealSpent(item.name)
+      const pct       = item.limit > 0 ? (spent / item.limit) * 100 : 0
+      const cacheKey  = `${item.id}-${selectedMonth}`
+      const lastSpent = cache[cacheKey] ?? 0
+
+      // Solo notifica si el gasto aumentó Y cruza el umbral por primera vez
+      if (spent !== lastSpent) {
+        cache[cacheKey] = spent
+        changed = true
+
+        const thresholdAmount = (settings.alertThreshold / 100) * item.limit
+        if (spent >= thresholdAmount && lastSpent < thresholdAmount) {
+          new Notification(`⚠️ Presupuesto: ${item.emoji} ${item.name}`, {
+            body: `Has gastado el ${Math.round(pct)}% de tu límite (${fmt(spent)} de ${fmt(item.limit)})`,
+            icon: '/icons/icon-192.png',
+            tag: cacheKey,
+          })
+        }
       }
     })
+
+    if (changed) setNotifCache(cache)
   }, [data, items, selectedMonth, settings.budgetAlerts, settings.alertThreshold, notifPermission])
 
   const itemsWithSpent = items.map(item => ({ ...item, realSpent: getRealSpent(item.name) }))
