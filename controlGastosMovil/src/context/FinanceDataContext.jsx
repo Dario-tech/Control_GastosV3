@@ -62,7 +62,17 @@ export function FinanceDataProvider({ children }) {
   useEffect(() => {
     refresh()
     const interval = setInterval(refresh, 60_000)
-    return () => clearInterval(interval)
+
+    // Refresca al instante cuando el usuario vuelve a abrir la app
+    function onVisible() {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [refresh])
 
   return (
