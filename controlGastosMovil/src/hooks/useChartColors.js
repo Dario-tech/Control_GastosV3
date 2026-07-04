@@ -17,7 +17,7 @@ export function useChartColors() {
     refLine:      isLight || isPastel ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.15)',
     cursor:       isLight || isPastel ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)',
     tooltip:      isLight || isPastel ? '#f4f4fb' : undefined,
-    incomeColor:  isPastel ? '#34d399' : '#22c55e',
+    incomeColor:  isPastel ? '#f9a8d4' : '#22c55e',
     expenseColor: isPastel ? '#fb7185' : '#f43f5e',
   }
 }

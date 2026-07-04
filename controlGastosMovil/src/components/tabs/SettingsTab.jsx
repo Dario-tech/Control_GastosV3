@@ -17,7 +17,7 @@ const THEMES = [
     id: 'pastel',
     name: 'Pastel',
     emoji: '🌸',
-    bg: '#faf7ff', surface: '#ffffff', accent: '#b088f9', bar: '#86efac',
+    bg: '#fff0f7', surface: '#ffffff', accent: '#ec4899', bar: '#f9a8d4',
   },
   {
     id: 'auto',

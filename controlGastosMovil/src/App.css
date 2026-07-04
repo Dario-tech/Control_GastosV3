@@ -772,70 +772,70 @@ html, body, #root {
 
 /* ===== PASTEL THEME ===== */
 html.pastel {
-  --bg:           #faf7ff;
-  --bg2:          #f2eeff;
+  --bg:           #fff0f7;
+  --bg2:          #ffe4f0;
   --surface:      #ffffff;
-  --surface2:     #ede8ff;
-  --border:       rgba(176,136,249,0.18);
-  --border2:      rgba(176,136,249,0.32);
-  --accent:       #9b72f5;
-  --accent-dim:   rgba(155,114,245,0.12);
-  --green:        #34d399;
-  --green-dim:    rgba(52,211,153,0.15);
+  --surface2:     #fce7f3;
+  --border:       rgba(236,72,153,0.15);
+  --border2:      rgba(236,72,153,0.28);
+  --accent:       #ec4899;
+  --accent-dim:   rgba(236,72,153,0.12);
+  --green:        #f9a8d4;
+  --green-dim:    rgba(249,168,212,0.20);
   --red:          #fb7185;
   --red-dim:      rgba(251,113,133,0.15);
-  --orange:       #fbbf24;
-  --orange-dim:   rgba(251,191,36,0.15);
-  --purple:       #a78bfa;
-  --text:         #2d1b69;
-  --text2:        #6b4fc9;
-  --text3:        #a090cc;
-  --shadow:       0 8px 32px rgba(155,114,245,0.12);
-  --shadow-sm:    0 2px 12px rgba(155,114,245,0.08);
+  --orange:       #fda4af;
+  --orange-dim:   rgba(253,164,175,0.15);
+  --purple:       #f0abfc;
+  --text:         #831843;
+  --text2:        #be185d;
+  --text3:        #f9a8d4;
+  --shadow:       0 8px 32px rgba(236,72,153,0.10);
+  --shadow-sm:    0 2px 12px rgba(236,72,153,0.07);
 }
 html.pastel body,
 html.pastel #root { background: var(--bg); color: var(--text); }
 
 /* Nav */
-html.pastel .bottom-nav { background: rgba(250,247,255,0.96); border-top: 1px solid var(--border); }
+html.pastel .bottom-nav { background: rgba(255,240,247,0.96); border-top: 1px solid var(--border); }
 
 /* Modals */
 html.pastel .modal-sheet  { background: #ffffff; }
-html.pastel .detail-sheet { background: #faf7ff; }
+html.pastel .detail-sheet { background: #fff0f7; }
 
-/* Hero cards — gradiente pastel suave */
+/* Hero cards — gradiente rosa pastel */
 html.pastel .hero-card {
-  background: linear-gradient(145deg, #ede0ff 0%, #e6d8ff 60%, #eedaff 100%);
-  border-color: rgba(155,114,245,0.25);
+  background: linear-gradient(145deg, #fce7f3 0%, #fbcfe8 60%, #fce7f3 100%);
+  border-color: rgba(236,72,153,0.20);
 }
 html.pastel .hero-card::after {
-  background: radial-gradient(circle, rgba(155,114,245,0.2) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(236,72,153,0.15) 0%, transparent 65%);
 }
-html.pastel .hero-month-label { color: rgba(45,27,105,0.5); }
-html.pastel .hero-balance-label { color: rgba(45,27,105,0.4); }
-html.pastel .hero-stats { background: rgba(155,114,245,0.08); }
-html.pastel .hero-stat { background: rgba(255,255,255,0.35); }
-html.pastel .hero-stat-label { color: rgba(45,27,105,0.45); }
+html.pastel .hero-month-label { color: rgba(131,24,67,0.5); }
+html.pastel .hero-balance-label { color: rgba(131,24,67,0.4); }
+html.pastel .hero-stats { background: rgba(236,72,153,0.06); }
+html.pastel .hero-stat { background: rgba(255,255,255,0.45); }
+html.pastel .hero-stat-label { color: rgba(131,24,67,0.45); }
 
 /* Year hero */
 html.pastel .year-hero {
-  background: linear-gradient(145deg, #f3e8ff 0%, #ede0ff 60%, #f5eaff 100%);
-  border-color: rgba(155,114,245,0.25);
+  background: linear-gradient(145deg, #fce7f3 0%, #fbcfe8 60%, #fce7f3 100%);
+  border-color: rgba(236,72,153,0.20);
 }
 html.pastel .year-hero::after {
-  background: radial-gradient(circle, rgba(155,114,245,0.2) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(236,72,153,0.15) 0%, transparent 65%);
 }
-html.pastel .year-hero-title  { color: rgba(45,27,105,0.4); }
+html.pastel .year-hero-title  { color: rgba(131,24,67,0.4); }
 html.pastel .year-hero-balance { color: var(--accent); }
-html.pastel .year-hero-stat   { background: rgba(255,255,255,0.4); }
-html.pastel .year-hero-stat-label { color: rgba(45,27,105,0.4); }
+html.pastel .year-hero-stat   { background: rgba(255,255,255,0.5); }
+html.pastel .year-hero-stat-label { color: rgba(131,24,67,0.4); }
 
 /* Budget hero */
 html.pastel .bgt-hero {
-  background: linear-gradient(145deg, #ede0ff 0%, #f2eaff 100%);
-  border-color: rgba(155,114,245,0.2);
+  background: linear-gradient(145deg, #fce7f3 0%, #fbcfe8 100%);
+  border-color: rgba(236,72,153,0.18);
 }
-html.pastel .bgt-bar-bg { background: rgba(155,114,245,0.1); }
+html.pastel .bgt-bar-bg { background: rgba(236,72,153,0.08); }
 
 /* Charts / tooltips */
 html.pastel .chart-tooltip { background: #ffffff; border-color: rgba(0,0,0,0.1); color: var(--text); }
