@@ -23,8 +23,13 @@ const TABS = [
   },
 ]
 
-export default function BottomNav() {
+export default function BottomNav({ onTabChange }) {
   const { activeTab, setActiveTab } = useApp()
+
+  function handleTab(id) {
+    setActiveTab(id)
+    onTabChange?.()
+  }
 
   return (
     <nav className="bottom-nav">
@@ -32,7 +37,7 @@ export default function BottomNav() {
         <button
           key={tab.id}
           className={`nav-btn${activeTab === tab.id ? ' active' : ''}`}
-          onClick={() => setActiveTab(tab.id)}
+          onClick={() => handleTab(tab.id)}
           aria-label={tab.label}
         >
           <div className="nav-icon-bg">{tab.icon}</div>

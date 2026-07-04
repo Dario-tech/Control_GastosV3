@@ -54,7 +54,7 @@ function AppContent() {
           {activeTab === 'budget'      && <BudgetTab />}
         </ErrorBoundary>
       </main>
-      <BottomNav />
+      <BottomNav onTabChange={() => setProfileOpen(false)} />
       <Toast />
       <ProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
