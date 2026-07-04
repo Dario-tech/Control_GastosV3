@@ -3,6 +3,9 @@ import httpx
 from datetime import datetime, timedelta
 from fastapi import HTTPException, Header
 from jose import jwt, JWTError
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 
 GOOGLE_CLIENT_ID  = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CERTS_URL  = "https://www.googleapis.com/oauth2/v1/certs"
@@ -19,15 +22,23 @@ async def verify_google_token(token: str) -> dict:
             certs = res.json()  # {"kid": "-----BEGIN CERTIFICATE-----..."}
 
         header  = jwt.get_unverified_header(token)
-        cert    = certs.get(header.get("kid"))
-        if not cert:
+        cert_str = certs.get(header.get("kid"))
+        if not cert_str:
             raise HTTPException(status_code=401, detail="Certificado de Google no encontrado")
+
+        # Extraer clave pública RSA del certificado X.509
+        cert_obj    = x509.load_pem_x509_certificate(cert_str.encode(), default_backend())
+        pub_key_pem = cert_obj.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        ).decode()
 
         payload = jwt.decode(
             token,
-            cert,
+            pub_key_pem,
             algorithms=["RS256"],
             audience=GOOGLE_CLIENT_ID,
+            issuer=["accounts.google.com", "https://accounts.google.com"],
         )
         return {
             "email":   payload["email"],
