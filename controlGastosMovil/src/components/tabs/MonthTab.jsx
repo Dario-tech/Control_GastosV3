@@ -13,7 +13,17 @@ export default function MonthTab() {
   const { selectedMonth, setSelectedMonth } = useApp()
   const { data } = useFinanceData()
   const [selectedConcept, setSelectedConcept] = useState(null)
+  const [heatmapOpen, setHeatmapOpen] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('mi-economia-cal-open') ?? 'false') }
+    catch { return false }
+  })
   const active = getActiveMonths(data)
+
+  function toggleHeatmap() {
+    const next = !heatmapOpen
+    setHeatmapOpen(next)
+    try { localStorage.setItem('mi-economia-cal-open', JSON.stringify(next)) } catch {}
+  }
   const currentIdx = active.findIndex(m => m.index === selectedMonth)
   const stats = getMonthStats(data, selectedMonth)
 
@@ -65,10 +75,16 @@ export default function MonthTab() {
         <DonutChart fixed={stats.fixed} variable={stats.variable} />
       </Card>
 
-      {/* Actividad diaria */}
-      <Card title="Actividad diaria" noPad>
-        <DayHeatmap monthIndex={selectedMonth} year={data.year || new Date().getFullYear()} />
-      </Card>
+      {/* Actividad diaria — plegable */}
+      <div className="card">
+        <button className="card-collapse-header" onClick={toggleHeatmap}>
+          <span className="card-title">📅 Actividad diaria</span>
+          <span className={`card-collapse-arrow${heatmapOpen ? ' open' : ''}`}>›</span>
+        </button>
+        {heatmapOpen && (
+          <DayHeatmap monthIndex={selectedMonth} year={data.year || new Date().getFullYear()} />
+        )}
+      </div>
 
       {/* Conceptos */}
       <Card title="💰 Ingresos" noPad>
