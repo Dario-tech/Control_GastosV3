@@ -5,7 +5,7 @@ from fastapi import HTTPException, Header
 from jose import jwt, JWTError
 
 GOOGLE_CLIENT_ID  = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_JWKS_URL   = "https://www.googleapis.com/oauth2/v3/certs"
+GOOGLE_CERTS_URL  = "https://www.googleapis.com/oauth2/v1/certs"
 JWT_SECRET        = os.getenv("JWT_SECRET", "dev-secret-change-in-production")
 JWT_ALGORITHM     = "HS256"
 JWT_EXPIRE_DAYS   = 30
@@ -15,20 +15,19 @@ async def verify_google_token(token: str) -> dict:
     """Verifica un Google ID token usando httpx + python-jose (sin google-auth)."""
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            res = await client.get(GOOGLE_JWKS_URL)
-            jwks = res.json()
+            res = await client.get(GOOGLE_CERTS_URL)
+            certs = res.json()  # {"kid": "-----BEGIN CERTIFICATE-----..."}
 
-        header = jwt.get_unverified_header(token)
-        key    = next((k for k in jwks.get("keys", []) if k.get("kid") == header.get("kid")), None)
-        if not key:
-            raise HTTPException(status_code=401, detail="Clave pública de Google no encontrada")
+        header  = jwt.get_unverified_header(token)
+        cert    = certs.get(header.get("kid"))
+        if not cert:
+            raise HTTPException(status_code=401, detail="Certificado de Google no encontrado")
 
         payload = jwt.decode(
             token,
-            key,
+            cert,
             algorithms=["RS256"],
             audience=GOOGLE_CLIENT_ID,
-            options={"verify_at_hash": False},
         )
         return {
             "email":   payload["email"],
