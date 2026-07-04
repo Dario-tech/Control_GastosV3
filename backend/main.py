@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from services.prices import get_all_prices
 from services.sheets import get_finance_data, get_raw_transactions, delete_transaction, post_transaction
 from services.auth import verify_google_token, create_jwt, get_current_user
-from services.users import get_user, ensure_user
+from services.users import get_user, ensure_user, get_email_by_shortcut_token
 from services.db import init_pool
 
 
@@ -49,15 +49,16 @@ async def auth_login(body: GoogleLoginIn):
     google_user   = await verify_google_token(body.token)
     email         = google_user["email"]
     name          = google_user.get("name") or email.split("@")[0]
-    await ensure_user(email, name)
+    user_data     = await ensure_user(email, name)
     session_token = create_jwt(email)
     return {
         "session_token": session_token,
         "needs_setup":   False,
         "user": {
-            "email":   email,
-            "name":    name,
-            "picture": google_user.get("picture", ""),
+            "email":          email,
+            "name":           name,
+            "picture":        google_user.get("picture", ""),
+            "shortcut_token": user_data.get("shortcut_token", ""),
         },
     }
 
@@ -157,6 +158,37 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Error al escribir en la base de datos: {e}")
 
+    await _broadcast()
+    return result
+
+
+# ── Atajo iOS (token permanente, sin JWT) ────────────────────────────────────
+
+@app.post("/api/shortcut")
+async def shortcut_transaction(request: Request):
+    """Endpoint para iOS Shortcuts — autenticación por shortcut_token permanente."""
+    raw = await request.body()
+    try:
+        data = json_lib.loads(raw)
+        if isinstance(data, str):
+            data = json_lib.loads(data)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Body inválido: {e}")
+
+    token = data.get("shortcut_token") or data.get("token")
+    if not token:
+        raise HTTPException(status_code=401, detail="shortcut_token requerido")
+
+    email = await get_email_by_shortcut_token(token)
+    if not email:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    try:
+        tx = TransactionIn(**{k: v for k, v in data.items() if k in ("importe", "tipo", "concepto", "source")})
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Datos inválidos: {e}")
+
+    result = await post_transaction(tx.importe, tx.tipo, tx.concepto, email, "shortcut")
     await _broadcast()
     return result
 

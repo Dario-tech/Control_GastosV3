@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import SettingsTab from '../tabs/SettingsTab'
 
@@ -19,6 +19,14 @@ export default function ProfilePanel({ open, onClose }) {
   function handleLogout() {
     onClose()
     logout()
+  }
+
+  const [copied, setCopied] = useState(false)
+
+  function copyToken() {
+    navigator.clipboard.writeText(user?.shortcut_token ?? '')
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const initials = user?.name
@@ -54,6 +62,17 @@ export default function ProfilePanel({ open, onClose }) {
       </div>
 
       <div className="profile-screen-body">
+        {user?.shortcut_token && (
+          <div className="shortcut-token-section">
+            <p className="shortcut-token-label">Token para iOS Shortcuts</p>
+            <div className="shortcut-token-row">
+              <code className="shortcut-token-value">{user.shortcut_token.slice(0, 16)}…</code>
+              <button className="shortcut-token-copy" onClick={copyToken}>
+                {copied ? '✓ Copiado' : 'Copiar'}
+              </button>
+            </div>
+          </div>
+        )}
         <SettingsTab />
       </div>
 
