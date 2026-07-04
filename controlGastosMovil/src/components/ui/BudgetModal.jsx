@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
+import { BUDGET_COLORS } from '../../hooks/useBudget'
 
 const QUICK_EMOJIS = [
   '🏃','🍽️','🏠','🚗','💊','✈️','🛍️','📱','🎉','☕',
@@ -13,11 +14,12 @@ export default function BudgetModal({ item, onSave, onClose, onDelete }) {
   const [emoji, setEmoji] = useState(item?.emoji || '💰')
   const [name,  setName]  = useState(item?.name  || '')
   const [limit, setLimit] = useState(item?.limit != null ? item.limit.toString() : '')
+  const [color, setColor] = useState(item?.color || BUDGET_COLORS[0])
 
   function handleSubmit(e) {
     e.preventDefault()
     if (!name.trim() || !limit) return
-    onSave({ emoji, name: name.trim(), limit: parseFloat(limit) || 0 })
+    onSave({ emoji, name: name.trim(), limit: parseFloat(limit) || 0, color })
   }
 
   const canSave = name.trim() && limit && parseFloat(limit) > 0
@@ -78,6 +80,24 @@ export default function BudgetModal({ item, onSave, onClose, onDelete }) {
             <span className="modal-field-hint">
               El gasto real se obtiene automáticamente de tus transacciones
             </span>
+          </div>
+
+          <div className="modal-field">
+            <label className="modal-label">Color de la barra</label>
+            <div className="modal-color-row">
+              {BUDGET_COLORS.map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`modal-color-dot${color === c ? ' active' : ''}`}
+                  style={{ background: c }}
+                  onClick={() => setColor(c)}
+                />
+              ))}
+            </div>
+            <div className="modal-bar-preview">
+              <div className="modal-bar-preview-fill" style={{ background: color, width: '60%' }} />
+            </div>
           </div>
 
           <div className="modal-actions">

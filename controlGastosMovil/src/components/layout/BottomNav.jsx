@@ -37,9 +37,9 @@ export default function BottomNav() {
           key={tab.id}
           className={`nav-btn${activeTab === tab.id ? ' active' : ''}`}
           onClick={() => setActiveTab(tab.id)}
+          aria-label={tab.label}
         >
           <div className="nav-icon-bg">{tab.icon}</div>
-          <span>{tab.label}</span>
         </button>
       ))}
     </nav>

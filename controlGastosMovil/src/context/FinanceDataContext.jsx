@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { fetchFinanceData } from '../services/api'
+
+const SSE_URL = (import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com') + '/api/events'
 
 const LS_KEY = 'mi-economia-finance-cache-v1'
 
@@ -59,9 +61,35 @@ export function FinanceDataProvider({ children }) {
     }
   }, [])
 
+  // SSE: recibe notificación del backend cuando hay datos nuevos
+  const sseRef = useRef(null)
+  useEffect(() => {
+    function connectSSE() {
+      const es = new EventSource(SSE_URL)
+      sseRef.current = es
+
+      es.addEventListener('update', () => {
+        refresh()
+      })
+
+      es.onerror = () => {
+        es.close()
+        // Reintento con backoff de 5s si la conexión falla
+        setTimeout(connectSSE, 5_000)
+      }
+    }
+
+    connectSSE()
+
+    return () => {
+      sseRef.current?.close()
+    }
+  }, [refresh])
+
   useEffect(() => {
     refresh()
-    const interval = setInterval(refresh, 60_000)
+    // Polling de respaldo cada 5 min (SSE es el canal principal)
+    const interval = setInterval(refresh, 5 * 60_000)
 
     // Refresca al instante cuando el usuario vuelve a abrir la app
     function onVisible() {
