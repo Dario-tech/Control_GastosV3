@@ -108,7 +108,7 @@ function Segmented({ options, value, onChange }) {
 
 export default function SettingsTab() {
   const { settings, update } = useSettings()
-  const { items: budgetItems, removeItem } = useBudget()
+  const { allItems: budgetItems, removeItem } = useBudget()
   const { status, lastUpdated, errorMsg, refresh } = useFinanceData()
 
   function exportData() {

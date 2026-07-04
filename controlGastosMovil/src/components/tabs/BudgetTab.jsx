@@ -157,7 +157,8 @@ function BudgetItem({ item, spent, daysLeft, onEdit }) {
 
 /* ── Tab principal ── */
 export default function BudgetTab() {
-  const { items, addItem, updateItem, removeItem } = useBudget()
+  const { itemsForMonth, addItem, updateItem, removeItem } = useBudget()
+  const items = itemsForMonth(budgetMonth)
   const { data } = useFinanceData()
   const { selectedMonth: globalMonth } = useApp()
   const { settings } = useSettings()
@@ -227,7 +228,7 @@ export default function BudgetTab() {
 
   function handleSave(formData) {
     if (editItem) updateItem(editItem.id, formData)
-    else          addItem(formData)
+    else          addItem(formData, budgetMonth)
     closeModal()
   }
   function handleDelete() {
