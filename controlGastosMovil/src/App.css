@@ -782,15 +782,15 @@ html.pastel .hero-stat-label { color: rgba(45,27,105,0.45); }
 
 /* Year hero */
 html.pastel .year-hero {
-  background: linear-gradient(145deg, #ddfff0 0%, #d5ffe8 60%, #e0fff3 100%);
-  border-color: rgba(22,163,74,0.2);
+  background: linear-gradient(145deg, #f3e8ff 0%, #ede0ff 60%, #f5eaff 100%);
+  border-color: rgba(155,114,245,0.25);
 }
 html.pastel .year-hero::after {
-  background: radial-gradient(circle, rgba(22,163,74,0.15) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(155,114,245,0.2) 0%, transparent 65%);
 }
-html.pastel .year-hero-title { color: rgba(45,27,105,0.4); }
-html.pastel .year-hero-balance { color: #16a34a; }
-html.pastel .year-hero-stat { background: rgba(255,255,255,0.4); }
+html.pastel .year-hero-title  { color: rgba(45,27,105,0.4); }
+html.pastel .year-hero-balance { color: var(--accent); }
+html.pastel .year-hero-stat   { background: rgba(255,255,255,0.4); }
 html.pastel .year-hero-stat-label { color: rgba(45,27,105,0.4); }
 
 /* Budget hero */

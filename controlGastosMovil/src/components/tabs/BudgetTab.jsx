@@ -158,19 +158,21 @@ function BudgetItem({ item, spent, daysLeft, onEdit }) {
 /* ── Tab principal ── */
 export default function BudgetTab() {
   const { itemsForMonth, addItem, updateItem, removeItem } = useBudget()
-  const items = itemsForMonth(budgetMonth)
   const { data } = useFinanceData()
   const { selectedMonth: globalMonth } = useApp()
   const { settings } = useSettings()
 
   // Mes local — independiente del selector global
-  const [budgetMonth, setBudgetMonth]     = useState(globalMonth)
+  const [budgetMonth, setBudgetMonth]         = useState(globalMonth)
   const [showMonthPicker, setShowMonthPicker] = useState(false)
-  const [showModal, setShowModal]         = useState(false)
-  const [editItem,  setEditItem]          = useState(null)
+  const [showModal, setShowModal]             = useState(false)
+  const [editItem,  setEditItem]              = useState(null)
   const [notifPermission, setNotifPermission] = useState(
     'Notification' in window ? Notification.permission : 'unsupported'
   )
+
+  // items del mes seleccionado — DESPUÉS de declarar budgetMonth
+  const items = itemsForMonth(budgetMonth)
 
   const days = daysLeftInMonth(budgetMonth)
 
