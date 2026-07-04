@@ -3,6 +3,7 @@ import { useBudget } from '../../hooks/useBudget'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useApp } from '../../context/AppContext'
 import { useSettings } from '../../context/SettingsContext'
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import BudgetModal from '../ui/BudgetModal'
 import { fmt } from '../../utils'
 
@@ -27,6 +28,40 @@ function daysLeftInMonth(monthIndex) {
   return lastDay - now.getDate()
 }
 
+/* ── Month picker sheet ── */
+function MonthPickerSheet({ selected, activeMonths, onSelect, onClose }) {
+  useLockBodyScroll()
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet bgt-month-sheet" onClick={e => e.stopPropagation()}>
+        <div className="modal-drag-handle" />
+        <div className="bgt-month-picker-title">Seleccionar mes</div>
+        <div className="bgt-month-grid">
+          {MONTH_NAMES.map((name, i) => (
+            <button
+              key={i}
+              className={[
+                'bgt-month-option',
+                i === selected       ? 'active'   : '',
+                activeMonths?.[i]    ? 'has-data' : '',
+              ].join(' ').trim()}
+              onClick={() => { onSelect(i); onClose() }}
+            >
+              <span className="bgt-month-option-name">{name}</span>
+              {activeMonths?.[i] && <span className="bgt-month-dot" />}
+              {i === selected    && (
+                <svg className="bgt-month-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M3 8l3.5 3.5L13 5"/>
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Estado vacío ── */
 function EmptyState({ onAdd }) {
   return (
@@ -45,7 +80,7 @@ function EmptyState({ onAdd }) {
 }
 
 /* ── Hero total mensual ── */
-function TotalHero({ totalLimit, totalSpent, month, daysLeft }) {
+function TotalHero({ totalLimit, totalSpent, daysLeft }) {
   const pct       = totalLimit > 0 ? Math.min(100, (totalSpent / totalLimit) * 100) : 0
   const remaining = totalLimit - totalSpent
   const over      = remaining < 0
@@ -55,7 +90,6 @@ function TotalHero({ totalLimit, totalSpent, month, daysLeft }) {
       <div className="bgt-hero-top">
         <div className="bgt-hero-left">
           <span className="bgt-hero-title">Total Mensual</span>
-          <span className="bgt-hero-month">{MONTH_NAMES[month]}</span>
         </div>
         <div className="bgt-hero-right">
           {daysLeft > 0 && <span className="bgt-days-badge">{daysLeft}d restantes</span>}
@@ -73,9 +107,7 @@ function TotalHero({ totalLimit, totalSpent, month, daysLeft }) {
       <div className="bgt-bar-footer">
         <span className="bgt-pct-label">Gastado {Math.round(pct)}%</span>
         <span className={`bgt-rem-label ${over ? 'over' : ''}`}>
-          {over
-            ? `${fmt(-remaining)} excedido`
-            : `${fmt(remaining)} restantes este mes`}
+          {over ? `${fmt(-remaining)} excedido` : `${fmt(remaining)} restantes este mes`}
         </span>
       </div>
     </div>
@@ -116,9 +148,7 @@ function BudgetItem({ item, spent, daysLeft, onEdit }) {
       <div className="bgt-bar-footer">
         <span className="bgt-pct-label">Gastado {Math.round(pct)}%</span>
         <span className={`bgt-rem-label ${over ? 'over' : ''}`}>
-          {over
-            ? `${fmt(-remaining)} excedido`
-            : `${fmt(remaining)} restantes este mes`}
+          {over ? `${fmt(-remaining)} excedido` : `${fmt(remaining)} restantes este mes`}
         </span>
       </div>
     </div>
@@ -129,21 +159,25 @@ function BudgetItem({ item, spent, daysLeft, onEdit }) {
 export default function BudgetTab() {
   const { items, addItem, updateItem, removeItem } = useBudget()
   const { data } = useFinanceData()
-  const { selectedMonth } = useApp()
+  const { selectedMonth: globalMonth } = useApp()
   const { settings } = useSettings()
-  const [showModal, setShowModal] = useState(false)
-  const [editItem,  setEditItem]  = useState(null)
+
+  // Mes local — independiente del selector global
+  const [budgetMonth, setBudgetMonth]     = useState(globalMonth)
+  const [showMonthPicker, setShowMonthPicker] = useState(false)
+  const [showModal, setShowModal]         = useState(false)
+  const [editItem,  setEditItem]          = useState(null)
   const [notifPermission, setNotifPermission] = useState(
     'Notification' in window ? Notification.permission : 'unsupported'
   )
 
-  const days = daysLeftInMonth(selectedMonth)
+  const days = daysLeftInMonth(budgetMonth)
 
   function getRealSpent(name) {
     const key = name.toLowerCase().trim()
     const match = [...(data.variableExpenses || []), ...(data.fixedExpenses || [])]
       .find(e => e.concept.toLowerCase().trim() === key)
-    return match ? (match.amounts[selectedMonth] ?? 0) : 0
+    return match ? (match.amounts[budgetMonth] ?? 0) : 0
   }
 
   async function requestNotifPermission() {
@@ -159,14 +193,13 @@ export default function BudgetTab() {
   }, [])
 
   useEffect(() => {
-    if (!settings.budgetAlerts) return
-    if (notifPermission !== 'granted') return
+    if (!settings.budgetAlerts || notifPermission !== 'granted') return
     const cache = getNotifCache()
     let changed = false
     items.forEach(item => {
       const spent     = getRealSpent(item.name)
       const pct       = item.limit > 0 ? (spent / item.limit) * 100 : 0
-      const cacheKey  = `${item.id}-${selectedMonth}`
+      const cacheKey  = `${item.id}-${budgetMonth}`
       const lastSpent = cache[cacheKey] ?? 0
       if (spent !== lastSpent) {
         cache[cacheKey] = spent
@@ -182,7 +215,7 @@ export default function BudgetTab() {
       }
     })
     if (changed) setNotifCache(cache)
-  }, [data, items, selectedMonth, settings.budgetAlerts, settings.alertThreshold, notifPermission])
+  }, [data, items, budgetMonth, settings.budgetAlerts, settings.alertThreshold, notifPermission])
 
   const itemsWithSpent = items.map(item => ({ ...item, realSpent: getRealSpent(item.name) }))
   const totalLimit     = items.reduce((s, i) => s + (i.limit || 0), 0)
@@ -205,6 +238,17 @@ export default function BudgetTab() {
   return (
     <div className="tab-panel budget-tab">
 
+      {/* Sub-header con selector de mes */}
+      <div className="bgt-subheader">
+        <span className="bgt-subheader-title">Presupuesto</span>
+        <button className="bgt-month-btn" onClick={() => setShowMonthPicker(true)}>
+          {MONTH_NAMES[budgetMonth]}
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <path d="M4 6l4 4 4-4"/>
+          </svg>
+        </button>
+      </div>
+
       {/* Banners de notificación */}
       {settings.budgetAlerts && notifPermission === 'default' && (
         <button className="notif-banner" onClick={requestNotifPermission}>
@@ -224,12 +268,7 @@ export default function BudgetTab() {
         <EmptyState onAdd={openAdd} />
       ) : (
         <>
-          <TotalHero
-            totalLimit={totalLimit}
-            totalSpent={totalSpent}
-            month={selectedMonth}
-            daysLeft={days}
-          />
+          <TotalHero totalLimit={totalLimit} totalSpent={totalSpent} daysLeft={days} />
 
           <div className="bgt-list">
             {itemsWithSpent.map(item => (
@@ -249,6 +288,17 @@ export default function BudgetTab() {
         </>
       )}
 
+      {/* Month picker */}
+      {showMonthPicker && (
+        <MonthPickerSheet
+          selected={budgetMonth}
+          activeMonths={data.activeMonths}
+          onSelect={setBudgetMonth}
+          onClose={() => setShowMonthPicker(false)}
+        />
+      )}
+
+      {/* Budget modal */}
       {showModal && (
         <BudgetModal
           item={editItem}

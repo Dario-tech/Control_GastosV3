@@ -471,7 +471,7 @@ html, body, #root {
 .nav-btn {
   flex: 1;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px;
+  gap: 0;
   background: none; border: none;
   color: var(--text3);
   cursor: pointer;
@@ -825,6 +825,92 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
 /* ===== BUDGET ===== */
 
 .budget-tab { padding-bottom: 24px; }
+
+/* Sub-header de Budget con selector de mes */
+.bgt-subheader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.bgt-subheader-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+.bgt-month-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  padding: 7px 12px 7px 14px;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.bgt-month-btn svg { width: 14px; height: 14px; color: var(--text3); }
+.bgt-month-btn:active { background: var(--surface2); border-color: var(--accent); }
+
+/* Month picker sheet */
+.bgt-month-sheet {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+}
+.bgt-month-picker-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 20px 14px;
+}
+.bgt-month-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 16px;
+}
+.bgt-month-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--surface2);
+  border: 1.5px solid transparent;
+  border-radius: 14px;
+  padding: 13px 14px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.bgt-month-option:active { background: var(--surface); }
+.bgt-month-option.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.bgt-month-option-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+.bgt-month-option.active .bgt-month-option-name { color: var(--accent); font-weight: 700; }
+.bgt-month-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+}
+.bgt-month-check {
+  width: 16px; height: 16px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
 
 /* Empty state */
 .budget-empty {
@@ -2011,10 +2097,10 @@ html.light .cal-day { background: #ededf5; }
   text-decoration: none;
 }
 
-/* Nav adjustments for 6 tabs */
-.nav-btn { font-size: 0.57rem; padding: 5px 2px 7px; }
-.nav-btn svg { width: 20px; height: 20px; }
-.nav-icon-bg { width: 38px; height: 26px; }
+/* Nav adjustments for 6 tabs — icons only */
+.nav-btn { font-size: 0; padding: 4px 2px; }
+.nav-btn svg { width: 22px; height: 22px; }
+.nav-icon-bg { width: 44px; height: 38px; border-radius: 14px; }
 
 /* ===== RESPONSIVE ===== */
 @media (min-width: 430px) {
