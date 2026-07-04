@@ -10,12 +10,12 @@ from services.prices import get_all_prices
 from services.sheets import get_finance_data, get_raw_transactions, delete_transaction, post_transaction
 from services.auth import verify_google_token, create_jwt, get_current_user
 from services.users import get_user, ensure_user
-from services.db import get_pool
+from services.db import init_pool
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await get_pool()
+    init_pool()
     yield
 
 

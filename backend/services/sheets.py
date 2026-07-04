@@ -1,9 +1,9 @@
 from datetime import date as date_type
 from fastapi import HTTPException
-from .db import get_pool
+from .db import db_cursor, run_in_thread
 
 
-# ── Helpers (lógica de negocio pura, sin I/O) ─────────────────────────────────
+# ── Helpers (lógica pura, sin I/O) ────────────────────────────────────────────
 
 def _month_index(date_str: str) -> int | None:
     try:
@@ -130,15 +130,18 @@ def _build_finance(rows: list[dict]) -> dict:
     return result
 
 
-# ── I/O (PostgreSQL) ──────────────────────────────────────────────────────────
+# ── I/O (PostgreSQL via psycopg2) ─────────────────────────────────────────────
 
 async def get_finance_data(email: str) -> dict:
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT id, fecha::text, tipo, concepto, importe FROM transactions WHERE user_email = $1 ORDER BY fecha, id",
-            email,
-        )
+    def _q():
+        with db_cursor() as cur:
+            cur.execute(
+                "SELECT id, fecha::text, tipo, concepto, importe FROM transactions WHERE user_email = %s ORDER BY fecha, id",
+                (email,),
+            )
+            return cur.fetchall()
+
+    rows = await run_in_thread(_q)
 
     if not rows:
         return {
@@ -161,32 +164,41 @@ async def get_finance_data(email: str) -> dict:
 
 
 async def delete_transaction(row_index: int, email: str = "") -> dict:
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        result = await conn.execute(
-            "DELETE FROM transactions WHERE id = $1 AND user_email = $2",
-            row_index, email,
-        )
-    if result == "DELETE 0":
+    def _q():
+        with db_cursor() as cur:
+            cur.execute(
+                "DELETE FROM transactions WHERE id = %s AND user_email = %s",
+                (row_index, email),
+            )
+            return cur.rowcount
+
+    deleted = await run_in_thread(_q)
+    if deleted == 0:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
     return {"status": "ok", "deleted": row_index}
 
 
 async def post_transaction(importe: float, tipo: str, concepto: str, email: str = "", source: str = "shortcut") -> dict:
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "INSERT INTO transactions (user_email, tipo, concepto, importe) VALUES ($1, $2, $3, $4) RETURNING id, fecha::text",
-            email, tipo, concepto, importe,
-        )
+    def _q():
+        with db_cursor() as cur:
+            cur.execute(
+                "INSERT INTO transactions (user_email, tipo, concepto, importe) VALUES (%s, %s, %s, %s) RETURNING id, fecha::text",
+                (email, tipo, concepto, importe),
+            )
+            return cur.fetchone()
+
+    row = await run_in_thread(_q)
     return {"status": "ok", "id": row["id"], "fecha": row["fecha"]}
 
 
 async def get_raw_transactions(email: str = "") -> dict:
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT id, fecha::text, tipo, concepto, importe FROM transactions WHERE user_email = $1 ORDER BY fecha DESC, id DESC LIMIT 100",
-            email,
-        )
+    def _q():
+        with db_cursor() as cur:
+            cur.execute(
+                "SELECT id, fecha::text, tipo, concepto, importe FROM transactions WHERE user_email = %s ORDER BY fecha DESC, id DESC LIMIT 100",
+                (email,),
+            )
+            return cur.fetchall()
+
+    rows = await run_in_thread(_q)
     return {"data": [dict(r) for r in rows]}
