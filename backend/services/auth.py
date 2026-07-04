@@ -2,53 +2,50 @@ import os
 import httpx
 from datetime import datetime, timedelta
 from fastapi import HTTPException, Header
-from jose import jwt, JWTError
+from jose import jwt as jose_jwt, JWTError
+import jwt as pyjwt
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
 
-GOOGLE_CLIENT_ID  = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CERTS_URL  = "https://www.googleapis.com/oauth2/v1/certs"
-JWT_SECRET        = os.getenv("JWT_SECRET", "dev-secret-change-in-production")
-JWT_ALGORITHM     = "HS256"
-JWT_EXPIRE_DAYS   = 30
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CERTS_URL = "https://www.googleapis.com/oauth2/v1/certs"
+JWT_SECRET       = os.getenv("JWT_SECRET", "dev-secret-change-in-production")
+JWT_ALGORITHM    = "HS256"
+JWT_EXPIRE_DAYS  = 30
 
 
 async def verify_google_token(token: str) -> dict:
-    """Verifica un Google ID token usando httpx + python-jose (sin google-auth)."""
+    """Verifica un Google ID token usando PyJWT + cryptography."""
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             res = await client.get(GOOGLE_CERTS_URL)
-            certs = res.json()  # {"kid": "-----BEGIN CERTIFICATE-----..."}
+            certs = res.json()
 
-        header  = jwt.get_unverified_header(token)
+        header   = pyjwt.get_unverified_header(token)
         cert_str = certs.get(header.get("kid"))
         if not cert_str:
             raise HTTPException(status_code=401, detail="Certificado de Google no encontrado")
 
-        # Extraer clave pública RSA del certificado X.509
-        cert_obj    = x509.load_pem_x509_certificate(cert_str.encode(), default_backend())
-        pub_key_pem = cert_obj.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        ).decode()
+        cert_obj   = x509.load_pem_x509_certificate(cert_str.encode(), default_backend())
+        public_key = cert_obj.public_key()
 
-        payload = jwt.decode(
+        payload = pyjwt.decode(
             token,
-            pub_key_pem,
+            public_key,
             algorithms=["RS256"],
             audience=GOOGLE_CLIENT_ID,
-            issuer=["accounts.google.com", "https://accounts.google.com"],
         )
         return {
             "email":   payload["email"],
             "name":    payload.get("name", ""),
             "picture": payload.get("picture", ""),
         }
+    except pyjwt.exceptions.PyJWTError as e:
+        raise HTTPException(status_code=401, detail=f"Token Google inválido: {e}")
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Token Google inválido: {e}")
+        raise HTTPException(status_code=401, detail=f"Error verificando token: {e}")
 
 
 def create_jwt(email: str) -> str:
@@ -56,7 +53,7 @@ def create_jwt(email: str) -> str:
         "sub": email,
         "exp": datetime.utcnow() + timedelta(days=JWT_EXPIRE_DAYS),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jose_jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
 def get_current_user(authorization: str = Header(default="")) -> str:
@@ -65,7 +62,7 @@ def get_current_user(authorization: str = Header(default="")) -> str:
         raise HTTPException(status_code=401, detail="Authorization header requerido")
     token = authorization.removeprefix("Bearer ").strip()
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jose_jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return payload["sub"]
     except JWTError:
         raise HTTPException(status_code=401, detail="Token de sesión inválido o expirado")
