@@ -1,4 +1,58 @@
 import { useSettings, ACCENTS } from '../../context/SettingsContext'
+
+const THEMES = [
+  {
+    id: 'dark',
+    name: 'Oscuro',
+    emoji: '🌙',
+    bg: '#07070f', surface: '#111120', accent: '#6366f1', bar: '#22c55e',
+  },
+  {
+    id: 'light',
+    name: 'Claro',
+    emoji: '☀️',
+    bg: '#f0f0f8', surface: '#ffffff', accent: '#6366f1', bar: '#22c55e',
+  },
+  {
+    id: 'pastel',
+    name: 'Pastel',
+    emoji: '🌸',
+    bg: '#faf7ff', surface: '#ffffff', accent: '#b088f9', bar: '#86efac',
+  },
+  {
+    id: 'auto',
+    name: 'Auto',
+    emoji: '⚙️',
+    bg: '#888', surface: '#aaa', accent: '#6366f1', bar: '#22c55e',
+  },
+]
+
+function ThemeCard({ theme, selected, onSelect }) {
+  const isAuto = theme.id === 'auto'
+  return (
+    <button
+      className={`theme-card${selected ? ' active' : ''}`}
+      onClick={() => onSelect(theme.id)}
+    >
+      <div className="theme-card-preview" style={{ background: isAuto ? 'linear-gradient(135deg, #111120 50%, #f0f0f8 50%)' : theme.bg }}>
+        <div className="theme-card-preview-surface" style={{ background: isAuto ? 'transparent' : theme.surface }}>
+          <div className="theme-card-preview-bar" style={{ background: isAuto ? '#6366f1' : theme.accent, width: '65%' }} />
+          <div className="theme-card-preview-bar" style={{ background: isAuto ? '#22c55e' : theme.bar, width: '40%', opacity: 0.7 }} />
+          <div className="theme-card-preview-bar" style={{ background: isAuto ? '#6366f1' : theme.accent, width: '80%', opacity: 0.4 }} />
+        </div>
+      </div>
+      <div className="theme-card-label">
+        <span className="theme-card-emoji">{theme.emoji}</span>
+        <span className="theme-card-name">{theme.name}</span>
+        {selected && (
+          <svg className="theme-card-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M3 8l3.5 3.5L13 5"/>
+          </svg>
+        )}
+      </div>
+    </button>
+  )
+}
 import { useBudget } from '../../hooks/useBudget'
 import { useFinanceData } from '../../context/FinanceDataContext'
 
@@ -90,18 +144,20 @@ export default function SettingsTab() {
   return (
     <div className="tab-panel">
 
+      <Section title="Temas">
+        <div className="theme-grid">
+          {THEMES.map(t => (
+            <ThemeCard
+              key={t.id}
+              theme={t}
+              selected={settings.theme === t.id}
+              onSelect={v => update('theme', v)}
+            />
+          ))}
+        </div>
+      </Section>
+
       <Section title="Apariencia">
-        <Row icon="🌗" label="Tema">
-          <Segmented
-            value={settings.theme}
-            onChange={v => update('theme', v)}
-            options={[
-              { value: 'dark',  label: '🌙 Oscuro' },
-              { value: 'light', label: '☀️ Claro'  },
-              { value: 'auto',  label: '⚙️ Auto'   },
-            ]}
-          />
-        </Row>
         <Row icon="🎨" label="Color de acento" last>
           <div className="accent-swatches">
             {ACCENTS.map(a => (

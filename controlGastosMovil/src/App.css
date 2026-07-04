@@ -733,6 +733,109 @@ html, body, #root {
 }
 .inv-extra-meta strong { color: var(--text2); font-weight: 600; }
 
+/* ===== PASTEL THEME ===== */
+html.pastel {
+  --bg:           #faf7ff;
+  --bg2:          #f2eeff;
+  --surface:      #ffffff;
+  --surface2:     #ede8ff;
+  --border:       rgba(176,136,249,0.18);
+  --border2:      rgba(176,136,249,0.32);
+  --accent:       #9b72f5;
+  --accent-dim:   rgba(155,114,245,0.12);
+  --green:        #16a34a;
+  --green-dim:    rgba(22,163,74,0.1);
+  --red:          #dc2626;
+  --red-dim:      rgba(220,38,38,0.1);
+  --orange:       #d97706;
+  --orange-dim:   rgba(217,119,6,0.1);
+  --purple:       #a78bfa;
+  --text:         #2d1b69;
+  --text2:        #6b4fc9;
+  --text3:        #a090cc;
+  --shadow:       0 8px 32px rgba(155,114,245,0.12);
+  --shadow-sm:    0 2px 12px rgba(155,114,245,0.08);
+}
+html.pastel body,
+html.pastel #root { background: var(--bg); color: var(--text); }
+
+/* Nav */
+html.pastel .bottom-nav { background: rgba(250,247,255,0.96); border-top: 1px solid var(--border); }
+
+/* Modals */
+html.pastel .modal-sheet  { background: #ffffff; }
+html.pastel .detail-sheet { background: #faf7ff; }
+
+/* Hero cards — gradiente pastel suave */
+html.pastel .hero-card {
+  background: linear-gradient(145deg, #ede0ff 0%, #e6d8ff 60%, #eedaff 100%);
+  border-color: rgba(155,114,245,0.25);
+}
+html.pastel .hero-card::after {
+  background: radial-gradient(circle, rgba(155,114,245,0.2) 0%, transparent 65%);
+}
+html.pastel .hero-month-label { color: rgba(45,27,105,0.5); }
+html.pastel .hero-balance-label { color: rgba(45,27,105,0.4); }
+html.pastel .hero-stats { background: rgba(155,114,245,0.08); }
+html.pastel .hero-stat { background: rgba(255,255,255,0.35); }
+html.pastel .hero-stat-label { color: rgba(45,27,105,0.45); }
+
+/* Year hero */
+html.pastel .year-hero {
+  background: linear-gradient(145deg, #ddfff0 0%, #d5ffe8 60%, #e0fff3 100%);
+  border-color: rgba(22,163,74,0.2);
+}
+html.pastel .year-hero::after {
+  background: radial-gradient(circle, rgba(22,163,74,0.15) 0%, transparent 65%);
+}
+html.pastel .year-hero-title { color: rgba(45,27,105,0.4); }
+html.pastel .year-hero-balance { color: #16a34a; }
+html.pastel .year-hero-stat { background: rgba(255,255,255,0.4); }
+html.pastel .year-hero-stat-label { color: rgba(45,27,105,0.4); }
+
+/* Budget hero */
+html.pastel .bgt-hero {
+  background: linear-gradient(145deg, #ede0ff 0%, #f2eaff 100%);
+  border-color: rgba(155,114,245,0.2);
+}
+html.pastel .bgt-bar-bg { background: rgba(155,114,245,0.1); }
+
+/* Charts / tooltips */
+html.pastel .chart-tooltip { background: #ffffff; border-color: rgba(0,0,0,0.1); color: var(--text); }
+html.pastel .tt-title { color: var(--text); }
+html.pastel .tt-row   { color: var(--text2); }
+
+/* Text fixes */
+html.pastel .saving-month,
+html.pastel .saving-pct    { color: var(--text2); }
+html.pastel .legend-name   { color: var(--text2); }
+html.pastel .legend-pct    { color: var(--text3); }
+html.pastel .legend-amount { color: var(--text); }
+html.pastel .donut-label   { color: var(--text3); }
+html.pastel .donut-value   { color: var(--text); }
+html.pastel .top-name,
+html.pastel .top-amount,
+html.pastel .breakdown-name,
+html.pastel .breakdown-amount { color: var(--text); }
+html.pastel .breakdown-pct    { color: var(--text3); }
+html.pastel .concept-name     { color: var(--text); }
+html.pastel .concept-icon-wrap { background: var(--surface2); }
+html.pastel .mt-cell           { color: var(--text2); }
+html.pastel .mt-cell:first-child { color: var(--text); }
+
+/* Settings */
+html.pastel .s-segmented   { background: var(--surface2); border-color: var(--border); }
+html.pastel .s-seg-btn     { color: var(--text3); }
+html.pastel .s-seg-btn.active { background: white; color: var(--text); }
+html.pastel .s-toggle      { background: var(--surface2); }
+html.pastel .s-action-btn  { background: var(--surface2); color: var(--text2); border-color: var(--border2); }
+html.pastel .s-api-input   { background: var(--surface2); border-color: var(--border2); color: var(--text); }
+html.pastel .api-key-info  { border-color: var(--border); }
+html.pastel .api-key-ok    { border-color: var(--border); color: #16a34a; }
+
+/* Calendar */
+html.pastel .cal-day { background: #ede8ff; }
+
 /* ===== LIGHT THEME ===== */
 html.light {
   --bg:       #f0f0f8;
@@ -1477,6 +1580,73 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
 }
 
 /* ===== SETTINGS ===== */
+
+/* Theme selector cards */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 14px 14px 16px;
+}
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.theme-card:active { transform: scale(0.94); }
+.theme-card.active { border-color: var(--accent); }
+
+.theme-card-preview {
+  width: 100%;
+  aspect-ratio: 3/4;
+  padding: 6px;
+  display: flex;
+  align-items: flex-end;
+}
+.theme-card-preview-surface {
+  width: 100%;
+  padding: 5px 4px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(255,255,255,0.15);
+}
+.theme-card-preview-bar {
+  height: 3px;
+  border-radius: 10px;
+}
+
+.theme-card-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 4px 6px;
+  background: var(--surface2);
+}
+.theme-card-emoji { font-size: 0.7rem; }
+.theme-card-name  {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text2);
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.theme-card.active .theme-card-name { color: var(--accent); }
+.theme-card-check {
+  width: 12px; height: 12px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
 
 .settings-section { margin-bottom: 20px; }
 

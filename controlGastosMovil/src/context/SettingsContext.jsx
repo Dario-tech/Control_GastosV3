@@ -46,21 +46,22 @@ export function SettingsProvider({ children }) {
     })
   }
 
-  // Apply/remove .light class on <html>
+  // Apply theme class on <html>
   useEffect(() => {
     const root = document.documentElement
+    root.classList.remove('light', 'pastel')
+
     if (settings.theme === 'light') {
       root.classList.add('light')
-      return
-    }
-    if (settings.theme === 'auto') {
+    } else if (settings.theme === 'pastel') {
+      root.classList.add('pastel')
+    } else if (settings.theme === 'auto') {
       const mq = window.matchMedia('(prefers-color-scheme: light)')
       const apply = () => mq.matches ? root.classList.add('light') : root.classList.remove('light')
       apply()
       mq.addEventListener('change', apply)
       return () => mq.removeEventListener('change', apply)
     }
-    root.classList.remove('light')
   }, [settings.theme])
 
   // Apply accent color as CSS variable
