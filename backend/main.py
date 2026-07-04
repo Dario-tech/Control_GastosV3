@@ -38,7 +38,7 @@ class GoogleLoginIn(BaseModel):
 async def auth_login(body: GoogleLoginIn):
     """Recibe el ID token de Google, lo verifica y devuelve un JWT de sesión.
     Si el usuario es nuevo (sin Sheet), needs_setup=True — el frontend muestra la pantalla de configuración."""
-    google_user = verify_google_token(body.token)
+    google_user = await verify_google_token(body.token)
     email       = google_user["email"]
     user_info   = await get_user(email)
     session_token = create_jwt(email)
