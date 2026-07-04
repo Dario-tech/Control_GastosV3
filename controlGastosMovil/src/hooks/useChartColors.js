@@ -9,11 +9,15 @@ export function useChartColors() {
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-color-scheme: light)').matches)
 
+  const isPastel = settings.theme === 'pastel'
+
   return {
-    tick:      isLight ? '#505070' : '#8c94b0',
-    grid:      isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.05)',
-    refLine:   isLight ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.15)',
-    cursor:    isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)',
-    tooltip:   isLight ? '#f4f4fb' : undefined,
+    tick:         isLight || isPastel ? '#505070' : '#8c94b0',
+    grid:         isLight || isPastel ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.05)',
+    refLine:      isLight || isPastel ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.15)',
+    cursor:       isLight || isPastel ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)',
+    tooltip:      isLight || isPastel ? '#f4f4fb' : undefined,
+    incomeColor:  isPastel ? '#34d399' : '#22c55e',
+    expenseColor: isPastel ? '#fb7185' : '#f43f5e',
   }
 }

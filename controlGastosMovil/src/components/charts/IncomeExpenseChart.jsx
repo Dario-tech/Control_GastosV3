@@ -22,7 +22,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function IncomeExpenseChart({ data: financeData }) {
-  const { tick, grid, cursor } = useChartColors()
+  const { tick, grid, cursor, incomeColor, expenseColor } = useChartColors()
   const data = getChartData(financeData).map(d => ({ ...d, monthLabel: MONTH_SHORT[d.month] }))
 
   return (
@@ -46,8 +46,8 @@ export default function IncomeExpenseChart({ data: financeData }) {
           wrapperStyle={{ fontSize: 11, color: tick, paddingTop: 8 }}
           formatter={(value) => value === 'income' ? 'Ingresos' : 'Gastos'}
         />
-        <Bar dataKey="income"   name="income"   fill="#22c55e" radius={[4,4,0,0]} maxBarSize={28} />
-        <Bar dataKey="expenses" name="expenses" fill="#f43f5e" radius={[4,4,0,0]} maxBarSize={28} />
+        <Bar dataKey="income"   name="income"   fill={incomeColor}  radius={[4,4,0,0]} maxBarSize={28} />
+        <Bar dataKey="expenses" name="expenses" fill={expenseColor} radius={[4,4,0,0]} maxBarSize={28} />
       </BarChart>
     </ResponsiveContainer>
   )

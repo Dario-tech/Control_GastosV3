@@ -743,12 +743,12 @@ html.pastel {
   --border2:      rgba(176,136,249,0.32);
   --accent:       #9b72f5;
   --accent-dim:   rgba(155,114,245,0.12);
-  --green:        #16a34a;
-  --green-dim:    rgba(22,163,74,0.1);
-  --red:          #dc2626;
-  --red-dim:      rgba(220,38,38,0.1);
-  --orange:       #d97706;
-  --orange-dim:   rgba(217,119,6,0.1);
+  --green:        #34d399;
+  --green-dim:    rgba(52,211,153,0.15);
+  --red:          #fb7185;
+  --red-dim:      rgba(251,113,133,0.15);
+  --orange:       #fbbf24;
+  --orange-dim:   rgba(251,191,36,0.15);
   --purple:       #a78bfa;
   --text:         #2d1b69;
   --text2:        #6b4fc9;
@@ -831,7 +831,7 @@ html.pastel .s-toggle      { background: var(--surface2); }
 html.pastel .s-action-btn  { background: var(--surface2); color: var(--text2); border-color: var(--border2); }
 html.pastel .s-api-input   { background: var(--surface2); border-color: var(--border2); color: var(--text); }
 html.pastel .api-key-info  { border-color: var(--border); }
-html.pastel .api-key-ok    { border-color: var(--border); color: #16a34a; }
+html.pastel .api-key-ok    { border-color: var(--border); color: var(--green); }
 
 /* Calendar */
 html.pastel .cal-day { background: #ede8ff; }
