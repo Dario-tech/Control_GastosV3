@@ -1,10 +1,11 @@
-import { Component } from 'react'
+import { Component, useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppProvider, useApp } from './context/AppContext'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
 import { FinanceDataProvider } from './context/FinanceDataContext'
 import Header from './components/layout/Header'
 import BottomNav from './components/layout/BottomNav'
+import ProfilePanel from './components/layout/ProfilePanel'
 import Toast from './components/ui/Toast'
 import LoginScreen from './components/auth/LoginScreen'
 import SetupScreen from './components/auth/SetupScreen'
@@ -13,7 +14,6 @@ import MonthTab from './components/tabs/MonthTab'
 import StatsTab from './components/tabs/StatsTab'
 import InvestmentsTab from './components/tabs/InvestmentsTab'
 import BudgetTab from './components/tabs/BudgetTab'
-import SettingsTab from './components/tabs/SettingsTab'
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -41,10 +41,11 @@ class ErrorBoundary extends Component {
 function AppContent() {
   const { activeTab } = useApp()
   const { settings }  = useSettings()
+  const [profileOpen, setProfileOpen] = useState(false)
 
   return (
     <div className={`app${settings.hideAmounts ? ' hide-amounts' : ''}`}>
-      <Header />
+      <Header onAvatarClick={() => setProfileOpen(true)} />
       <main className="main">
         <ErrorBoundary>
           {activeTab === 'year'        && <YearTab />}
@@ -52,11 +53,11 @@ function AppContent() {
           {activeTab === 'stats'       && <StatsTab />}
           {activeTab === 'investments' && <InvestmentsTab />}
           {activeTab === 'budget'      && <BudgetTab />}
-          {activeTab === 'settings'    && <SettingsTab />}
         </ErrorBoundary>
       </main>
       <BottomNav />
       <Toast />
+      <ProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   )
 }
