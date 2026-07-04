@@ -3,6 +3,7 @@ import Card from '../ui/Card'
 import ConceptList from '../ui/ConceptList'
 import DonutChart from '../charts/DonutChart'
 import TransactionLogModal from '../ui/TransactionLogModal'
+import DayHeatmap from '../ui/DayHeatmap'
 import { useApp } from '../../context/AppContext'
 import { getMonthStats, getActiveMonths, fmt } from '../../utils'
 import { MONTH_NAMES } from '../../data/mockData'
@@ -62,6 +63,11 @@ export default function MonthTab() {
       {/* Distribución */}
       <Card title="Distribución de gastos" noPad>
         <DonutChart fixed={stats.fixed} variable={stats.variable} />
+      </Card>
+
+      {/* Actividad diaria */}
+      <Card title="Actividad diaria" noPad>
+        <DayHeatmap monthIndex={selectedMonth} year={data.year || new Date().getFullYear()} />
       </Card>
 
       {/* Conceptos */}
