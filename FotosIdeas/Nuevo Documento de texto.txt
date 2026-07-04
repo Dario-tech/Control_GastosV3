@@ -1,0 +1,2 @@
+- Permitir registrar un gasto que se te ha olvidado desde la aplicación
+- Cuando añada más usuarios y vea que todo funciona, puedo añadir presupuestos compartidos para ir de viaje. Intentar NO coger la temática de tricount

@@ -11,12 +11,13 @@ APPS_SCRIPT_URL = os.getenv(
 )
 
 
-async def _fetch_raw() -> dict:
+async def _fetch_raw(sheet_url: str = "") -> dict:
+    url = sheet_url or APPS_SCRIPT_URL
     last_err = None
     for attempt in range(3):
         try:
             async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                res = await client.get(APPS_SCRIPT_URL)
+                res = await client.get(url)
                 res.raise_for_status()
             return res.json()
         except Exception as e:
@@ -174,8 +175,8 @@ def _build_finance(rows: list[dict]) -> dict:
     return result
 
 
-async def get_finance_data() -> dict:
-    raw  = await _fetch_raw()
+async def get_finance_data(sheet_url: str = "") -> dict:
+    raw  = await _fetch_raw(sheet_url)
     rows = raw.get("data", [])
 
     if not rows:
@@ -191,29 +192,22 @@ async def get_finance_data() -> dict:
     return _build_finance(rows)
 
 
-async def delete_transaction(row_index: int) -> dict:
+async def delete_transaction(row_index: int, sheet_url: str = "") -> dict:
+    url = sheet_url or APPS_SCRIPT_URL
     async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-        res = await client.post(
-            APPS_SCRIPT_URL,
-            json={"method": "delete", "rowIndex": row_index},
-        )
+        res = await client.post(url, json={"method": "delete", "rowIndex": row_index})
         res.raise_for_status()
     return res.json()
 
 
-async def post_transaction(importe: float, tipo: str, concepto: str, source: str = "shortcut") -> dict:
-    """Escribe una transacción en Google Sheets vía Apps Script."""
-    body = {
-        "importe":  importe,
-        "tipo":     tipo,
-        "concepto": concepto,
-        "source":   source,
-    }
+async def post_transaction(importe: float, tipo: str, concepto: str, sheet_url: str = "", source: str = "shortcut") -> dict:
+    url = sheet_url or APPS_SCRIPT_URL
+    body = {"importe": importe, "tipo": tipo, "concepto": concepto, "source": source}
     async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-        res = await client.post(APPS_SCRIPT_URL, json=body)
+        res = await client.post(url, json=body)
         res.raise_for_status()
     return res.json()
 
 
-async def get_raw_transactions() -> dict:
-    return await _fetch_raw()
+async def get_raw_transactions(sheet_url: str = "") -> dict:
+    return await _fetch_raw(sheet_url)

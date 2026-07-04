@@ -1,10 +1,13 @@
 import { Component } from 'react'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppProvider, useApp } from './context/AppContext'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
 import { FinanceDataProvider } from './context/FinanceDataContext'
 import Header from './components/layout/Header'
 import BottomNav from './components/layout/BottomNav'
 import Toast from './components/ui/Toast'
+import LoginScreen from './components/auth/LoginScreen'
+import SetupScreen from './components/auth/SetupScreen'
 import YearTab from './components/tabs/YearTab'
 import MonthTab from './components/tabs/MonthTab'
 import StatsTab from './components/tabs/StatsTab'
@@ -58,14 +61,25 @@ function AppContent() {
   )
 }
 
+function AuthGate() {
+  const { user } = useAuth()
+  if (!user)             return <LoginScreen />
+  if (user.needsSetup)   return <SetupScreen />
+  return (
+    <FinanceDataProvider>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </FinanceDataProvider>
+  )
+}
+
 export default function App() {
   return (
-    <SettingsProvider>
-      <FinanceDataProvider>
-        <AppProvider>
-          <AppContent />
-        </AppProvider>
-      </FinanceDataProvider>
-    </SettingsProvider>
+    <AuthProvider>
+      <SettingsProvider>
+        <AuthGate />
+      </SettingsProvider>
+    </AuthProvider>
   )
 }

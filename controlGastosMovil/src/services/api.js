@@ -1,4 +1,15 @@
-const BASE = import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com'
+const BASE   = import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com'
+const LS_KEY = 'mi-economia-auth-v1'
+
+function authHeaders() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(LS_KEY))
+    if (stored?.sessionToken) {
+      return { Authorization: `Bearer ${stored.sessionToken}` }
+    }
+  } catch { /* no-op */ }
+  return {}
+}
 
 export async function fetchPrices() {
   const res = await fetch(`${BASE}/api/investments/prices`, { signal: AbortSignal.timeout(15000) })
@@ -7,15 +18,19 @@ export async function fetchPrices() {
 }
 
 export async function fetchFinanceData() {
-  const res = await fetch(`${BASE}/api/finance`, { signal: AbortSignal.timeout(15000) })
+  const res = await fetch(`${BASE}/api/finance`, {
+    headers: authHeaders(),
+    signal:  AbortSignal.timeout(15000),
+  })
   if (!res.ok) throw new Error(`API ${res.status}`)
   return res.json()
 }
 
 export async function deleteTransaction(rowIndex) {
   const res = await fetch(`${BASE}/api/transactions/${rowIndex}`, {
-    method: 'DELETE',
-    signal: AbortSignal.timeout(15000),
+    method:  'DELETE',
+    headers: authHeaders(),
+    signal:  AbortSignal.timeout(15000),
   })
   if (!res.ok) throw new Error(`Delete ${res.status}`)
   return res.json()
