@@ -121,7 +121,7 @@ async def notify_update():
 @app.get("/api/finance")
 async def finance_data(email: str = Depends(get_current_user)):
     try:
-        sheet_url = get_user_sheet_url(email)
+        sheet_url = await get_user_sheet_url(email)
         return await get_finance_data(sheet_url)
     except HTTPException:
         raise
@@ -132,7 +132,7 @@ async def finance_data(email: str = Depends(get_current_user)):
 @app.delete("/api/transactions/{row_index}")
 async def delete_transaction_endpoint(row_index: int, email: str = Depends(get_current_user)):
     try:
-        sheet_url = get_user_sheet_url(email)
+        sheet_url = await get_user_sheet_url(email)
         return await delete_transaction(row_index, sheet_url)
     except HTTPException:
         raise
@@ -160,7 +160,7 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
         raise HTTPException(status_code=422, detail=f"Body inválido: {e}")
 
     try:
-        sheet_url = get_user_sheet_url(email)
+        sheet_url = await get_user_sheet_url(email)
         result = await post_transaction(tx.importe, tx.tipo, tx.concepto, sheet_url, tx.source)
     except HTTPException:
         raise
@@ -186,7 +186,7 @@ async def investment_prices():
 @app.get("/api/debug/transactions")
 async def debug_transactions(email: str = Depends(get_current_user)):
     try:
-        sheet_url = get_user_sheet_url(email)
+        sheet_url = await get_user_sheet_url(email)
         return await get_raw_transactions(sheet_url)
     except HTTPException:
         raise
