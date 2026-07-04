@@ -23,29 +23,10 @@ export function AuthProvider({ children }) {
       throw new Error(err.detail || 'Login fallido')
     }
     const data   = await res.json()
-    const stored = { ...data.user, sessionToken: data.session_token, needsSetup: data.needs_setup }
+    const stored = { ...data.user, sessionToken: data.session_token }
     localStorage.setItem(LS_KEY, JSON.stringify(stored))
     setUser(stored)
     return stored
-  }
-
-  async function registerSheet(sheetUrl) {
-    const stored = loadStored()
-    const res = await fetch(`${BASE}/api/auth/register`, {
-      method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${stored?.sessionToken}`,
-      },
-      body: JSON.stringify({ sheet_url: sheetUrl }),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err.detail || 'Error al guardar configuración')
-    }
-    const updated = { ...stored, needsSetup: false }
-    localStorage.setItem(LS_KEY, JSON.stringify(updated))
-    setUser(updated)
   }
 
   function logout() {
@@ -54,7 +35,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthCtx.Provider value={{ user, loginWithGoogle, registerSheet, logout }}>
+    <AuthCtx.Provider value={{ user, loginWithGoogle, logout }}>
       {children}
     </AuthCtx.Provider>
   )

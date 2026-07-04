@@ -1,36 +1,24 @@
-import os
-import httpx
 from fastapi import HTTPException
-
-USERS_SHEET_URL = os.getenv("USERS_SHEET_URL", "")
+from .db import get_pool
 
 
 async def get_user(email: str) -> dict | None:
-    """Busca un usuario en el Sheet de usuarios. Devuelve None si no existe."""
-    if not USERS_SHEET_URL:
-        raise HTTPException(status_code=500, detail="USERS_SHEET_URL no configurado")
-    async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
-        res = await client.get(USERS_SHEET_URL, params={"email": email})
-        res.raise_for_status()
-    data = res.json()
-    return data if data.get("found") else None
-
-
-async def register_user(email: str, name: str, sheet_url: str) -> dict:
-    """Añade o actualiza un usuario en el Sheet de usuarios."""
-    if not USERS_SHEET_URL:
-        raise HTTPException(status_code=500, detail="USERS_SHEET_URL no configurado")
-    async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
-        res = await client.post(
-            USERS_SHEET_URL,
-            json={"email": email, "name": name, "sheet_url": sheet_url},
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT email, name FROM users WHERE email = $1", email
         )
-        res.raise_for_status()
-    return res.json()
+    return dict(row) if row else None
 
 
-async def get_user_sheet_url(email: str) -> str:
-    user = await get_user(email)
-    if not user or not user.get("sheet_url"):
-        raise HTTPException(status_code=403, detail="Usuario sin Sheet configurado")
-    return user["sheet_url"]
+async def ensure_user(email: str, name: str) -> dict:
+    """Crea el usuario si no existe; actualiza el nombre si ya existe."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """INSERT INTO users (email, name) VALUES ($1, $2)
+               ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+               RETURNING email, name""",
+            email, name,
+        )
+    return dict(row)

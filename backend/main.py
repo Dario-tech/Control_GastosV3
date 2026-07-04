@@ -1,6 +1,7 @@
 import os
 import asyncio
 import json as json_lib
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -8,9 +9,17 @@ from pydantic import BaseModel
 from services.prices import get_all_prices
 from services.sheets import get_finance_data, get_raw_transactions, delete_transaction, post_transaction
 from services.auth import verify_google_token, create_jwt, get_current_user
-from services.users import get_user, get_user_sheet_url, register_user
+from services.users import get_user, ensure_user
+from services.db import get_pool
 
-app = FastAPI(title="Control Gastos API", version="2.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await get_pool()
+    yield
+
+
+app = FastAPI(title="Control Gastos API", version="3.0.0", lifespan=lifespan)
 
 _raw_origins = os.getenv(
     "CORS_ORIGINS",
@@ -36,42 +45,27 @@ class GoogleLoginIn(BaseModel):
 
 @app.post("/api/auth/login")
 async def auth_login(body: GoogleLoginIn):
-    """Recibe el ID token de Google, lo verifica y devuelve un JWT de sesión.
-    Si el usuario es nuevo (sin Sheet), needs_setup=True — el frontend muestra la pantalla de configuración."""
-    google_user = await verify_google_token(body.token)
-    email       = google_user["email"]
-    user_info   = await get_user(email)
+    """Verifica el token de Google y auto-registra al usuario si es nuevo."""
+    google_user   = await verify_google_token(body.token)
+    email         = google_user["email"]
+    name          = google_user.get("name") or email.split("@")[0]
+    await ensure_user(email, name)
     session_token = create_jwt(email)
     return {
         "session_token": session_token,
-        "needs_setup": user_info is None,
+        "needs_setup":   False,
         "user": {
             "email":   email,
-            "name":    google_user.get("name") or (user_info or {}).get("name", ""),
+            "name":    name,
             "picture": google_user.get("picture", ""),
         },
     }
 
 
-class RegisterIn(BaseModel):
-    sheet_url: str
-
-
-@app.post("/api/auth/register")
-async def auth_register(body: RegisterIn, email: str = Depends(get_current_user)):
-    """Guarda el Sheet URL del usuario nuevo en el Sheet de usuarios."""
-    if not body.sheet_url.startswith("https://script.google.com"):
-        raise HTTPException(status_code=400, detail="URL de Apps Script inválida")
-    user_info = await get_user(email)
-    name = (user_info or {}).get("name", email.split("@")[0])
-    result = await register_user(email, name, body.sheet_url)
-    return {"status": result.get("status"), "email": email}
-
-
 @app.get("/api/auth/me")
 async def auth_me(email: str = Depends(get_current_user)):
     user = await get_user(email)
-    return {"email": email, "needs_setup": user is None, "name": (user or {}).get("name", "")}
+    return {"email": email, "name": (user or {}).get("name", "")}
 
 
 # ── SSE ───────────────────────────────────────────────────────────────────────
@@ -121,8 +115,7 @@ async def notify_update():
 @app.get("/api/finance")
 async def finance_data(email: str = Depends(get_current_user)):
     try:
-        sheet_url = await get_user_sheet_url(email)
-        return await get_finance_data(sheet_url)
+        return await get_finance_data(email)
     except HTTPException:
         raise
     except Exception as e:
@@ -132,8 +125,7 @@ async def finance_data(email: str = Depends(get_current_user)):
 @app.delete("/api/transactions/{row_index}")
 async def delete_transaction_endpoint(row_index: int, email: str = Depends(get_current_user)):
     try:
-        sheet_url = await get_user_sheet_url(email)
-        return await delete_transaction(row_index, sheet_url)
+        return await delete_transaction(row_index, email)
     except HTTPException:
         raise
     except Exception as e:
@@ -149,7 +141,6 @@ class TransactionIn(BaseModel):
 
 @app.post("/api/transaction")
 async def add_transaction(request: Request, email: str = Depends(get_current_user)):
-    """Recibe una transacción del Atajo iOS, la escribe en el Sheet del usuario y notifica via SSE."""
     raw = await request.body()
     try:
         data = json_lib.loads(raw)
@@ -160,12 +151,11 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
         raise HTTPException(status_code=422, detail=f"Body inválido: {e}")
 
     try:
-        sheet_url = await get_user_sheet_url(email)
-        result = await post_transaction(tx.importe, tx.tipo, tx.concepto, sheet_url, tx.source)
+        result = await post_transaction(tx.importe, tx.tipo, tx.concepto, email, tx.source)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error al escribir en Sheets: {e}")
+        raise HTTPException(status_code=502, detail=f"Error al escribir en la base de datos: {e}")
 
     await _broadcast()
     return result
@@ -186,8 +176,7 @@ async def investment_prices():
 @app.get("/api/debug/transactions")
 async def debug_transactions(email: str = Depends(get_current_user)):
     try:
-        sheet_url = await get_user_sheet_url(email)
-        return await get_raw_transactions(sheet_url)
+        return await get_raw_transactions(email)
     except HTTPException:
         raise
     except Exception as e:
