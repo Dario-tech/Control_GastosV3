@@ -26,6 +26,15 @@
 .login-loading  { color: var(--text2); font-size: 0.9rem; padding: 12px 0; }
 .login-error    { color: var(--red); font-size: 0.8rem; text-align: center; margin: 4px 0 0; }
 
+.setup-steps    { display: flex; flex-direction: column; gap: 6px; width: 100%; margin-bottom: 8px; }
+.setup-step     { font-size: 0.82rem; color: var(--text2); margin: 0; }
+.setup-form     { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.setup-input    { background: var(--surface2, var(--bg2)); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-size: 0.82rem; outline: none; width: 100%; box-sizing: border-box; }
+.setup-input:focus { border-color: var(--accent); }
+.setup-btn      { background: var(--accent); color: white; border: none; border-radius: 10px; padding: 13px; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
+.setup-btn:disabled { opacity: 0.6; }
+.setup-logout   { background: none; border: none; color: var(--text3); font-size: 0.8rem; cursor: pointer; margin-top: 8px; text-decoration: underline; }
+
 /* ===== VARIABLES ===== */
 :root {
   --bg:           #07070f;

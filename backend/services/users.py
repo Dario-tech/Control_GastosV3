@@ -1,27 +1,36 @@
 import os
-import json
+import httpx
 from fastapi import HTTPException
 
-# Formato de USERS_CONFIG (env var en Render):
-# {"mario@gmail.com": {"name": "Mario", "sheet_url": "https://script.google.com/..."}}
-def _load_config() -> dict:
-    raw = os.getenv("USERS_CONFIG", "{}")
-    try:
-        return json.loads(raw)
-    except Exception:
-        return {}
+USERS_SHEET_URL = os.getenv("USERS_SHEET_URL", "")
 
 
-def get_user_sheet_url(email: str) -> str:
-    config = _load_config()
-    user = config.get(email)
-    if not user:
-        raise HTTPException(status_code=403, detail=f"Usuario '{email}' no autorizado. Contacta al administrador.")
-    url = user.get("sheet_url", "")
-    if not url:
-        raise HTTPException(status_code=500, detail=f"Usuario '{email}' no tiene Sheet configurado.")
-    return url
+async def get_user(email: str) -> dict | None:
+    """Busca un usuario en el Sheet de usuarios. Devuelve None si no existe."""
+    if not USERS_SHEET_URL:
+        raise HTTPException(status_code=500, detail="USERS_SHEET_URL no configurado")
+    async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+        res = await client.get(USERS_SHEET_URL, params={"email": email})
+        res.raise_for_status()
+    data = res.json()
+    return data if data.get("found") else None
 
 
-def get_user_info(email: str) -> dict:
-    return _load_config().get(email, {})
+async def register_user(email: str, name: str, sheet_url: str) -> dict:
+    """Añade o actualiza un usuario en el Sheet de usuarios."""
+    if not USERS_SHEET_URL:
+        raise HTTPException(status_code=500, detail="USERS_SHEET_URL no configurado")
+    async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+        res = await client.post(
+            USERS_SHEET_URL,
+            json={"email": email, "name": name, "sheet_url": sheet_url},
+        )
+        res.raise_for_status()
+    return res.json()
+
+
+async def get_user_sheet_url(email: str) -> str:
+    user = await get_user(email)
+    if not user or not user.get("sheet_url"):
+        raise HTTPException(status_code=403, detail="Usuario sin Sheet configurado")
+    return user["sheet_url"]

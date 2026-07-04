@@ -7,6 +7,7 @@ import Header from './components/layout/Header'
 import BottomNav from './components/layout/BottomNav'
 import Toast from './components/ui/Toast'
 import LoginScreen from './components/auth/LoginScreen'
+import SetupScreen from './components/auth/SetupScreen'
 import YearTab from './components/tabs/YearTab'
 import MonthTab from './components/tabs/MonthTab'
 import StatsTab from './components/tabs/StatsTab'
@@ -62,7 +63,8 @@ function AppContent() {
 
 function AuthGate() {
   const { user } = useAuth()
-  if (!user) return <LoginScreen />
+  if (!user)             return <LoginScreen />
+  if (user.needsSetup)   return <SetupScreen />
   return (
     <FinanceDataProvider>
       <AppProvider>

@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from services.prices import get_all_prices
 from services.sheets import get_finance_data, get_raw_transactions, delete_transaction, post_transaction
 from services.auth import verify_google_token, create_jwt, get_current_user
-from services.users import get_user_sheet_url, get_user_info
+from services.users import get_user, get_user_sheet_url, register_user
 
 app = FastAPI(title="Control Gastos API", version="2.0.0")
 
@@ -36,28 +36,42 @@ class GoogleLoginIn(BaseModel):
 
 @app.post("/api/auth/login")
 async def auth_login(body: GoogleLoginIn):
-    """Recibe el ID token de Google, lo verifica y devuelve un JWT de sesión."""
+    """Recibe el ID token de Google, lo verifica y devuelve un JWT de sesión.
+    Si el usuario es nuevo (sin Sheet), needs_setup=True — el frontend muestra la pantalla de configuración."""
     google_user = verify_google_token(body.token)
-    email = google_user["email"]
-    user_info = get_user_info(email)
-    if not user_info:
-        raise HTTPException(status_code=403, detail=f"Usuario '{email}' no autorizado. Contacta al administrador.")
+    email       = google_user["email"]
+    user_info   = await get_user(email)
     session_token = create_jwt(email)
     return {
         "session_token": session_token,
+        "needs_setup": user_info is None,
         "user": {
             "email":   email,
-            "name":    google_user.get("name") or user_info.get("name", ""),
+            "name":    google_user.get("name") or (user_info or {}).get("name", ""),
             "picture": google_user.get("picture", ""),
         },
     }
 
 
+class RegisterIn(BaseModel):
+    sheet_url: str
+
+
+@app.post("/api/auth/register")
+async def auth_register(body: RegisterIn, email: str = Depends(get_current_user)):
+    """Guarda el Sheet URL del usuario nuevo en el Sheet de usuarios."""
+    if not body.sheet_url.startswith("https://script.google.com"):
+        raise HTTPException(status_code=400, detail="URL de Apps Script inválida")
+    user_info = await get_user(email)
+    name = (user_info or {}).get("name", email.split("@")[0])
+    result = await register_user(email, name, body.sheet_url)
+    return {"status": result.get("status"), "email": email}
+
+
 @app.get("/api/auth/me")
 async def auth_me(email: str = Depends(get_current_user)):
-    """Devuelve la info del usuario autenticado."""
-    info = get_user_info(email)
-    return {"email": email, "name": info.get("name", ""), "authorized": bool(info)}
+    user = await get_user(email)
+    return {"email": email, "needs_setup": user is None, "name": (user or {}).get("name", "")}
 
 
 # ── SSE ───────────────────────────────────────────────────────────────────────
