@@ -201,5 +201,19 @@ async def delete_transaction(row_index: int) -> dict:
     return res.json()
 
 
+async def post_transaction(importe: float, tipo: str, concepto: str, source: str = "shortcut") -> dict:
+    """Escribe una transacción en Google Sheets vía Apps Script."""
+    params = {
+        "importe":  importe,
+        "tipo":     tipo,
+        "concepto": concepto,
+        "source":   source,
+    }
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+        res = await client.get(APPS_SCRIPT_URL, params=params)
+        res.raise_for_status()
+    return res.json()
+
+
 async def get_raw_transactions() -> dict:
     return await _fetch_raw()

@@ -3,8 +3,9 @@ import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from services.prices import get_all_prices
-from services.sheets import get_finance_data, get_raw_transactions, delete_transaction
+from services.sheets import get_finance_data, get_raw_transactions, delete_transaction, post_transaction
 
 app = FastAPI(title="Control Gastos API", version="1.0.0")
 
@@ -55,6 +56,28 @@ async def sse_events():
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+class TransactionIn(BaseModel):
+    importe:  float
+    tipo:     str
+    concepto: str
+    source:   str = "shortcut"
+
+
+@app.post("/api/transaction")
+async def add_transaction(tx: TransactionIn):
+    """Recibe una transacción del Atajo iOS, la escribe en Google Sheets y notifica a todos los clientes."""
+    try:
+        result = await post_transaction(tx.importe, tx.tipo, tx.concepto, tx.source)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error al escribir en Sheets: {e}")
+
+    # Notificar a todos los clientes SSE para refresco instantáneo
+    for q in list(_sse_clients):
+        await q.put("data_updated")
+
+    return result
 
 
 @app.post("/api/notify")
