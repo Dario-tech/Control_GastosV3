@@ -167,13 +167,14 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
 
 class PendingIn(BaseModel):
     importe: float
+    fecha: str | None = None  # YYYY-MM-DD; si no se pasa, el backend usa CURRENT_DATE
 
 @app.post("/api/pending")
 async def create_pending_tx(body: PendingIn, email: str = Depends(get_current_user)):
-    """La app guarda el importe con la fecha de hoy usando la sesión activa."""
+    """La app guarda el importe con la fecha real del Atajo usando la sesión activa."""
     if body.importe <= 0:
         raise HTTPException(status_code=422, detail="importe inválido")
-    return await create_pending(email, body.importe)
+    return await create_pending(email, body.importe, body.fecha)
 
 
 @app.get("/api/pending")
@@ -195,14 +196,12 @@ async def categorize_pending_tx(pending_id: int, body: CategorizeIn, email: str 
 
 # ── Atajo iOS (token permanente, sin JWT) ────────────────────────────────────
 
-@app.post("/api/shortcut")
-async def shortcut_transaction(request: Request):
-    """Endpoint para iOS Shortcuts — autenticación por shortcut_token permanente."""
-    raw = await request.body()
+@app.post("/api/shortcut/pending")
+async def shortcut_create_pending(request: Request):
+    """Atajo iOS: guarda un gasto pendiente usando el token permanente del usuario.
+    No requiere abrir la app — el usuario categoriza después desde la campana."""
     try:
-        data = json_lib.loads(raw)
-        if isinstance(data, str):
-            data = json_lib.loads(data)
+        data = await request.json()
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Body inválido: {e}")
 
@@ -215,12 +214,15 @@ async def shortcut_transaction(request: Request):
         raise HTTPException(status_code=401, detail="Token inválido")
 
     try:
-        tx = TransactionIn(**{k: v for k, v in data.items() if k in ("importe", "tipo", "concepto", "source")})
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Datos inválidos: {e}")
+        importe = float(data["importe"])
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="importe inválido")
 
-    result = await post_transaction(tx.importe, tx.tipo, tx.concepto, email, "shortcut")
-    await _broadcast()
+    if importe <= 0:
+        raise HTTPException(status_code=422, detail="importe debe ser mayor que 0")
+
+    result = await create_pending(email, importe)
+    await _broadcast()  # la PWA recibe SSE y actualiza la campana en tiempo real
     return result
 
 

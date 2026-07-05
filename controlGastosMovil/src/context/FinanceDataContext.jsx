@@ -70,6 +70,8 @@ export function FinanceDataProvider({ children }) {
 
       es.addEventListener('update', () => {
         refresh()
+        // Notifica a usePendingTransaction para que refresque la campana
+        window.dispatchEvent(new Event('finance-update'))
       })
 
       es.onerror = () => {

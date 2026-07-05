@@ -2,13 +2,19 @@ from fastapi import HTTPException
 from .db import db_cursor, run_in_thread
 
 
-async def create_pending(email: str, importe: float) -> dict:
+async def create_pending(email: str, importe: float, fecha: str | None = None) -> dict:
     def _q():
         with db_cursor() as cur:
-            cur.execute(
-                "INSERT INTO pending_transactions (user_email, importe) VALUES (%s, %s) RETURNING id, fecha::text, importe",
-                (email, importe),
-            )
+            if fecha:
+                cur.execute(
+                    "INSERT INTO pending_transactions (user_email, importe, fecha) VALUES (%s, %s, %s::date) RETURNING id, fecha::text, importe",
+                    (email, importe, fecha),
+                )
+            else:
+                cur.execute(
+                    "INSERT INTO pending_transactions (user_email, importe) VALUES (%s, %s) RETURNING id, fecha::text, importe",
+                    (email, importe),
+                )
             return cur.fetchone()
     return dict(await run_in_thread(_q))
 

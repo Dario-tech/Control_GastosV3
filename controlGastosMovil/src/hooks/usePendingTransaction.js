@@ -22,27 +22,22 @@ export function usePendingTransaction() {
     } catch { /* no-op */ }
   }, [])
 
-  // Al arrancar: guarda el importe de la URL si viene del Atajo, luego carga la cola
   useEffect(() => {
-    async function init() {
-      const params = new URLSearchParams(window.location.search)
-      const amount = params.get('amount')
-      if (amount) {
-        const num = parseFloat(amount)
-        window.history.replaceState({}, '', window.location.pathname)
-        if (!isNaN(num) && num > 0) {
-          try {
-            await fetch(`${BASE}/api/pending`, {
-              method:  'POST',
-              headers: { 'Content-Type': 'application/json', ...authHeaders() },
-              body:    JSON.stringify({ importe: num }),
-            })
-          } catch { /* no-op */ }
-        }
-      }
-      await fetchQueue()
+    fetchQueue()
+
+    // Refresca al volver al frente (resume desde segundo plano en iOS)
+    function onVisible() {
+      if (document.visibilityState === 'visible') fetchQueue()
     }
-    init()
+    document.addEventListener('visibilitychange', onVisible)
+
+    // Refresca cuando el backend notifica via SSE (Atajo ejecutado mientras la app estaba abierta)
+    window.addEventListener('finance-update', fetchQueue)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('finance-update', fetchQueue)
+    }
   }, [fetchQueue])
 
   async function categorizePending(id, tipo, concepto) {

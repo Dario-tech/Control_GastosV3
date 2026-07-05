@@ -48,9 +48,6 @@ function AppContent() {
 
   const current = queue[0] ?? null
 
-  useEffect(() => {
-    if (queue.length > 0) setCategorizeOpen(true)
-  }, [queue.length])
 
   return (
     <div className={`app${settings.hideAmounts ? ' hide-amounts' : ''}`}>
