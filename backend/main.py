@@ -11,6 +11,7 @@ from services.sheets import get_finance_data, get_raw_transactions, delete_trans
 from services.auth import verify_google_token, create_jwt, get_current_user
 from services.users import get_user, ensure_user, get_email_by_shortcut_token
 from services.db import init_pool
+from services.pending import create_pending, get_pending, categorize_pending
 
 
 @asynccontextmanager
@@ -158,6 +159,51 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Error al escribir en la base de datos: {e}")
 
+    await _broadcast()
+    return result
+
+
+# ── Pendientes (Shortcut → DB → App) ─────────────────────────────────────────
+
+@app.post("/api/pending")
+async def create_pending_tx(request: Request):
+    """Shortcut guarda el importe con la fecha de hoy. No requiere JWT."""
+    raw = await request.body()
+    try:
+        data = json_lib.loads(raw)
+        if isinstance(data, str):
+            data = json_lib.loads(data)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Body inválido: {e}")
+
+    token = data.get("shortcut_token") or data.get("token")
+    if not token:
+        raise HTTPException(status_code=401, detail="shortcut_token requerido")
+
+    email = await get_email_by_shortcut_token(token)
+    if not email:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    importe = float(data.get("importe", 0))
+    if importe <= 0:
+        raise HTTPException(status_code=422, detail="importe inválido")
+
+    return await create_pending(email, importe)
+
+
+@app.get("/api/pending")
+async def get_pending_txs(email: str = Depends(get_current_user)):
+    return await get_pending(email)
+
+
+class CategorizeIn(BaseModel):
+    tipo:     str
+    concepto: str
+
+
+@app.post("/api/pending/{pending_id}/categorize")
+async def categorize_pending_tx(pending_id: int, body: CategorizeIn, email: str = Depends(get_current_user)):
+    result = await categorize_pending(pending_id, email, body.tipo, body.concepto)
     await _broadcast()
     return result
 

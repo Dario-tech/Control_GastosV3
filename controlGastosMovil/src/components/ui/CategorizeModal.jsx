@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { postTransaction } from '../../services/api'
 import { useFinanceData } from '../../context/FinanceDataContext'
 
 const TYPES = [
@@ -34,29 +33,34 @@ const SUBCATEGORIES = {
   ],
 }
 
-export default function CategorizeModal({ amount, onClose, onDone }) {
+const DATE_FMT = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
+
+function formatDate(dateStr) {
+  try { return DATE_FMT.format(new Date(dateStr + 'T12:00:00')) } catch { return dateStr }
+}
+
+export default function CategorizeModal({ pending, total, onCategorize, onSkip }) {
   const [step, setStep]       = useState(1)
   const [tipo, setTipo]       = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState(null)
   const { refresh }           = useFinanceData()
 
-  const fmt = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount)
+  const fmt = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(pending.importe)
 
-  function handleType(t) {
-    setTipo(t)
-    setStep(2)
-  }
+  function handleType(t) { setTipo(t); setStep(2) }
 
   async function handleConcepto(concepto) {
     setLoading(true)
     setError(null)
     try {
-      await postTransaction(amount, tipo, concepto)
+      await onCategorize(pending.id, tipo, concepto)
       refresh()
-      onDone()
-    } catch (e) {
+      setStep(1)
+      setTipo(null)
+    } catch {
       setError('Error al guardar. Inténtalo de nuevo.')
+    } finally {
       setLoading(false)
     }
   }
@@ -64,6 +68,8 @@ export default function CategorizeModal({ amount, onClose, onDone }) {
   return (
     <div className="catmodal-overlay">
       <div className="catmodal">
+        <div className="catmodal-counter">{total > 1 ? `Quedan ${total} pagos por categorizar` : 'Pago pendiente'}</div>
+        <div className="catmodal-date">{formatDate(pending.fecha)}</div>
         <div className="catmodal-amount">{fmt}</div>
         <p className="catmodal-subtitle">
           {step === 1 ? '¿Qué tipo de movimiento es?' : `${tipo} — ¿qué concepto?`}
@@ -72,8 +78,8 @@ export default function CategorizeModal({ amount, onClose, onDone }) {
         {step === 1 && (
           <div className="catmodal-types">
             {TYPES.map(t => (
-              <button key={t.id} className="catmodal-type-card" onClick={() => handleType(t.id)}
-                style={{ '--card-color': t.color }}>
+              <button key={t.id} className="catmodal-type-card"
+                onClick={() => handleType(t.id)} style={{ '--card-color': t.color }}>
                 <span className="catmodal-type-emoji">{t.emoji}</span>
                 <span className="catmodal-type-label">{t.label}</span>
               </button>
@@ -99,7 +105,7 @@ export default function CategorizeModal({ amount, onClose, onDone }) {
           {step === 2 && (
             <button className="catmodal-back" onClick={() => setStep(1)}>← Cambiar tipo</button>
           )}
-          <button className="catmodal-cancel" onClick={onClose}>Cancelar</button>
+          <button className="catmodal-cancel" onClick={onSkip}>Dejar para luego</button>
         </div>
       </div>
     </div>

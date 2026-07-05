@@ -42,24 +42,21 @@ class ErrorBoundary extends Component {
 function AppContent() {
   const { activeTab } = useApp()
   const { settings }  = useSettings()
-  const [profileOpen,  setProfileOpen]  = useState(false)
+  const [profileOpen,    setProfileOpen]    = useState(false)
   const [categorizeOpen, setCategorizeOpen] = useState(false)
-  const { pendingAmount, clearPending } = usePendingTransaction()
+  const { queue, categorizePending } = usePendingTransaction()
+
+  const current = queue[0] ?? null
 
   useEffect(() => {
-    if (pendingAmount) setCategorizeOpen(true)
-  }, [pendingAmount])
-
-  function handleDone() {
-    clearPending()
-    setCategorizeOpen(false)
-  }
+    if (queue.length > 0) setCategorizeOpen(true)
+  }, [queue.length])
 
   return (
     <div className={`app${settings.hideAmounts ? ' hide-amounts' : ''}`}>
       <Header
         onAvatarClick={() => setProfileOpen(true)}
-        pendingAmount={pendingAmount}
+        pendingCount={queue.length}
         onPendingClick={() => setCategorizeOpen(true)}
       />
       <main className="main">
@@ -74,11 +71,12 @@ function AppContent() {
       <BottomNav onTabChange={() => setProfileOpen(false)} />
       <Toast />
       <ProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
-      {categorizeOpen && pendingAmount && (
+      {categorizeOpen && current && (
         <CategorizeModal
-          amount={pendingAmount}
-          onClose={() => setCategorizeOpen(false)}
-          onDone={handleDone}
+          pending={current}
+          total={queue.length}
+          onCategorize={categorizePending}
+          onSkip={() => setCategorizeOpen(false)}
         />
       )}
     </div>
