@@ -14,16 +14,36 @@ function authHeaders() {
 export function usePendingTransaction() {
   const [queue, setQueue] = useState([])
 
-  const fetchPending = useCallback(async () => {
+  const fetchQueue = useCallback(async () => {
     try {
       const res = await fetch(`${BASE}/api/pending`, { headers: authHeaders() })
       if (!res.ok) return
-      const data = await res.json()
-      setQueue(data)
+      setQueue(await res.json())
     } catch { /* no-op */ }
   }, [])
 
-  useEffect(() => { fetchPending() }, [fetchPending])
+  // Al arrancar: guarda el importe de la URL si viene del Atajo, luego carga la cola
+  useEffect(() => {
+    async function init() {
+      const params = new URLSearchParams(window.location.search)
+      const amount = params.get('amount')
+      if (amount) {
+        const num = parseFloat(amount)
+        window.history.replaceState({}, '', window.location.pathname)
+        if (!isNaN(num) && num > 0) {
+          try {
+            await fetch(`${BASE}/api/pending`, {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json', ...authHeaders() },
+              body:    JSON.stringify({ importe: num }),
+            })
+          } catch { /* no-op */ }
+        }
+      }
+      await fetchQueue()
+    }
+    init()
+  }, [fetchQueue])
 
   async function categorizePending(id, tipo, concepto) {
     const res = await fetch(`${BASE}/api/pending/${id}/categorize`, {
@@ -35,5 +55,5 @@ export function usePendingTransaction() {
     setQueue(q => q.filter(t => t.id !== id))
   }
 
-  return { queue, fetchPending, categorizePending }
+  return { queue, fetchQueue, categorizePending }
 }

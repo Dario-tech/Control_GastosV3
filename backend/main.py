@@ -165,30 +165,15 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
 
 # ── Pendientes (Shortcut → DB → App) ─────────────────────────────────────────
 
+class PendingIn(BaseModel):
+    importe: float
+
 @app.post("/api/pending")
-async def create_pending_tx(request: Request):
-    """Shortcut guarda el importe con la fecha de hoy. No requiere JWT."""
-    raw = await request.body()
-    try:
-        data = json_lib.loads(raw)
-        if isinstance(data, str):
-            data = json_lib.loads(data)
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Body inválido: {e}")
-
-    token = data.get("shortcut_token") or data.get("token")
-    if not token:
-        raise HTTPException(status_code=401, detail="shortcut_token requerido")
-
-    email = await get_email_by_shortcut_token(token)
-    if not email:
-        raise HTTPException(status_code=401, detail="Token inválido")
-
-    importe = float(data.get("importe", 0))
-    if importe <= 0:
+async def create_pending_tx(body: PendingIn, email: str = Depends(get_current_user)):
+    """La app guarda el importe con la fecha de hoy usando la sesión activa."""
+    if body.importe <= 0:
         raise HTTPException(status_code=422, detail="importe inválido")
-
-    return await create_pending(email, importe)
+    return await create_pending(email, body.importe)
 
 
 @app.get("/api/pending")
