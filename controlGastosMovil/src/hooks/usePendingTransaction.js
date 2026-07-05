@@ -36,13 +36,16 @@ export function usePendingTransaction() {
 
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('pageshow', onPageShow)
-    // SSE: Atajo ejecutado mientras la app estaba en primer plano
     window.addEventListener('finance-update', fetchQueue)
+
+    // Polling cada 30s: fallback para cuando SSE no llega (Render free tier duerme)
+    const poll = setInterval(fetchQueue, 30_000)
 
     return () => {
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('pageshow', onPageShow)
       window.removeEventListener('finance-update', fetchQueue)
+      clearInterval(poll)
     }
   }, [fetchQueue])
 
