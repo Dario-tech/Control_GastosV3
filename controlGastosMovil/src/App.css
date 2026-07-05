@@ -1293,6 +1293,59 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
   user-select: none;
 }
 
+/* ===== BUDGET MODAL — tipo selector ===== */
+.bgt-tipo-segmented {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.bgt-tipo-btn {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 9px 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text3);
+  cursor: pointer;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.bgt-tipo-btn.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.bgt-cat-grid {
+  max-height: 220px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+/* Selected state for category cards in budget picker */
+.catmodal-cat-card.selected {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+.catmodal-cat-card.selected .catmodal-cat-label { color: var(--accent); }
+
+/* ===== INLINE NEW-CATEGORY FORM (AddTransactionModal) ===== */
+.cat-new-card {
+  border-style: dashed !important;
+  color: var(--text3);
+}
+.cat-new-card .catmodal-cat-emoji { opacity: 0.6; }
+.cat-inline-form {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* ===== BUDGET ===== */
 
 .budget-tab { padding-bottom: 24px; }
