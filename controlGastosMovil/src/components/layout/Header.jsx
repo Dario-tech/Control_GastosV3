@@ -1,7 +1,7 @@
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useAuth } from '../../context/AuthContext'
 
-export default function Header({ onAvatarClick }) {
+export default function Header({ onAvatarClick, pendingAmount, onPendingClick }) {
   const { data } = useFinanceData()
   const { user } = useAuth()
 
@@ -9,18 +9,33 @@ export default function Header({ onAvatarClick }) {
     ? user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : '?'
 
+  const fmt = pendingAmount
+    ? new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(pendingAmount)
+    : null
+
   return (
     <header className="header">
       <div className="header-title-block">
         <h1 className="header-title">Mi Economía</h1>
         <span className="header-sub">Resumen {data?.year ?? new Date().getFullYear()}</span>
       </div>
-      <button className="avatar-btn" onClick={onAvatarClick} aria-label="Perfil y ajustes">
-        {user?.picture
-          ? <img className="avatar-img" src={user.picture} alt={user.name} referrerPolicy="no-referrer" />
-          : <span className="avatar-initials">{initials}</span>
-        }
-      </button>
+      <div className="header-actions">
+        {pendingAmount && (
+          <button className="pending-btn" onClick={onPendingClick} aria-label="Categorizar pago pendiente">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <span className="pending-badge">{fmt}</span>
+          </button>
+        )}
+        <button className="avatar-btn" onClick={onAvatarClick} aria-label="Perfil y ajustes">
+          {user?.picture
+            ? <img className="avatar-img" src={user.picture} alt={user.name} referrerPolicy="no-referrer" />
+            : <span className="avatar-initials">{initials}</span>
+          }
+        </button>
+      </div>
     </header>
   )
 }

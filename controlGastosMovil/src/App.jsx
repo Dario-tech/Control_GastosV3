@@ -1,4 +1,4 @@
-import { Component, useState } from 'react'
+import { Component, useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppProvider, useApp } from './context/AppContext'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
@@ -6,7 +6,9 @@ import { FinanceDataProvider } from './context/FinanceDataContext'
 import Header from './components/layout/Header'
 import BottomNav from './components/layout/BottomNav'
 import ProfilePanel from './components/layout/ProfilePanel'
+import CategorizeModal from './components/ui/CategorizeModal'
 import Toast from './components/ui/Toast'
+import { usePendingTransaction } from './hooks/usePendingTransaction'
 import LoginScreen from './components/auth/LoginScreen'
 import YearTab from './components/tabs/YearTab'
 import MonthTab from './components/tabs/MonthTab'
@@ -40,11 +42,26 @@ class ErrorBoundary extends Component {
 function AppContent() {
   const { activeTab } = useApp()
   const { settings }  = useSettings()
-  const [profileOpen, setProfileOpen] = useState(false)
+  const [profileOpen,  setProfileOpen]  = useState(false)
+  const [categorizeOpen, setCategorizeOpen] = useState(false)
+  const { pendingAmount, clearPending } = usePendingTransaction()
+
+  useEffect(() => {
+    if (pendingAmount) setCategorizeOpen(true)
+  }, [pendingAmount])
+
+  function handleDone() {
+    clearPending()
+    setCategorizeOpen(false)
+  }
 
   return (
     <div className={`app${settings.hideAmounts ? ' hide-amounts' : ''}`}>
-      <Header onAvatarClick={() => setProfileOpen(true)} />
+      <Header
+        onAvatarClick={() => setProfileOpen(true)}
+        pendingAmount={pendingAmount}
+        onPendingClick={() => setCategorizeOpen(true)}
+      />
       <main className="main">
         <ErrorBoundary>
           {activeTab === 'year'        && <YearTab />}
@@ -57,6 +74,13 @@ function AppContent() {
       <BottomNav onTabChange={() => setProfileOpen(false)} />
       <Toast />
       <ProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
+      {categorizeOpen && pendingAmount && (
+        <CategorizeModal
+          amount={pendingAmount}
+          onClose={() => setCategorizeOpen(false)}
+          onDone={handleDone}
+        />
+      )}
     </div>
   )
 }
