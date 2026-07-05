@@ -94,10 +94,7 @@ html, body, #root {
 /* ===== HEADER ===== */
 .header {
   height: var(--header-h);
-  background: rgba(28,28,30,0.88);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-bottom: 0.5px solid var(--border);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -224,9 +221,7 @@ html, body, #root {
 .shortcut-token-copy:active { background: var(--accent); color: white; }
 
 .profile-logout-wrap {
-  padding: 12px 20px 16px;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
+  padding: 8px 16px 24px;
 }
 .profile-logout-btn {
   width: 100%;
@@ -1064,9 +1059,6 @@ html.light {
 }
 html.light body,
 html.light #root { background: var(--bg); }
-html.light .header {
-  background: rgba(242,242,247,0.88);
-}
 html.light .bottom-nav {
   background: rgba(242,242,247,0.92);
 }

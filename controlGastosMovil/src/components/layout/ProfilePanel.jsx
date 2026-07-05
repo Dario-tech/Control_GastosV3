@@ -74,12 +74,11 @@ export default function ProfilePanel({ open, onClose }) {
           </div>
         )}
         <SettingsTab />
-      </div>
-
-      <div className="profile-logout-wrap">
-        <button className="profile-logout-btn" onClick={handleLogout}>
-          Cerrar sesión
-        </button>
+        <div className="profile-logout-wrap">
+          <button className="profile-logout-btn" onClick={handleLogout}>
+            Cerrar sesión
+          </button>
+        </div>
       </div>
     </div>
   )
