@@ -1,37 +1,7 @@
 import { useState } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
-
-const TYPES = [
-  { id: 'Gasto Variable', label: 'Gasto Variable', emoji: '🛍️', color: 'var(--red)' },
-  { id: 'Gasto Fijo',     label: 'Gasto Fijo',     emoji: '🏠', color: 'var(--orange)' },
-  { id: 'Ingreso',        label: 'Ingreso',         emoji: '💼', color: 'var(--green)' },
-]
-
-const SUBCATEGORIES = {
-  'Gasto Variable': [
-    { concepto: 'Ocio',                 emoji: '🎉' },
-    { concepto: 'Comida',               emoji: '🍽️' },
-    { concepto: 'Ropa',                 emoji: '👗' },
-    { concepto: 'Vuelos',               emoji: '✈️' },
-    { concepto: 'Gimnasio',             emoji: '💪' },
-    { concepto: 'Netflix&Dazn&Regalos', emoji: '📺' },
-    { concepto: 'Variado',              emoji: '💶' },
-  ],
-  'Gasto Fijo': [
-    { concepto: 'Piso',        emoji: '🏠' },
-    { concepto: 'Luz',         emoji: '⚡' },
-    { concepto: 'Gas',         emoji: '🔥' },
-    { concepto: 'Agua',        emoji: '🚿' },
-    { concepto: 'Wifi',        emoji: '📡' },
-    { concepto: 'Transporte',  emoji: '🚇' },
-    { concepto: 'Inversiones', emoji: '📈' },
-    { concepto: 'Cripto',      emoji: '₿'  },
-  ],
-  'Ingreso': [
-    { concepto: 'Nómina',        emoji: '💼' },
-    { concepto: 'Otros motivos', emoji: '🎁' },
-  ],
-}
+import { useSettings } from '../../context/SettingsContext'
+import { TYPES, DEFAULT_CATEGORIES } from '../../data/categories'
 
 const DATE_FMT = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
 
@@ -45,6 +15,7 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip }
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState(null)
   const { refresh }           = useFinanceData()
+  const { customCategories }  = useSettings()
 
   const fmt = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(pending.importe)
 
@@ -64,6 +35,8 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip }
       setLoading(false)
     }
   }
+
+  const allCats = tipo ? [...DEFAULT_CATEGORIES[tipo], ...(customCategories[tipo] || [])] : []
 
   return (
     <div className="catmodal-overlay">
@@ -89,7 +62,7 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip }
 
         {step === 2 && (
           <div className="catmodal-grid">
-            {SUBCATEGORIES[tipo].map(c => (
+            {allCats.map(c => (
               <button key={c.concepto} className="catmodal-cat-card"
                 onClick={() => handleConcepto(c.concepto)} disabled={loading}>
                 <span className="catmodal-cat-emoji">{c.emoji}</span>

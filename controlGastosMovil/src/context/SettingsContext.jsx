@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 
-const LS_KEY = 'mi-economia-settings-v1'
+const LS_KEY      = 'mi-economia-settings-v1'
+const LS_CATS_KEY = 'mi-economia-custom-cats-v1'
 
 export const ACCENTS = [
   { id: 'indigo',   color: '#6366f1', label: 'Índigo'   },
@@ -20,6 +21,8 @@ const DEFAULT = {
   alertThreshold: 80,
 }
 
+const EMPTY_CATS = { 'Gasto Variable': [], 'Gasto Fijo': [], 'Ingreso': [] }
+
 function load() {
   try {
     const raw = localStorage.getItem(LS_KEY)
@@ -29,19 +32,51 @@ function load() {
   }
 }
 
+function loadCats() {
+  try {
+    const raw = localStorage.getItem(LS_CATS_KEY)
+    return raw ? { ...EMPTY_CATS, ...JSON.parse(raw) } : EMPTY_CATS
+  } catch {
+    return EMPTY_CATS
+  }
+}
+
 function persist(s) {
   localStorage.setItem(LS_KEY, JSON.stringify(s))
+}
+
+function persistCats(c) {
+  localStorage.setItem(LS_CATS_KEY, JSON.stringify(c))
 }
 
 const Ctx = createContext(null)
 
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState(load)
+  const [customCategories, setCustomCategories] = useState(loadCats)
 
   function update(key, value) {
     setSettings(prev => {
       const next = { ...prev, [key]: value }
       persist(next)
+      return next
+    })
+  }
+
+  function addCategory(tipo, item) {
+    setCustomCategories(prev => {
+      const list = prev[tipo] || []
+      if (list.some(c => c.concepto === item.concepto)) return prev
+      const next = { ...prev, [tipo]: [...list, item] }
+      persistCats(next)
+      return next
+    })
+  }
+
+  function removeCategory(tipo, concepto) {
+    setCustomCategories(prev => {
+      const next = { ...prev, [tipo]: (prev[tipo] || []).filter(c => c.concepto !== concepto) }
+      persistCats(next)
       return next
     })
   }
@@ -72,7 +107,7 @@ export function SettingsProvider({ children }) {
   }, [settings.accent])
 
   return (
-    <Ctx.Provider value={{ settings, update }}>
+    <Ctx.Provider value={{ settings, update, customCategories, addCategory, removeCategory }}>
       {children}
     </Ctx.Provider>
   )

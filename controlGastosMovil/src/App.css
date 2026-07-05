@@ -1120,6 +1120,165 @@ html.light .s-api-input { background: #f0f0f8; border-color: rgba(0,0,0,0.14); c
 html.light .api-key-info { border-color: var(--border); }
 html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
 
+/* ===== ADD TRANSACTION BUTTON (header) ===== */
+.add-tx-btn {
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--accent);
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.add-tx-btn:active { background: var(--accent); color: white; transform: scale(0.9); }
+.add-tx-btn svg { width: 18px; height: 18px; }
+
+/* ===== ADD TRANSACTION MODAL ===== */
+.add-tx-sheet {
+  display: flex;
+  flex-direction: column;
+}
+.add-tx-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.add-tx-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.add-tx-fields {
+  margin-bottom: 16px;
+}
+.add-tx-field-row {
+  display: flex;
+  gap: 12px;
+}
+
+/* ===== CUSTOM CATEGORIES (settings) ===== */
+.cat-tipo-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.cat-tipo-tab {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 7px 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text3);
+  cursor: pointer;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cat-tipo-tab.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.cat-empty-hint {
+  font-size: 0.8rem;
+  color: var(--text3);
+  padding: 8px 0 12px;
+  text-align: center;
+}
+.cat-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.cat-custom-row:last-of-type { border-bottom: none; }
+.cat-custom-emoji { font-size: 1.25rem; flex-shrink: 0; }
+.cat-custom-name  { flex: 1; font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.cat-delete-btn {
+  background: var(--red-dim);
+  border: none;
+  border-radius: 50%;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--red);
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.cat-delete-btn:active { background: var(--red); color: white; }
+.cat-delete-btn svg { width: 14px; height: 14px; }
+.cat-add-row {
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cat-emoji-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.cat-emoji-scroll::-webkit-scrollbar { display: none; }
+.cat-emoji-btn {
+  flex-shrink: 0;
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  border: 1.5px solid transparent;
+  background: var(--surface2);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cat-emoji-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.cat-add-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cat-selected-emoji { font-size: 1.4rem; flex-shrink: 0; }
+.cat-name-input {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-xs);
+  padding: 9px 12px;
+  color: var(--text);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.cat-name-input:focus { border-color: var(--accent); }
+.cat-add-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-xs);
+  padding: 9px 14px;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cat-add-btn:active { opacity: 0.8; }
+.cat-err { font-size: 0.75rem; color: var(--red); }
+
 /* ===== HIDE AMOUNTS ===== */
 .hide-amounts .kpi-value,
 .hide-amounts .hero-balance-value,

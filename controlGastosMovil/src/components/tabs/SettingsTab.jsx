@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { useSettings, ACCENTS } from '../../context/SettingsContext'
+import { EMOJI_SUGGESTIONS } from '../../data/categories'
 
 const THEMES = [
   {
@@ -106,6 +108,81 @@ function Segmented({ options, value, onChange }) {
   )
 }
 
+const CAT_TIPOS = ['Gasto Variable', 'Gasto Fijo', 'Ingreso']
+
+function CustomCategoriesSection() {
+  const { customCategories, addCategory, removeCategory } = useSettings()
+  const [activeTipo, setActiveTipo] = useState('Gasto Variable')
+  const [newEmoji, setNewEmoji]     = useState('💶')
+  const [newName, setNewName]       = useState('')
+  const [err, setErr]               = useState('')
+
+  function handleAdd() {
+    const name = newName.trim()
+    if (!name) { setErr('Escribe un nombre'); return }
+    addCategory(activeTipo, { concepto: name, emoji: newEmoji })
+    setNewName('')
+    setErr('')
+  }
+
+  const list = customCategories[activeTipo] || []
+
+  return (
+    <div className="settings-section">
+      <div className="settings-section-title">Mis categorías</div>
+      <div className="settings-card">
+        <div className="cat-tipo-tabs">
+          {CAT_TIPOS.map(t => (
+            <button key={t} className={`cat-tipo-tab${activeTipo === t ? ' active' : ''}`}
+              onClick={() => setActiveTipo(t)}>
+              {t === 'Gasto Variable' ? 'Variable' : t === 'Gasto Fijo' ? 'Fijo' : 'Ingreso'}
+            </button>
+          ))}
+        </div>
+
+        {list.length === 0 && (
+          <p className="cat-empty-hint">Sin categorías personalizadas</p>
+        )}
+
+        {list.map(c => (
+          <div key={c.concepto} className="cat-custom-row">
+            <span className="cat-custom-emoji">{c.emoji}</span>
+            <span className="cat-custom-name">{c.concepto}</span>
+            <button className="cat-delete-btn" onClick={() => removeCategory(activeTipo, c.concepto)}
+              aria-label="Eliminar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+              </svg>
+            </button>
+          </div>
+        ))}
+
+        <div className="cat-add-row">
+          <div className="cat-emoji-scroll">
+            {EMOJI_SUGGESTIONS.map(e => (
+              <button key={e} className={`cat-emoji-btn${newEmoji === e ? ' active' : ''}`}
+                onClick={() => setNewEmoji(e)}>{e}</button>
+            ))}
+          </div>
+          <div className="cat-add-input-row">
+            <span className="cat-selected-emoji">{newEmoji}</span>
+            <input
+              className="cat-name-input"
+              placeholder="Nombre de la categoría"
+              value={newName}
+              onChange={e => { setNewName(e.target.value); setErr('') }}
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+              maxLength={32}
+            />
+            <button className="cat-add-btn" onClick={handleAdd}>Añadir</button>
+          </div>
+          {err && <p className="cat-err">{err}</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsTab() {
   const { settings, update } = useSettings()
   const { allItems: budgetItems, removeItem } = useBudget()
@@ -205,6 +282,8 @@ export default function SettingsTab() {
           />
         </Row>
       </Section>
+
+      <CustomCategoriesSection />
 
       <Section title="Backend">
         <Row icon="🔌" label="Estado" last>

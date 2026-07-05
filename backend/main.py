@@ -138,6 +138,7 @@ class TransactionIn(BaseModel):
     importe:  float
     tipo:     str
     concepto: str
+    fecha:    str | None = None  # YYYY-MM-DD; si no se pasa, usa CURRENT_DATE
     source:   str = "shortcut"
 
 
@@ -153,7 +154,7 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
         raise HTTPException(status_code=422, detail=f"Body inválido: {e}")
 
     try:
-        result = await post_transaction(tx.importe, tx.tipo, tx.concepto, email, tx.source)
+        result = await post_transaction(tx.importe, tx.tipo, tx.concepto, email, tx.source, tx.fecha)
     except HTTPException:
         raise
     except Exception as e:

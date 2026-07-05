@@ -1,4 +1,4 @@
-import { Component, useState, useEffect } from 'react'
+import { Component, useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppProvider, useApp } from './context/AppContext'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
@@ -7,6 +7,7 @@ import Header from './components/layout/Header'
 import BottomNav from './components/layout/BottomNav'
 import ProfilePanel from './components/layout/ProfilePanel'
 import CategorizeModal from './components/ui/CategorizeModal'
+import AddTransactionModal from './components/ui/AddTransactionModal'
 import Toast from './components/ui/Toast'
 import { usePendingTransaction } from './hooks/usePendingTransaction'
 import LoginScreen from './components/auth/LoginScreen'
@@ -44,6 +45,7 @@ function AppContent() {
   const { settings }  = useSettings()
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [categorizeOpen, setCategorizeOpen] = useState(false)
+  const [addOpen,        setAddOpen]        = useState(false)
   const { queue, fetchQueue, categorizePending } = usePendingTransaction()
 
   const current = queue[0] ?? null
@@ -55,6 +57,7 @@ function AppContent() {
         onAvatarClick={() => setProfileOpen(true)}
         pendingCount={queue.length}
         onPendingClick={async () => { await fetchQueue(); setCategorizeOpen(true) }}
+        onAddClick={() => setAddOpen(true)}
       />
       <main className="main">
         <ErrorBoundary>
@@ -76,6 +79,7 @@ function AppContent() {
           onSkip={() => setCategorizeOpen(false)}
         />
       )}
+      {addOpen && <AddTransactionModal onClose={() => setAddOpen(false)} />}
     </div>
   )
 }

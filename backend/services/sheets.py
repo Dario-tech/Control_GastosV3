@@ -178,13 +178,19 @@ async def delete_transaction(row_index: int, email: str = "") -> dict:
     return {"status": "ok", "deleted": row_index}
 
 
-async def post_transaction(importe: float, tipo: str, concepto: str, email: str = "", source: str = "shortcut") -> dict:
+async def post_transaction(importe: float, tipo: str, concepto: str, email: str = "", source: str = "shortcut", fecha: str | None = None) -> dict:
     def _q():
         with db_cursor() as cur:
-            cur.execute(
-                "INSERT INTO transactions (user_email, tipo, concepto, importe) VALUES (%s, %s, %s, %s) RETURNING id, fecha::text",
-                (email, tipo, concepto, importe),
-            )
+            if fecha:
+                cur.execute(
+                    "INSERT INTO transactions (user_email, tipo, concepto, importe, fecha) VALUES (%s, %s, %s, %s, %s::date) RETURNING id, fecha::text",
+                    (email, tipo, concepto, importe, fecha),
+                )
+            else:
+                cur.execute(
+                    "INSERT INTO transactions (user_email, tipo, concepto, importe) VALUES (%s, %s, %s, %s) RETURNING id, fecha::text",
+                    (email, tipo, concepto, importe),
+                )
             return cur.fetchone()
 
     row = await run_in_thread(_q)

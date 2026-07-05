@@ -26,11 +26,13 @@ export async function fetchFinanceData() {
   return res.json()
 }
 
-export async function postTransaction(importe, tipo, concepto) {
+export async function postTransaction(importe, tipo, concepto, fecha = null) {
+  const body = { importe, tipo, concepto, source: 'app' }
+  if (fecha) body.fecha = fecha
   const res = await fetch(`${BASE}/api/transaction`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body:    JSON.stringify({ importe, tipo, concepto, source: 'app' }),
+    body:    JSON.stringify(body),
     signal:  AbortSignal.timeout(15000),
   })
   if (!res.ok) throw new Error(`API ${res.status}`)
