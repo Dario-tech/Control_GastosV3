@@ -1,0 +1,15 @@
+name: Keep Render Alive
+
+on:
+  schedule:
+    - cron: '*/14 * * * *'  # cada 14 min — Render duerme tras 15 min sin tráfico
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" https://control-gastos-api-jflv.onrender.com/api/health)
+          echo "Health status: $status"
+          [ "$status" = "200" ] || exit 1
