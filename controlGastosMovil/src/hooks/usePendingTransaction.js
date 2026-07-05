@@ -25,17 +25,23 @@ export function usePendingTransaction() {
   useEffect(() => {
     fetchQueue()
 
-    // Refresca al volver al frente (resume desde segundo plano en iOS)
+    // visibilitychange: app vuelve al frente en Android / escritorio
     function onVisible() {
       if (document.visibilityState === 'visible') fetchQueue()
     }
-    document.addEventListener('visibilitychange', onVisible)
+    // pageshow: más fiable que visibilitychange en iOS PWA (incluye bfcache restore)
+    function onPageShow(e) {
+      if (e.persisted || document.visibilityState === 'visible') fetchQueue()
+    }
 
-    // Refresca cuando el backend notifica via SSE (Atajo ejecutado mientras la app estaba abierta)
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('pageshow', onPageShow)
+    // SSE: Atajo ejecutado mientras la app estaba en primer plano
     window.addEventListener('finance-update', fetchQueue)
 
     return () => {
       document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('pageshow', onPageShow)
       window.removeEventListener('finance-update', fetchQueue)
     }
   }, [fetchQueue])

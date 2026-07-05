@@ -44,7 +44,7 @@ function AppContent() {
   const { settings }  = useSettings()
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [categorizeOpen, setCategorizeOpen] = useState(false)
-  const { queue, categorizePending } = usePendingTransaction()
+  const { queue, fetchQueue, categorizePending } = usePendingTransaction()
 
   const current = queue[0] ?? null
 
@@ -54,7 +54,7 @@ function AppContent() {
       <Header
         onAvatarClick={() => setProfileOpen(true)}
         pendingCount={queue.length}
-        onPendingClick={() => setCategorizeOpen(true)}
+        onPendingClick={async () => { await fetchQueue(); setCategorizeOpen(true) }}
       />
       <main className="main">
         <ErrorBoundary>
