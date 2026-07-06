@@ -1,0 +1,832 @@
+<!doctype html>
+<title>Mi Economía — Demo</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --canvas:   #000000;
+  --surface:  #1C1C1E;
+  --surface2: #2C2C2E;
+  --surface3: #3A3A3C;
+  --accent:   #007AFF;
+  --green:    #34C759;
+  --red:      #FF3B30;
+  --orange:   #FF9500;
+  --text:     #FFFFFF;
+  --text2:    rgba(235,235,245,0.60);
+  --text3:    rgba(235,235,245,0.30);
+  --border:   rgba(84,84,88,0.36);
+}
+
+html, body {
+  height: 100%;
+  background: var(--canvas);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scroll container ── */
+.pres {
+  height: 100dvh;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+.pres::-webkit-scrollbar { display: none; }
+
+/* ── Side dots nav ── */
+.side-dots {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 200;
+}
+.side-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text3);
+  cursor: pointer;
+  transition: background 0.4s, transform 0.4s, height 0.4s;
+  border: none;
+}
+.side-dot.active {
+  background: var(--accent);
+  transform: scale(1.4);
+  height: 14px;
+  border-radius: 3px;
+}
+
+/* ── Section ── */
+.section {
+  height: 100dvh;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px 48px;
+  position: relative;
+  gap: 20px;
+}
+
+/* ── Animate-in items ── */
+.ai {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.8s cubic-bezier(0.4,0,0.2,1),
+              transform 0.8s cubic-bezier(0.4,0,0.2,1);
+}
+.section.visible .ai { opacity: 1; transform: translateY(0); }
+.section.visible .ai:nth-child(1) { transition-delay: 0.05s; }
+.section.visible .ai:nth-child(2) { transition-delay: 0.18s; }
+.section.visible .ai:nth-child(3) { transition-delay: 0.32s; }
+.section.visible .ai:nth-child(4) { transition-delay: 0.46s; }
+.section.visible .ai:nth-child(5) { transition-delay: 0.58s; }
+
+/* ── Text pieces ── */
+.eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-align: center;
+}
+.headline {
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  color: var(--text);
+  text-align: center;
+  text-wrap: balance;
+}
+.headline em { font-style: normal; color: var(--accent); }
+.subtext {
+  font-size: clamp(0.85rem, 1.5vw, 1rem);
+  color: var(--text2);
+  line-height: 1.7;
+  text-align: center;
+  max-width: 480px;
+  text-wrap: balance;
+}
+.subtext strong { color: var(--text); font-weight: 600; }
+
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 5px 13px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  color: var(--text2);
+}
+.pill.a { border-color: var(--accent); color: var(--accent); background: rgba(0,122,255,0.08); }
+.pill.g { border-color: var(--green);  color: var(--green);  background: rgba(52,199,89,0.08); }
+
+/* ── Phone mockup ── */
+.phone {
+  width: clamp(220px, 28vw, 270px);
+  height: clamp(440px, 56vw, 540px);
+  background: #000;
+  border-radius: 46px;
+  border: 5px solid #2A2A2C;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow:
+    0 60px 120px rgba(0,0,0,0.8),
+    0 0 0 1px rgba(255,255,255,0.04) inset,
+    0 1px 0 rgba(255,255,255,0.1) inset;
+}
+.phone::before {
+  content: '';
+  position: absolute;
+  top: 10px; left: 50%;
+  transform: translateX(-50%);
+  width: 76px; height: 26px;
+  background: #000;
+  border-radius: 20px;
+  z-index: 50;
+}
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── App chrome ── */
+.app-hdr {
+  height: 56px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 16px 10px;
+  flex-shrink: 0;
+  margin-top: 40px;
+}
+.app-title { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+.app-sub   { font-size: 0.52rem; color: var(--text3); font-weight: 500; }
+.app-actions { display: flex; align-items: center; gap: 8px; }
+.hdr-btn {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem;
+  color: var(--text2);
+  flex-shrink: 0;
+}
+.hdr-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg,#2d9e4f,#34C759);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.55rem; font-weight: 700; color: white;
+}
+.bell-btn {
+  background: rgba(0,122,255,0.15);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  position: relative;
+}
+.bell-badge {
+  position: absolute; top: -3px; right: -3px;
+  width: 12px; height: 12px;
+  background: var(--red); border-radius: 50%;
+  font-size: 0.45rem; font-weight: 800; color: white;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid #000;
+  opacity: 0; transition: opacity 0.4s;
+}
+.app-cnt { flex: 1; overflow: hidden; padding: 0 13px; }
+.app-nav {
+  height: 58px;
+  background: rgba(28,28,30,0.95);
+  border-top: 0.5px solid var(--border);
+  display: flex; align-items: flex-start; padding: 8px 0 0;
+  flex-shrink: 0;
+}
+.nav-i {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 2px;
+  font-size: 0.42rem; font-weight: 500; color: var(--text3);
+}
+.nav-i.on { color: var(--accent); }
+.nav-ico { font-size: 0.92rem; line-height: 1; }
+
+/* ── Hero card ── */
+.hero-card {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 14px 13px 12px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+}
+.hero-mnav {
+  display: flex; align-items: center;
+  justify-content: space-between; margin-bottom: 12px;
+}
+.hero-arr {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.55rem; color: var(--text2);
+}
+.hero-mlbl {
+  font-size: 0.52rem; font-weight: 700;
+  color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em;
+}
+.hero-bal { text-align: center; margin-bottom: 12px; }
+.hero-lbl {
+  display: block; font-size: 0.46rem; color: var(--text3);
+  text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; margin-bottom: 5px;
+}
+.hero-val {
+  font-size: 1.9rem; font-weight: 800;
+  letter-spacing: -0.04em; font-variant-numeric: tabular-nums; line-height: 1;
+}
+.hero-val.g { color: var(--green); }
+.hero-stats {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px; background: var(--border);
+  border-radius: 10px; overflow: hidden;
+}
+.hsc {
+  background: var(--surface2); padding: 7px 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.hsc-l { font-size: 0.4rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; }
+.hsc-v { font-size: 0.68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.hsc-v.g { color: var(--green); }
+.hsc-v.r { color: var(--red); }
+.hsc-v.a { color: var(--accent); }
+
+/* ── Slide 2: notif steps ── */
+.notif-steps { display: flex; flex-direction: column; gap: 7px; margin-top: 6px; }
+.nstep {
+  display: flex; align-items: center; gap: 9px;
+  background: var(--surface); border-radius: 10px;
+  padding: 9px 11px; border: 1px solid var(--border);
+  opacity: 0; transition: opacity 0.5s ease;
+}
+.nstep.vis { opacity: 1; }
+.nstep-ico { font-size: 1rem; flex-shrink: 0; }
+.nstep-txt { font-size: 0.58rem; color: var(--text2); line-height: 1.4; }
+.nstep-txt b { display: block; color: var(--text); font-size: 0.62rem; margin-bottom: 1px; }
+.cat-mini {
+  position: absolute; bottom: 58px; left: 0; right: 0;
+  background: var(--surface);
+  border-radius: 14px 14px 0 0;
+  border-top: 0.5px solid var(--border);
+  padding: 10px 12px 12px;
+  transform: translateY(100%);
+  transition: transform 0.5s cubic-bezier(0.34,1.1,0.64,1);
+}
+.cat-mini.open { transform: translateY(0); }
+.cat-handle { width: 28px; height: 3px; background: var(--border); border-radius: 10px; margin: 0 auto 10px; }
+.cat-amt { font-size: 1.2rem; font-weight: 800; color: var(--text); text-align: center; font-variant-numeric: tabular-nums; }
+.cat-sub { font-size: 0.5rem; color: var(--text3); text-align: center; margin: 3px 0 9px; text-transform: uppercase; letter-spacing: 0.08em; }
+.cat-types { display: flex; gap: 6px; }
+.cat-type-btn {
+  flex: 1; background: var(--surface2); border-radius: 8px;
+  padding: 8px 4px; display: flex; flex-direction: column;
+  align-items: center; gap: 3px; border: 1px solid var(--border);
+}
+.cat-type-btn.hl { background: rgba(255,59,48,0.1); border-color: var(--red); }
+.ct-em { font-size: 0.85rem; }
+.ct-lb { font-size: 0.42rem; font-weight: 600; color: var(--text2); text-align: center; }
+
+/* ── Slide 3: add flow ── */
+.tipo-cards { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.tipo-card {
+  display: flex; align-items: center; gap: 9px;
+  background: var(--surface); border-radius: 10px;
+  padding: 10px 12px; border: 1px solid var(--border);
+}
+.tipo-card.on { border-color: var(--red); background: rgba(255,59,48,0.08); }
+.tipo-card.gon { border-color: var(--green); background: rgba(52,199,89,0.08); }
+.tc-em { font-size: 1.1rem; }
+.tc-lb { font-size: 0.62rem; font-weight: 600; color: var(--text); }
+.fields { display: flex; gap: 6px; margin-top: 8px; }
+.field {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 9px;
+}
+.fl { font-size: 0.42rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; margin-bottom: 2px; }
+.fv { font-size: 0.78rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.fv.av { color: var(--accent); }
+.cat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; margin-top: 7px; }
+.cc {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 3px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.cc.on { background: rgba(255,59,48,0.1); border-color: var(--red); }
+.cc.new { border-style: dashed; }
+.cc-em { font-size: 0.88rem; }
+.cc-lb { font-size: 0.4rem; font-weight: 600; color: var(--text2); text-align: center; }
+.cc.new .cc-lb { color: var(--accent); }
+
+/* ── Slide 4: budget ── */
+.bgt-hero {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 11px 11px 9px; margin-top: 5px;
+}
+.bgt-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 9px; }
+.bgt-ttl { font-size: 0.56rem; font-weight: 700; color: var(--text); }
+.bgt-st  { font-size: 0.47rem; color: var(--text3); margin-top: 1px; }
+.bgt-tot { font-size: 0.88rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.bar-bg { height: 5px; background: var(--surface2); border-radius: 10px; overflow: hidden; margin-bottom: 5px; }
+.bar-fill { height: 100%; border-radius: 10px; transition: width 2s cubic-bezier(0.4,0,0.2,1); width: 0; }
+.bar-foot { display: flex; justify-content: space-between; }
+.bar-pct { font-size: 0.46rem; color: var(--text3); font-weight: 600; }
+.bar-rem { font-size: 0.46rem; color: var(--text2); font-weight: 600; font-variant-numeric: tabular-nums; }
+.bgt-list { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
+.bgt-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 9px 7px;
+}
+.bgt-itp { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.bgt-ilft { display: flex; align-items: center; gap: 6px; }
+.bgt-iem { font-size: 0.82rem; }
+.bgt-inm { font-size: 0.58rem; font-weight: 700; color: var(--text); }
+.bgt-iamt { font-size: 0.6rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ── Slide 5: year ── */
+.year-hero {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 11px 11px 9px; margin-top: 5px;
+}
+.y-lbl { font-size: 0.47rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin-bottom: 3px; }
+.y-bal { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; color: var(--green); margin-bottom: 9px; }
+.y-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border-radius: 8px; overflow: hidden; }
+.y-cell { background: var(--surface2); padding: 7px 9px; }
+.y-cl { font-size: 0.42rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin-bottom: 2px; }
+.y-cv { font-size: 0.68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.y-cv.g { color: var(--green); }
+.y-cv.r { color: var(--red); }
+.y-cv.a { color: var(--accent); }
+.bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 56px; margin-top: 9px; padding: 0 2px; }
+.bc { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.br { width: 100%; border-radius: 3px 3px 0 0; transition: height 1.8s cubic-bezier(0.4,0,0.2,1); min-height: 2px; }
+.bl { font-size: 0.38rem; color: var(--text3); font-weight: 600; }
+
+/* ── Slide 6: closing screen ── */
+.closing-scr {
+  padding: 20px 14px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  height: 100%; gap: 12px; margin-top: 40px;
+}
+.app-icon { width: 58px; height: 58px; background: linear-gradient(145deg,#1C1C1E,#2C2C2E); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+.app-nm { font-size: 0.88rem; font-weight: 700; color: var(--text); }
+.app-tg { font-size: 0.52rem; color: var(--text3); text-align: center; line-height: 1.5; }
+.stk-pills { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+.sp { font-size: 0.46rem; font-weight: 600; padding: 3px 8px; border-radius: 100px; background: var(--surface2); border: 1px solid var(--border); color: var(--text2); }
+.url-box { background: rgba(0,122,255,0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 7px 11px; text-align: center; }
+.url-l { font-size: 0.42rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
+.url-v { font-size: 0.56rem; font-weight: 700; color: var(--accent); font-family: monospace; }
+
+/* ── Closing copy (s6) ── */
+.tech-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.tc {
+  font-size: 0.78rem; font-weight: 600;
+  padding: 6px 14px; border-radius: 100px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text2);
+}
+.tc.a { border-color: var(--accent); color: var(--accent); background: rgba(0,122,255,0.08); }
+.tc.g { border-color: var(--green);  color: var(--green);  background: rgba(52,199,89,0.08); }
+.url-big { padding: 16px 22px; background: rgba(0,122,255,0.08); border: 1px solid var(--accent); border-radius: 14px; text-align: center; }
+.url-big .url-l { font-size: 0.65rem; margin-bottom: 6px; }
+.url-big .url-v { font-size: 1rem; }
+
+/* ── Scroll hint ── */
+.scroll-hint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  opacity: 0.4;
+  animation: bounce 2s ease-in-out infinite;
+  font-size: 0.6rem; color: var(--text3);
+}
+.scroll-hint svg { width: 18px; height: 18px; opacity: 0.5; }
+@keyframes bounce {
+  0%,100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(6px); }
+}
+
+@media (max-width: 600px) {
+  .headline { font-size: 1.7rem; }
+  .subtext { font-size: 0.82rem; }
+  .phone { width: 200px; height: 410px; border-radius: 38px; }
+  .hero-val { font-size: 1.5rem; }
+  .side-dots { right: 10px; }
+}
+@media (max-height: 700px) {
+  .section { gap: 12px; padding: 50px 24px 40px; }
+  .phone { height: 360px; }
+}
+</style>
+
+<!-- Side nav dots -->
+<div class="side-dots" id="sideDots"></div>
+
+<div class="pres" id="pres">
+
+  <!-- S1: Hero -->
+  <div class="section" data-idx="0">
+    <span class="eyebrow ai">Control personal de finanzas</span>
+    <h1 class="headline ai">Tu economía,<br><em>siempre bajo control</em></h1>
+    <div class="phone ai">
+      <div class="screen">
+        <div class="app-hdr">
+          <div><div class="app-title">Mi Economía</div><div class="app-sub">Resumen 2025</div></div>
+          <div class="app-actions">
+            <div class="hdr-btn" style="color:var(--accent)">＋</div>
+            <div class="hdr-avatar">MM</div>
+          </div>
+        </div>
+        <div class="app-cnt">
+          <div class="hero-card">
+            <div class="hero-mnav">
+              <div class="hero-arr">‹</div>
+              <div class="hero-mlbl">Junio 2025</div>
+              <div class="hero-arr">›</div>
+            </div>
+            <div class="hero-bal">
+              <span class="hero-lbl">Ahorro del mes</span>
+              <span class="hero-val g">+1.240 €</span>
+            </div>
+            <div class="hero-stats">
+              <div class="hsc"><div class="hsc-l">Ingresos</div><div class="hsc-v g">3.200 €</div></div>
+              <div class="hsc"><div class="hsc-l">Gastos</div><div class="hsc-v r">1.960 €</div></div>
+              <div class="hsc"><div class="hsc-l">Tasa</div><div class="hsc-v a">38.7%</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="app-nav">
+          <div class="nav-i"><div class="nav-ico">📊</div>Año</div>
+          <div class="nav-i on"><div class="nav-ico" style="color:var(--accent)">📅</div>Mes</div>
+          <div class="nav-i"><div class="nav-ico">📈</div>Stats</div>
+          <div class="nav-i"><div class="nav-ico">💼</div>Inv.</div>
+          <div class="nav-i"><div class="nav-ico">🎯</div>Budget</div>
+        </div>
+      </div>
+    </div>
+    <div class="pill-row ai">
+      <span class="pill a">iOS PWA</span>
+      <span class="pill g">Tiempo real</span>
+      <span class="pill">Sin suscripción</span>
+    </div>
+    <div class="scroll-hint">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+    </div>
+  </div>
+
+  <!-- S2: Shortcut → Bell -->
+  <div class="section" data-idx="1">
+    <span class="eyebrow ai">iOS Atajos</span>
+    <h1 class="headline ai">Paga sin<br><em>abrir la app</em></h1>
+    <div class="phone ai">
+      <div class="screen">
+        <div class="app-hdr">
+          <div><div class="app-title">Mi Economía</div><div class="app-sub">Resumen 2025</div></div>
+          <div class="app-actions">
+            <div class="hdr-btn bell-btn" id="bellBtn">🔔<div class="bell-badge" id="bellBadge">1</div></div>
+            <div class="hdr-avatar">MM</div>
+          </div>
+        </div>
+        <div class="app-cnt">
+          <div class="notif-steps">
+            <div class="nstep" id="ns1"><div class="nstep-ico">⚡</div><div class="nstep-txt"><b>Atajo ejecutado</b>Importe: 34,50 € enviado al servidor</div></div>
+            <div class="nstep" id="ns2"><div class="nstep-ico">🔔</div><div class="nstep-txt"><b>Notificación en tiempo real</b>La campana aparece al instante vía SSE</div></div>
+            <div class="nstep" id="ns3"><div class="nstep-ico">🗂️</div><div class="nstep-txt"><b>Categoriza cuando quieras</b>Toca la campana para clasificar el gasto</div></div>
+          </div>
+        </div>
+        <div class="cat-mini" id="catModal">
+          <div class="cat-handle"></div>
+          <div class="cat-amt">34,50 €</div>
+          <div class="cat-sub">¿Qué tipo de movimiento?</div>
+          <div class="cat-types">
+            <div class="cat-type-btn hl"><div class="ct-em">🛍️</div><div class="ct-lb">Gasto<br>Variable</div></div>
+            <div class="cat-type-btn"><div class="ct-em">🏠</div><div class="ct-lb">Gasto<br>Fijo</div></div>
+            <div class="cat-type-btn"><div class="ct-em">💼</div><div class="ct-lb">Ingreso</div></div>
+          </div>
+        </div>
+        <div class="app-nav">
+          <div class="nav-i on"><div class="nav-ico" style="color:var(--accent)">📅</div>Mes</div>
+          <div class="nav-i"><div class="nav-ico">📊</div>Año</div>
+          <div class="nav-i"><div class="nav-ico">📈</div>Stats</div>
+          <div class="nav-i"><div class="nav-ico">💼</div>Inv.</div>
+          <div class="nav-i"><div class="nav-ico">🎯</div>Budget</div>
+        </div>
+      </div>
+    </div>
+    <p class="subtext ai">Ejecuta el <strong>Atajo de iOS</strong> al pagar. El importe llega al backend al instante. Categorízalo cuando quieras, sin perder ningún gasto.</p>
+  </div>
+
+  <!-- S3: Add manual -->
+  <div class="section" data-idx="2">
+    <span class="eyebrow ai">Registro manual</span>
+    <h1 class="headline ai">Añade cualquier<br><em>movimiento</em></h1>
+    <div class="phone ai">
+      <div class="screen">
+        <div style="height:44px;background:rgba(28,28,30,0.95);border-bottom:0.5px solid var(--border);display:flex;align-items:flex-end;justify-content:space-between;padding:0 14px 8px;margin-top:36px;flex-shrink:0">
+          <span style="font-size:0.8rem;font-weight:700;color:var(--text)">Nuevo movimiento</span>
+          <div style="width:22px;height:22px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:var(--text3)">✕</div>
+        </div>
+        <div style="padding:10px 13px;overflow:hidden;flex:1">
+          <div class="tipo-cards">
+            <div class="tipo-card on"><div class="tc-em">🛍️</div><div class="tc-lb">Gasto Variable</div></div>
+            <div class="tipo-card"><div class="tc-em">🏠</div><div class="tc-lb">Gasto Fijo</div></div>
+            <div class="tipo-card gon"><div class="tc-em">💼</div><div class="tc-lb">Ingreso</div></div>
+          </div>
+          <div class="fields">
+            <div class="field"><div class="fl">Importe</div><div class="fv">€ 34,50</div></div>
+            <div class="field"><div class="fl">Fecha</div><div class="fv av">Hoy</div></div>
+          </div>
+          <div class="cat-grid">
+            <div class="cc on"><div class="cc-em">🎉</div><div class="cc-lb">Ocio</div></div>
+            <div class="cc"><div class="cc-em">🍽️</div><div class="cc-lb">Comida</div></div>
+            <div class="cc"><div class="cc-em">👗</div><div class="cc-lb">Ropa</div></div>
+            <div class="cc"><div class="cc-em">✈️</div><div class="cc-lb">Vuelos</div></div>
+            <div class="cc"><div class="cc-em">💪</div><div class="cc-lb">Gimnasio</div></div>
+            <div class="cc new"><div class="cc-em">＋</div><div class="cc-lb">Nueva</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="subtext ai">Pulsa <strong>＋</strong>, elige tipo, selecciona categoría e introduce el importe. ¿No encuentras la categoría? Crea una <strong>nueva directamente ahí</strong>.</p>
+  </div>
+
+  <!-- S4: Budget -->
+  <div class="section" data-idx="3">
+    <span class="eyebrow ai">Presupuesto mensual</span>
+    <h1 class="headline ai">Sabe cuánto<br><em>te queda</em></h1>
+    <div class="phone ai">
+      <div class="screen">
+        <div class="app-hdr">
+          <div><div class="app-title">Presupuesto</div><div class="app-sub">Junio 2025</div></div>
+          <div class="app-actions"><div class="hdr-btn" style="font-size:0.52rem;color:var(--text3);width:auto;padding:0 6px;border-radius:8px">Julio ›</div></div>
+        </div>
+        <div class="app-cnt">
+          <div class="bgt-hero">
+            <div class="bgt-top">
+              <div><div class="bgt-ttl">Total Mensual</div><div class="bgt-st">8 días restantes</div></div>
+              <div class="bgt-tot">900 €</div>
+            </div>
+            <div class="bar-bg"><div class="bar-fill" id="bgtMain" style="background:var(--text3)"></div></div>
+            <div class="bar-foot"><span class="bar-pct" id="bgtMainP">Gastado 0%</span><span class="bar-rem">900 € libres</span></div>
+          </div>
+          <div class="bgt-list">
+            <div class="bgt-item">
+              <div class="bgt-itp"><div class="bgt-ilft"><div class="bgt-iem">🎉</div><div class="bgt-inm">Ocio</div></div><div class="bgt-iamt">200 €</div></div>
+              <div class="bar-bg"><div class="bar-fill" id="b1" style="background:#6366f1"></div></div>
+              <div class="bar-foot"><span class="bar-pct" id="b1p">0%</span><span class="bar-rem">quedan 36 €</span></div>
+            </div>
+            <div class="bgt-item">
+              <div class="bgt-itp"><div class="bgt-ilft"><div class="bgt-iem">🍽️</div><div class="bgt-inm">Comida</div></div><div class="bgt-iamt">350 €</div></div>
+              <div class="bar-bg"><div class="bar-fill" id="b2" style="background:var(--orange)"></div></div>
+              <div class="bar-foot"><span class="bar-pct" id="b2p">0%</span><span class="bar-rem">quedan 154 €</span></div>
+            </div>
+            <div class="bgt-item">
+              <div class="bgt-itp"><div class="bgt-ilft"><div class="bgt-iem">🛍️</div><div class="bgt-inm">Ropa</div></div><div class="bgt-iamt">150 €</div></div>
+              <div class="bar-bg"><div class="bar-fill" id="b3" style="background:var(--red)"></div></div>
+              <div class="bar-foot"><span class="bar-pct" id="b3p">0%</span><span class="bar-rem">quedan 5 €</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="subtext ai">Crea límites mensuales eligiendo categorías de tus gastos. El gasto real se calcula <strong>automáticamente</strong> desde tus transacciones.</p>
+  </div>
+
+  <!-- S5: Year -->
+  <div class="section" data-idx="4">
+    <span class="eyebrow ai">Visión anual</span>
+    <h1 class="headline ai">Tu año,<br><em>de un vistazo</em></h1>
+    <div class="phone ai">
+      <div class="screen">
+        <div class="app-hdr">
+          <div><div class="app-title">Mi Economía</div><div class="app-sub">Resumen 2025</div></div>
+          <div class="app-actions"><div class="hdr-btn" style="color:var(--accent)">＋</div></div>
+        </div>
+        <div class="app-cnt">
+          <div class="year-hero">
+            <div class="y-lbl">Ahorro acumulado 2025</div>
+            <div class="y-bal" id="yearBal">+0 €</div>
+            <div class="y-grid">
+              <div class="y-cell"><div class="y-cl">Ingresos totales</div><div class="y-cv g">19.200 €</div></div>
+              <div class="y-cell"><div class="y-cl">Gastos totales</div><div class="y-cv r">11.760 €</div></div>
+              <div class="y-cell"><div class="y-cl">Mejor mes</div><div class="y-cv a">Abril</div></div>
+              <div class="y-cell"><div class="y-cl">Tasa media</div><div class="y-cv g">38.7%</div></div>
+            </div>
+            <div class="bar-chart" id="barChart"></div>
+          </div>
+        </div>
+        <div class="app-nav">
+          <div class="nav-i on"><div class="nav-ico" style="color:var(--accent)">📊</div>Año</div>
+          <div class="nav-i"><div class="nav-ico">📅</div>Mes</div>
+          <div class="nav-i"><div class="nav-ico">📈</div>Stats</div>
+          <div class="nav-i"><div class="nav-ico">💼</div>Inv.</div>
+          <div class="nav-i"><div class="nav-ico">🎯</div>Budget</div>
+        </div>
+      </div>
+    </div>
+    <p class="subtext ai">Navega mes a mes o consulta el resumen anual. Gráficos de ingresos, gastos y tasa de ahorro actualizados en <strong>tiempo real</strong>.</p>
+  </div>
+
+  <!-- S6: Closing -->
+  <div class="section" data-idx="5">
+    <span class="eyebrow ai">Stack técnico</span>
+    <h1 class="headline ai">Construido para<br><em>durar</em></h1>
+    <div class="tech-row ai">
+      <span class="tc a">React 18 + Vite</span>
+      <span class="tc a">FastAPI</span>
+      <span class="tc g">PostgreSQL</span>
+      <span class="tc g">Supabase</span>
+      <span class="tc">Vercel</span>
+      <span class="tc">Render</span>
+      <span class="tc">iOS Shortcuts</span>
+      <span class="tc">Server-Sent Events</span>
+    </div>
+    <div class="url-big ai">
+      <div class="url-l">Disponible ahora en</div>
+      <div class="url-v">control-beta-ten.vercel.app</div>
+    </div>
+    <p class="subtext ai" style="margin-top:-4px">Arquitectura limpia, sin dependencias innecesarias. Desplegado en producción y en uso diario.</p>
+  </div>
+
+</div><!-- /pres -->
+
+<script>
+const TOTAL    = 6;
+const AUTO_MS  = 8000;
+const sections = Array.from(document.querySelectorAll('.section'));
+const pres     = document.getElementById('pres');
+const dotsEl   = document.getElementById('sideDots');
+
+let autoTimer = null;
+let animTimers = [];
+let visibleIdx = 0;
+
+// Build side dots
+sections.forEach((_, i) => {
+  const d = document.createElement('button');
+  d.className = 'side-dot' + (i === 0 ? ' active' : '');
+  d.setAttribute('aria-label', `Sección ${i+1}`);
+  d.addEventListener('click', () => scrollTo(i));
+  dotsEl.appendChild(d);
+});
+
+function getDots() { return dotsEl.querySelectorAll('.side-dot'); }
+
+function scrollTo(idx) {
+  sections[idx].scrollIntoView({ behavior: 'smooth' });
+  resetAuto();
+}
+
+function resetAuto() {
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(() => {
+    const next = (visibleIdx + 1) % TOTAL;
+    scrollTo(next);
+  }, AUTO_MS);
+}
+
+// — Slide animations —
+function clearAnimT() { animTimers.forEach(clearTimeout); animTimers = []; }
+
+function animS2() {
+  const badge = document.getElementById('bellBadge');
+  const ns1   = document.getElementById('ns1');
+  const ns2   = document.getElementById('ns2');
+  const ns3   = document.getElementById('ns3');
+  const modal = document.getElementById('catModal');
+
+  badge.style.opacity = '0';
+  modal.classList.remove('open');
+  [ns1,ns2,ns3].forEach(n => n && n.classList.remove('vis'));
+
+  animTimers.push(setTimeout(() => ns1 && ns1.classList.add('vis'), 600));
+  animTimers.push(setTimeout(() => {
+    badge.style.opacity = '1';
+    ns2 && ns2.classList.add('vis');
+  }, 1500));
+  animTimers.push(setTimeout(() => ns3 && ns3.classList.add('vis'), 2600));
+  animTimers.push(setTimeout(() => modal.classList.add('open'), 3800));
+}
+
+function animS4() {
+  const els = [
+    { bar: 'bgtMain', pct: 'bgtMainP', w: '68', lbl: 'Gastado 68%' },
+    { bar: 'b1', pct: 'b1p', w: '82', lbl: '82%' },
+    { bar: 'b2', pct: 'b2p', w: '56', lbl: '56%' },
+    { bar: 'b3', pct: 'b3p', w: '97', lbl: '97%' },
+  ];
+  els.forEach(e => {
+    const bar = document.getElementById(e.bar);
+    const pct = document.getElementById(e.pct);
+    if (bar) bar.style.width = '0';
+    if (pct) pct.textContent = '0%';
+  });
+  animTimers.push(setTimeout(() => {
+    els.forEach((e, i) => {
+      animTimers.push(setTimeout(() => {
+        const bar = document.getElementById(e.bar);
+        const pct = document.getElementById(e.pct);
+        if (bar) bar.style.width = e.w + '%';
+        if (pct) pct.textContent = e.lbl;
+      }, i * 220));
+    });
+  }, 700));
+}
+
+function animS5() {
+  const yearBal = document.getElementById('yearBal');
+  const chart   = document.getElementById('barChart');
+
+  if (yearBal) yearBal.textContent = '+0 €';
+  if (chart) {
+    chart.innerHTML = '';
+    const months = ['E','F','M','A','M','J'];
+    const heights = [36,40,52,68,46,58];
+    months.forEach((m, i) => {
+      const col  = document.createElement('div'); col.className = 'bc';
+      const rect = document.createElement('div'); rect.className = 'br';
+      rect.style.height = '0px';
+      rect.style.background = 'var(--green)';
+      const lbl = document.createElement('div'); lbl.className = 'bl'; lbl.textContent = m;
+      col.appendChild(rect); col.appendChild(lbl); chart.appendChild(col);
+      animTimers.push(setTimeout(() => { rect.style.height = heights[i] + 'px'; }, 600 + i * 130));
+    });
+  }
+
+  let count = 0; const target = 7440;
+  function tick() {
+    count = Math.min(count + target / 38, target);
+    if (yearBal) yearBal.textContent = '+' + Math.round(count).toLocaleString('es-ES') + ' €';
+    if (count < target) animTimers.push(setTimeout(tick, 45));
+  }
+  animTimers.push(setTimeout(tick, 500));
+}
+
+function onEnter(idx) {
+  clearAnimT();
+  if (idx === 1) animS2();
+  if (idx === 3) animS4();
+  if (idx === 4) animS5();
+}
+
+// IntersectionObserver — full-section visibility
+const io = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    const idx = parseInt(entry.target.dataset.idx);
+    if (idx === visibleIdx) return;
+    visibleIdx = idx;
+
+    sections.forEach((s, i) => {
+      s.classList.toggle('visible', i === idx);
+    });
+    getDots().forEach((d, i) => {
+      d.classList.toggle('active', i === idx);
+    });
+
+    onEnter(idx);
+    resetAuto();
+  });
+}, { threshold: 0.55 });
+
+sections.forEach(s => io.observe(s));
+
+// Keyboard nav
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); scrollTo((visibleIdx + 1) % TOTAL); }
+  if (e.key === 'ArrowUp')                     { e.preventDefault(); scrollTo((visibleIdx - 1 + TOTAL) % TOTAL); }
+});
+
+// Init
+sections[0].classList.add('visible');
+onEnter(0);
+resetAuto();
+</script>
