@@ -215,7 +215,7 @@ async def shortcut_create_pending(request: Request):
         raise HTTPException(status_code=401, detail="Token inválido")
 
     try:
-        importe = float(data["importe"])
+        importe = float(str(data["importe"]).replace(",", "."))
     except (KeyError, TypeError, ValueError):
         raise HTTPException(status_code=422, detail="importe inválido")
 
