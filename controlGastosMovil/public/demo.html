@@ -508,24 +508,44 @@ html, body {
   font-size: 0.9rem; color: var(--accent);
 }
 
+/* ── Mobile (portrait phone) ── */
 @media (max-width: 600px) {
-  .headline { font-size: 1.5rem; }
-  .subtext { font-size: 0.8rem; }
-  .phone { width: 180px; height: 370px; border-radius: 34px; }
-  .hero-val { font-size: 1.4rem; }
-  .side-dots { right: 8px; }
-  .section { gap: 14px; padding: 52px 20px 44px; }
-  .install-step { padding: 10px 12px; gap: 10px; }
-  .install-text { font-size: 0.78rem; }
+  .section {
+    gap: 10px;
+    padding: 48px 16px 36px;
+    overflow-y: auto;          /* allow section to scroll if content taller than screen */
+    scroll-snap-align: start;
+  }
+  .eyebrow { font-size: 0.6rem; }
+  .headline { font-size: 1.45rem; letter-spacing: -0.02em; }
+  .subtext  { font-size: 0.78rem; max-width: 100%; }
+  .phone {
+    width: 140px;
+    height: 286px;
+    border-radius: 28px;
+    border-width: 4px;
+    flex-shrink: 0;
+  }
+  /* scale inner phone content down proportionally */
+  .phone .screen { transform: scale(0.54); transform-origin: top left; width: 185%; height: 185%; }
+  .hero-val { font-size: 1.5rem; }
+  .side-dots { right: 6px; gap: 6px; }
+  .side-dot  { width: 4px; height: 4px; }
+  .install-steps { max-width: 100%; }
+  .install-step  { padding: 9px 11px; gap: 9px; }
+  .install-text  { font-size: 0.76rem; }
+  .install-num   { width: 24px; height: 24px; font-size: 0.68rem; }
+  .scroll-hint   { display: none; }
+  .tech-row { gap: 6px; }
+  .tc { font-size: 0.68rem; padding: 5px 10px; }
+  .url-big .url-v { font-size: 0.85rem; }
 }
-@media (max-height: 700px) {
-  .section { gap: 10px; padding: 48px 24px 38px; }
-  .phone { height: 330px; }
-  .headline { font-size: 1.6rem; }
-}
+
+/* very short screens (landscape phone) */
 @media (max-height: 600px) {
   .phone { display: none; }
-  .section { justify-content: center; }
+  .section { gap: 12px; }
+  .headline { font-size: 1.6rem; }
 }
 </style>
 
