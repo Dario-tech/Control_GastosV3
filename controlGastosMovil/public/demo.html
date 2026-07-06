@@ -434,16 +434,98 @@ html, body {
   50%      { transform: translateX(-50%) translateY(6px); }
 }
 
+/* ── Install section ── */
+.install-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 340px;
+}
+.install-step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.install-num {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.install-text { font-size: 0.85rem; color: var(--text2); line-height: 1.4; }
+.install-text strong { color: var(--text); font-weight: 600; }
+.install-text em { font-style: normal; color: var(--accent); }
+
+/* share sheet mockup */
+.share-sheet {
+  position: absolute;
+  bottom: 58px; left: 0; right: 0;
+  background: rgba(44,44,46,0.97);
+  border-radius: 14px 14px 0 0;
+  border-top: 0.5px solid var(--border);
+  padding: 10px 0 0;
+  transform: translateY(100%);
+  transition: transform 0.5s cubic-bezier(0.34,1.1,0.64,1);
+}
+.share-sheet.open { transform: translateY(0); }
+.share-handle { width: 28px; height: 3px; background: var(--surface3); border-radius: 10px; margin: 0 auto 8px; }
+.share-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px;
+  font-size: 0.6rem; color: var(--text2);
+  border-bottom: 0.5px solid rgba(84,84,88,0.2);
+}
+.share-row.highlight { background: rgba(0,122,255,0.1); color: var(--text); }
+.share-row.highlight .share-ico { background: var(--accent); }
+.share-ico {
+  width: 26px; height: 26px; border-radius: 6px;
+  background: var(--surface3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; flex-shrink: 0;
+}
+.safari-bar {
+  height: 36px;
+  background: var(--surface2);
+  margin: 0 10px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.5rem; color: var(--text3);
+  font-family: monospace;
+  position: relative;
+  margin-top: 8px;
+}
+.safari-share-btn {
+  position: absolute; right: 10px;
+  font-size: 0.9rem; color: var(--accent);
+}
+
 @media (max-width: 600px) {
-  .headline { font-size: 1.7rem; }
-  .subtext { font-size: 0.82rem; }
-  .phone { width: 200px; height: 410px; border-radius: 38px; }
-  .hero-val { font-size: 1.5rem; }
-  .side-dots { right: 10px; }
+  .headline { font-size: 1.5rem; }
+  .subtext { font-size: 0.8rem; }
+  .phone { width: 180px; height: 370px; border-radius: 34px; }
+  .hero-val { font-size: 1.4rem; }
+  .side-dots { right: 8px; }
+  .section { gap: 14px; padding: 52px 20px 44px; }
+  .install-step { padding: 10px 12px; gap: 10px; }
+  .install-text { font-size: 0.78rem; }
 }
 @media (max-height: 700px) {
-  .section { gap: 12px; padding: 50px 24px 40px; }
-  .phone { height: 360px; }
+  .section { gap: 10px; padding: 48px 24px 38px; }
+  .phone { height: 330px; }
+  .headline { font-size: 1.6rem; }
+}
+@media (max-height: 600px) {
+  .phone { display: none; }
+  .section { justify-content: center; }
 }
 </style>
 
@@ -655,8 +737,57 @@ html, body {
     <p class="subtext ai">Navega mes a mes o consulta el resumen anual. Gráficos de ingresos, gastos y tasa de ahorro actualizados en <strong>tiempo real</strong>.</p>
   </div>
 
-  <!-- S6: Closing -->
+  <!-- S6: Install -->
   <div class="section" data-idx="5">
+    <span class="eyebrow ai">Instalación en iPhone</span>
+    <h1 class="headline ai">En tu pantalla<br><em>de inicio</em></h1>
+    <div class="phone ai">
+      <div class="screen">
+        <div style="margin-top:40px;padding:8px 10px 0;flex-shrink:0">
+          <div class="safari-bar">
+            control-beta-ten.vercel.app
+            <span class="safari-share-btn">⬆</span>
+          </div>
+        </div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;padding:0 20px">
+          <div style="width:52px;height:52px;background:linear-gradient(145deg,#1C1C1E,#2C2C2E);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;border:1px solid var(--border)">💰</div>
+          <div style="font-size:0.65rem;font-weight:700;color:var(--text)">Mi Economía</div>
+          <div style="font-size:0.5rem;color:var(--text3);text-align:center">control-beta-ten.vercel.app</div>
+        </div>
+        <div class="share-sheet" id="shareSheet">
+          <div class="share-handle"></div>
+          <div class="share-row"><div class="share-ico">📡</div>AirDrop</div>
+          <div class="share-row"><div class="share-ico">📋</div>Copiar enlace</div>
+          <div class="share-row highlight"><div class="share-ico" style="background:var(--accent)">＋</div><strong style="font-size:0.62rem;color:var(--text)">Añadir a pantalla de inicio</strong></div>
+          <div class="share-row"><div class="share-ico">⋯</div>Más opciones</div>
+        </div>
+        <div class="app-nav">
+          <div class="nav-i"><div class="nav-ico">◀</div></div>
+          <div class="nav-i"><div class="nav-ico">▶</div></div>
+          <div class="nav-i"><div class="nav-ico">⬆</div></div>
+          <div class="nav-i"><div class="nav-ico">📚</div></div>
+          <div class="nav-i"><div class="nav-ico">⋯</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="install-steps ai">
+      <div class="install-step">
+        <div class="install-num">1</div>
+        <div class="install-text">Abre <strong>Safari</strong> en tu iPhone y ve a <em>control-beta-ten.vercel.app</em></div>
+      </div>
+      <div class="install-step">
+        <div class="install-num">2</div>
+        <div class="install-text">Toca el botón <strong>Compartir</strong> ⬆ de la barra inferior de Safari</div>
+      </div>
+      <div class="install-step">
+        <div class="install-num">3</div>
+        <div class="install-text">Selecciona <em>"Añadir a pantalla de inicio"</em> y toca <strong>Añadir</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S7: Closing -->
+  <div class="section" data-idx="6">
     <span class="eyebrow ai">Stack técnico</span>
     <h1 class="headline ai">Construido para<br><em>durar</em></h1>
     <div class="tech-row ai">
@@ -679,7 +810,7 @@ html, body {
 </div><!-- /pres -->
 
 <script>
-const TOTAL    = 6;
+const TOTAL    = 7;
 const AUTO_MS  = 8000;
 const sections = Array.from(document.querySelectorAll('.section'));
 const pres     = document.getElementById('pres');
@@ -790,11 +921,20 @@ function animS5() {
   animTimers.push(setTimeout(tick, 500));
 }
 
+function animS6() {
+  const sheet = document.getElementById('shareSheet');
+  if (sheet) {
+    sheet.classList.remove('open');
+    animTimers.push(setTimeout(() => sheet.classList.add('open'), 1200));
+  }
+}
+
 function onEnter(idx) {
   clearAnimT();
   if (idx === 1) animS2();
   if (idx === 3) animS4();
   if (idx === 4) animS5();
+  if (idx === 5) animS6();
 }
 
 // IntersectionObserver — full-section visibility
