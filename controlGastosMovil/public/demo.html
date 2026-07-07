@@ -6,6 +6,7 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
+  color-scheme: light;
   --bg:       #F5F5F7;
   --bg-dark:  #1D1D1F;
   --surface:  #FFFFFF;
@@ -30,8 +31,8 @@
 
 html, body {
   height: 100%;
-  background: var(--bg);
-  color: var(--text);
+  background: #F5F5F7 !important;
+  color: #1D1D1F !important;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -82,7 +83,7 @@ html, body {
   align-items: center; justify-content: center;
   padding: 64px 32px 52px;
   gap: 18px;
-  background: var(--bg);
+  background: #F5F5F7;
   position: relative;
 }
 .section.dark {
