@@ -365,7 +365,7 @@ html, body {
 
 /* ── Mobile ── */
 @media (max-width: 600px) {
-  .section { gap: 12px; padding: 50px 18px 42px; overflow-y: auto; }
+  .section { gap: 12px; padding: 50px 18px 42px; overflow-y: auto; flex-direction: column !important; align-items: center !important; }
   .headline { font-size: 1.6rem; }
   .subtext  { font-size: 0.82rem; }
   .phone { width: 148px; height: 302px; border-radius: 30px; border-width: 4px; }
@@ -504,9 +504,7 @@ html, body {
   </div>
 
   <!-- S4: Budget — light -->
-  <div class="section" data-idx="3">
-    <span class="eyebrow ai">Presupuesto mensual</span>
-    <h1 class="headline ai">Sabe cuánto<br><em>te queda.</em></h1>
+  <div class="section" data-idx="3" style="flex-direction:row;gap:clamp(24px,4vw,64px);justify-content:center;align-items:center;padding:48px clamp(24px,5vw,80px)">
     <div class="phone ai">
       <div class="screen">
         <div class="app-hdr">
@@ -538,7 +536,11 @@ html, body {
         </div>
       </div>
     </div>
-    <p class="subtext ai">Crea límites mensuales para cada categoría. El gasto real se calcula <strong>automáticamente</strong> desde tus transacciones.</p>
+    <div class="ai" style="display:flex;flex-direction:column;gap:14px;max-width:300px;flex-shrink:0">
+      <span class="eyebrow" style="text-align:left">Presupuesto mensual</span>
+      <h1 class="headline" style="text-align:left;font-size:clamp(1.9rem,3.8vw,3rem)">Sabrás cuánto<br><em>te queda.</em></h1>
+      <p class="subtext" style="text-align:left;font-size:clamp(1rem,1.5vw,1.15rem);max-width:280px;color:#6E6E73">Crea límites mensuales para cada categoría. El gasto real se calcula <strong style="color:#1D1D1F">automáticamente</strong> desde tus transacciones.</p>
+    </div>
   </div>
 
   <!-- S5: Year — dark -->
