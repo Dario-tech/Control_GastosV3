@@ -1,35 +1,43 @@
 <!doctype html>
-<title>Mi Economía — Demo</title>
+<title>Mi Economía</title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --canvas:   #000000;
-  --surface:  #1C1C1E;
-  --surface2: #2C2C2E;
-  --surface3: #3A3A3C;
+  --bg:       #F5F5F7;
+  --bg-dark:  #1D1D1F;
+  --surface:  #FFFFFF;
+  --border:   rgba(0,0,0,0.08);
+  --text:     #1D1D1F;
+  --text2:    #6E6E73;
+  --text3:    #AEAEB2;
   --accent:   #007AFF;
   --green:    #34C759;
   --red:      #FF3B30;
   --orange:   #FF9500;
-  --text:     #FFFFFF;
-  --text2:    rgba(235,235,245,0.60);
-  --text3:    rgba(235,235,245,0.30);
-  --border:   rgba(84,84,88,0.36);
+
+  /* phone (always dark) */
+  --ph-bg:    #000000;
+  --ph-surf:  #1C1C1E;
+  --ph-surf2: #2C2C2E;
+  --ph-text:  #FFFFFF;
+  --ph-text2: rgba(235,235,245,0.6);
+  --ph-text3: rgba(235,235,245,0.3);
+  --ph-bord:  rgba(84,84,88,0.36);
 }
 
 html, body {
   height: 100%;
-  background: var(--canvas);
+  background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Scroll container ── */
+/* ── Scroll snap container ── */
 .pres {
   height: 100dvh;
   overflow-y: scroll;
@@ -39,160 +47,134 @@ html, body {
 }
 .pres::-webkit-scrollbar { display: none; }
 
-/* ── Side dots nav ── */
+/* ── Progress bar (top) ── */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; background: transparent; z-index: 300;
+}
+.progress-fill {
+  height: 100%; background: var(--accent);
+  width: 0%; transition: none;
+}
+.progress-fill.run { transition: width 8s linear; width: 100%; }
+
+/* ── Side dots ── */
 .side-dots {
-  position: fixed;
-  right: 20px;
-  top: 50%;
+  position: fixed; right: 18px; top: 50%;
   transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: flex; flex-direction: column; gap: 7px;
   z-index: 200;
 }
 .side-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--text3);
-  cursor: pointer;
-  transition: background 0.4s, transform 0.4s, height 0.4s;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: rgba(0,0,0,0.18); cursor: pointer;
+  transition: background 0.35s, transform 0.35s, height 0.35s;
   border: none;
 }
-.side-dot.active {
-  background: var(--accent);
-  transform: scale(1.4);
-  height: 14px;
-  border-radius: 3px;
-}
+.side-dot.on-dark { background: rgba(255,255,255,0.3); }
+.side-dot.active  { background: var(--accent); transform: scale(1.3); height: 13px; border-radius: 3px; }
 
 /* ── Section ── */
 .section {
   height: 100dvh;
   scroll-snap-align: start;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 24px 48px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 64px 32px 52px;
+  gap: 18px;
+  background: var(--bg);
   position: relative;
-  gap: 20px;
 }
+.section.dark {
+  background: var(--bg-dark);
+  color: #FFFFFF;
+}
+.section.dark .eyebrow { color: rgba(255,255,255,0.5); }
+.section.dark .subtext  { color: rgba(255,255,255,0.6); }
+.section.dark .subtext strong { color: #fff; }
 
-/* ── Animate-in items ── */
+/* ── Animate in ── */
 .ai {
   opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 0.8s cubic-bezier(0.4,0,0.2,1),
-              transform 0.8s cubic-bezier(0.4,0,0.2,1);
+  transform: translateY(24px);
+  transition: opacity 0.9s cubic-bezier(0.4,0,0.2,1),
+              transform 0.9s cubic-bezier(0.4,0,0.2,1);
 }
-.section.visible .ai { opacity: 1; transform: translateY(0); }
+.section.visible .ai { opacity: 1; transform: none; }
 .section.visible .ai:nth-child(1) { transition-delay: 0.05s; }
-.section.visible .ai:nth-child(2) { transition-delay: 0.18s; }
-.section.visible .ai:nth-child(3) { transition-delay: 0.32s; }
-.section.visible .ai:nth-child(4) { transition-delay: 0.46s; }
-.section.visible .ai:nth-child(5) { transition-delay: 0.58s; }
+.section.visible .ai:nth-child(2) { transition-delay: 0.16s; }
+.section.visible .ai:nth-child(3) { transition-delay: 0.28s; }
+.section.visible .ai:nth-child(4) { transition-delay: 0.40s; }
+.section.visible .ai:nth-child(5) { transition-delay: 0.52s; }
 
-/* ── Text pieces ── */
+/* ── Text ── */
 .eyebrow {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--accent);
-  text-align: center;
+  font-size: 0.68rem; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text2); text-align: center;
 }
 .headline {
-  font-size: clamp(2rem, 5vw, 3.4rem);
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.035em;
-  color: var(--text);
-  text-align: center;
+  font-size: clamp(2.2rem, 5.5vw, 4rem);
+  font-weight: 700; line-height: 1.07;
+  letter-spacing: -0.04em; text-align: center;
   text-wrap: balance;
 }
 .headline em { font-style: normal; color: var(--accent); }
+.section.dark .headline { color: #FFFFFF; }
 .subtext {
-  font-size: clamp(0.85rem, 1.5vw, 1rem);
-  color: var(--text2);
-  line-height: 1.7;
-  text-align: center;
-  max-width: 480px;
-  text-wrap: balance;
+  font-size: clamp(0.9rem, 1.6vw, 1.05rem);
+  color: var(--text2); line-height: 1.7;
+  text-align: center; max-width: 500px; text-wrap: balance;
 }
-.subtext strong { color: var(--text); font-weight: 600; }
+.subtext strong { color: var(--text); }
 
-.pill-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-}
+.pill-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .pill {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 5px 13px;
-  border-radius: 100px;
-  border: 1px solid var(--border);
-  color: var(--text2);
+  font-size: 0.72rem; font-weight: 600;
+  padding: 5px 14px; border-radius: 100px;
+  border: 1px solid var(--border); color: var(--text2);
+  background: var(--surface);
 }
-.pill.a { border-color: var(--accent); color: var(--accent); background: rgba(0,122,255,0.08); }
-.pill.g { border-color: var(--green);  color: var(--green);  background: rgba(52,199,89,0.08); }
+.pill.a { border-color: rgba(0,122,255,0.3); color: var(--accent); background: rgba(0,122,255,0.06); }
+.pill.g { border-color: rgba(52,199,89,0.3);  color: var(--green);  background: rgba(52,199,89,0.06); }
 
-/* ── Phone mockup ── */
+/* ── Phone ── */
 .phone {
-  width: clamp(220px, 28vw, 270px);
-  height: clamp(440px, 56vw, 540px);
+  width: clamp(220px, 28vw, 268px);
+  height: clamp(450px, 58vw, 548px);
   background: #000;
   border-radius: 46px;
   border: 5px solid #2A2A2C;
-  position: relative;
-  overflow: hidden;
-  flex-shrink: 0;
+  position: relative; overflow: hidden; flex-shrink: 0;
   box-shadow:
-    0 60px 120px rgba(0,0,0,0.8),
-    0 0 0 1px rgba(255,255,255,0.04) inset,
-    0 1px 0 rgba(255,255,255,0.1) inset;
+    0 40px 100px rgba(0,0,0,0.22),
+    0 0 0 1px rgba(255,255,255,0.06) inset;
 }
 .phone::before {
-  content: '';
-  position: absolute;
-  top: 10px; left: 50%;
-  transform: translateX(-50%);
+  content: ''; position: absolute;
+  top: 10px; left: 50%; transform: translateX(-50%);
   width: 76px; height: 26px;
-  background: #000;
-  border-radius: 20px;
-  z-index: 50;
+  background: #000; border-radius: 20px; z-index: 50;
 }
 .screen {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; overflow: hidden;
 }
 
 /* ── App chrome ── */
 .app-hdr {
-  height: 56px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  padding: 0 16px 10px;
-  flex-shrink: 0;
-  margin-top: 40px;
+  height: 56px; display: flex;
+  align-items: flex-end; justify-content: space-between;
+  padding: 0 16px 10px; flex-shrink: 0; margin-top: 40px;
 }
-.app-title { font-size: 0.9rem; font-weight: 700; color: var(--text); }
-.app-sub   { font-size: 0.52rem; color: var(--text3); font-weight: 500; }
+.app-title { font-size: 0.9rem; font-weight: 700; color: var(--ph-text); }
+.app-sub   { font-size: 0.5rem; color: var(--ph-text3); }
 .app-actions { display: flex; align-items: center; gap: 8px; }
 .hdr-btn {
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  background: var(--surface);
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--ph-surf);
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.65rem;
-  color: var(--text2);
-  flex-shrink: 0;
+  font-size: 0.65rem; color: var(--ph-text2); flex-shrink: 0;
 }
 .hdr-avatar {
   width: 28px; height: 28px; border-radius: 50%;
@@ -201,383 +183,225 @@ html, body {
   font-size: 0.55rem; font-weight: 700; color: white;
 }
 .bell-btn {
-  background: rgba(0,122,255,0.15);
-  border: 1px solid var(--accent);
-  color: var(--accent);
-  position: relative;
+  background: rgba(0,122,255,0.15); border: 1px solid #007AFF;
+  color: #007AFF; position: relative;
 }
 .bell-badge {
   position: absolute; top: -3px; right: -3px;
-  width: 12px; height: 12px;
-  background: var(--red); border-radius: 50%;
-  font-size: 0.45rem; font-weight: 800; color: white;
-  display: flex; align-items: center; justify-content: center;
-  border: 1.5px solid #000;
-  opacity: 0; transition: opacity 0.4s;
+  width: 12px; height: 12px; background: var(--red);
+  border-radius: 50%; font-size: 0.45rem; font-weight: 800;
+  color: white; display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid #000; opacity: 0; transition: opacity 0.4s;
 }
 .app-cnt { flex: 1; overflow: hidden; padding: 0 13px; }
 .app-nav {
-  height: 58px;
-  background: rgba(28,28,30,0.95);
-  border-top: 0.5px solid var(--border);
-  display: flex; align-items: flex-start; padding: 8px 0 0;
-  flex-shrink: 0;
+  height: 58px; background: rgba(28,28,30,0.95);
+  border-top: 0.5px solid var(--ph-bord);
+  display: flex; align-items: flex-start; padding: 8px 0 0; flex-shrink: 0;
 }
 .nav-i {
   flex: 1; display: flex; flex-direction: column;
   align-items: center; gap: 2px;
-  font-size: 0.42rem; font-weight: 500; color: var(--text3);
+  font-size: 0.42rem; font-weight: 500; color: var(--ph-text3);
 }
-.nav-i.on { color: var(--accent); }
+.nav-i.on { color: #007AFF; }
 .nav-ico { font-size: 0.92rem; line-height: 1; }
 
-/* ── Hero card ── */
+/* ── S1: Hero card ── */
 .hero-card {
-  background: var(--surface);
-  border-radius: 14px;
-  padding: 14px 13px 12px;
-  margin-top: 4px;
-  border: 1px solid var(--border);
+  background: var(--ph-surf); border-radius: 14px;
+  padding: 14px 13px 12px; margin-top: 4px;
+  border: 1px solid var(--ph-bord);
 }
-.hero-mnav {
-  display: flex; align-items: center;
-  justify-content: space-between; margin-bottom: 12px;
-}
+.hero-mnav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .hero-arr {
   width: 22px; height: 22px; border-radius: 50%;
-  background: var(--surface2);
+  background: var(--ph-surf2);
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.55rem; color: var(--text2);
+  font-size: 0.55rem; color: var(--ph-text2);
 }
-.hero-mlbl {
-  font-size: 0.52rem; font-weight: 700;
-  color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em;
-}
-.hero-bal { text-align: center; margin-bottom: 12px; }
-.hero-lbl {
-  display: block; font-size: 0.46rem; color: var(--text3);
-  text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; margin-bottom: 5px;
-}
-.hero-val {
-  font-size: 1.9rem; font-weight: 800;
-  letter-spacing: -0.04em; font-variant-numeric: tabular-nums; line-height: 1;
-}
+.hero-mlbl { font-size: 0.52rem; font-weight: 700; color: var(--ph-text3); text-transform: uppercase; letter-spacing: 0.1em; }
+.hero-bal  { text-align: center; margin-bottom: 12px; }
+.hero-lbl  { display: block; font-size: 0.46rem; color: var(--ph-text3); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; margin-bottom: 5px; }
+.hero-val  { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; line-height: 1; }
 .hero-val.g { color: var(--green); }
-.hero-stats {
-  display: grid; grid-template-columns: 1fr 1fr 1fr;
-  gap: 1px; background: var(--border);
-  border-radius: 10px; overflow: hidden;
-}
-.hsc {
-  background: var(--surface2); padding: 7px 4px;
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-}
-.hsc-l { font-size: 0.4rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; }
+.hero-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--ph-bord); border-radius: 10px; overflow: hidden; }
+.hsc { background: var(--ph-surf2); padding: 7px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.hsc-l { font-size: 0.4rem; color: var(--ph-text3); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; }
 .hsc-v { font-size: 0.68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.hsc-v.g { color: var(--green); }
-.hsc-v.r { color: var(--red); }
-.hsc-v.a { color: var(--accent); }
+.hsc-v.g { color: var(--green); } .hsc-v.r { color: var(--red); } .hsc-v.a { color: #007AFF; }
 
-/* ── Slide 2: notif steps ── */
-.notif-steps { display: flex; flex-direction: column; gap: 7px; margin-top: 6px; }
+/* ── S2: notif steps ── */
 .nstep {
   display: flex; align-items: center; gap: 9px;
-  background: var(--surface); border-radius: 10px;
-  padding: 9px 11px; border: 1px solid var(--border);
-  opacity: 0; transition: opacity 0.5s ease;
+  background: rgba(255,255,255,0.07); border-radius: 10px;
+  padding: 9px 11px; border: 1px solid rgba(255,255,255,0.08);
+  opacity: 0; transition: opacity 0.5s ease; margin-bottom: 7px;
 }
 .nstep.vis { opacity: 1; }
 .nstep-ico { font-size: 1rem; flex-shrink: 0; }
-.nstep-txt { font-size: 0.58rem; color: var(--text2); line-height: 1.4; }
-.nstep-txt b { display: block; color: var(--text); font-size: 0.62rem; margin-bottom: 1px; }
+.nstep-txt { font-size: 0.58rem; color: var(--ph-text2); line-height: 1.4; }
+.nstep-txt b { display: block; color: var(--ph-text); font-size: 0.62rem; margin-bottom: 1px; }
 .cat-mini {
   position: absolute; bottom: 58px; left: 0; right: 0;
-  background: var(--surface);
-  border-radius: 14px 14px 0 0;
-  border-top: 0.5px solid var(--border);
+  background: var(--ph-surf);
+  border-radius: 14px 14px 0 0; border-top: 0.5px solid var(--ph-bord);
   padding: 10px 12px 12px;
-  transform: translateY(100%);
-  transition: transform 0.5s cubic-bezier(0.34,1.1,0.64,1);
+  transform: translateY(100%); transition: transform 0.5s cubic-bezier(0.34,1.1,0.64,1);
 }
 .cat-mini.open { transform: translateY(0); }
-.cat-handle { width: 28px; height: 3px; background: var(--border); border-radius: 10px; margin: 0 auto 10px; }
-.cat-amt { font-size: 1.2rem; font-weight: 800; color: var(--text); text-align: center; font-variant-numeric: tabular-nums; }
-.cat-sub { font-size: 0.5rem; color: var(--text3); text-align: center; margin: 3px 0 9px; text-transform: uppercase; letter-spacing: 0.08em; }
+.cat-handle { width: 28px; height: 3px; background: var(--ph-bord); border-radius: 10px; margin: 0 auto 10px; }
+.cat-amt  { font-size: 1.2rem; font-weight: 800; color: var(--ph-text); text-align: center; font-variant-numeric: tabular-nums; }
+.cat-sub  { font-size: 0.5rem; color: var(--ph-text3); text-align: center; margin: 3px 0 9px; text-transform: uppercase; letter-spacing: 0.08em; }
 .cat-types { display: flex; gap: 6px; }
 .cat-type-btn {
-  flex: 1; background: var(--surface2); border-radius: 8px;
+  flex: 1; background: var(--ph-surf2); border-radius: 8px;
   padding: 8px 4px; display: flex; flex-direction: column;
-  align-items: center; gap: 3px; border: 1px solid var(--border);
+  align-items: center; gap: 3px; border: 1px solid var(--ph-bord);
 }
 .cat-type-btn.hl { background: rgba(255,59,48,0.1); border-color: var(--red); }
 .ct-em { font-size: 0.85rem; }
-.ct-lb { font-size: 0.42rem; font-weight: 600; color: var(--text2); text-align: center; }
+.ct-lb { font-size: 0.42rem; font-weight: 600; color: var(--ph-text2); text-align: center; }
 
-/* ── Slide 3: add flow ── */
-.tipo-cards { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+/* ── S3: add ── */
 .tipo-card {
   display: flex; align-items: center; gap: 9px;
-  background: var(--surface); border-radius: 10px;
-  padding: 10px 12px; border: 1px solid var(--border);
+  background: var(--ph-surf); border-radius: 10px;
+  padding: 10px 12px; border: 1px solid var(--ph-bord); margin-bottom: 6px;
 }
-.tipo-card.on { border-color: var(--red); background: rgba(255,59,48,0.08); }
+.tipo-card.on  { border-color: var(--red); background: rgba(255,59,48,0.08); }
 .tipo-card.gon { border-color: var(--green); background: rgba(52,199,89,0.08); }
 .tc-em { font-size: 1.1rem; }
-.tc-lb { font-size: 0.62rem; font-weight: 600; color: var(--text); }
+.tc-lb { font-size: 0.62rem; font-weight: 600; color: var(--ph-text); }
 .fields { display: flex; gap: 6px; margin-top: 8px; }
 .field {
-  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  flex: 1; background: var(--ph-surf2); border: 1px solid var(--ph-bord);
   border-radius: 8px; padding: 7px 9px;
 }
-.fl { font-size: 0.42rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; margin-bottom: 2px; }
-.fv { font-size: 0.78rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
-.fv.av { color: var(--accent); }
+.fl { font-size: 0.42rem; color: var(--ph-text3); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; margin-bottom: 2px; }
+.fv { font-size: 0.78rem; font-weight: 700; color: var(--ph-text); font-variant-numeric: tabular-nums; }
+.fv.av { color: #007AFF; }
 .cat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; margin-top: 7px; }
-.cc {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; padding: 6px 3px;
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-}
-.cc.on { background: rgba(255,59,48,0.1); border-color: var(--red); }
+.cc { background: var(--ph-surf); border: 1px solid var(--ph-bord); border-radius: 8px; padding: 6px 3px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.cc.on  { background: rgba(255,59,48,0.1); border-color: var(--red); }
 .cc.new { border-style: dashed; }
 .cc-em { font-size: 0.88rem; }
-.cc-lb { font-size: 0.4rem; font-weight: 600; color: var(--text2); text-align: center; }
-.cc.new .cc-lb { color: var(--accent); }
+.cc-lb { font-size: 0.4rem; font-weight: 600; color: var(--ph-text2); text-align: center; }
+.cc.new .cc-lb { color: #007AFF; }
 
-/* ── Slide 4: budget ── */
+/* ── S4: budget ── */
 .bgt-hero {
-  background: var(--surface); border: 1px solid var(--border);
+  background: var(--ph-surf); border: 1px solid var(--ph-bord);
   border-radius: 12px; padding: 11px 11px 9px; margin-top: 5px;
 }
 .bgt-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 9px; }
-.bgt-ttl { font-size: 0.56rem; font-weight: 700; color: var(--text); }
-.bgt-st  { font-size: 0.47rem; color: var(--text3); margin-top: 1px; }
-.bgt-tot { font-size: 0.88rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
-.bar-bg { height: 5px; background: var(--surface2); border-radius: 10px; overflow: hidden; margin-bottom: 5px; }
+.bgt-ttl { font-size: 0.56rem; font-weight: 700; color: var(--ph-text); }
+.bgt-st  { font-size: 0.47rem; color: var(--ph-text3); margin-top: 1px; }
+.bgt-tot { font-size: 0.88rem; font-weight: 800; color: var(--ph-text); font-variant-numeric: tabular-nums; }
+.bar-bg  { height: 5px; background: var(--ph-surf2); border-radius: 10px; overflow: hidden; margin-bottom: 5px; }
 .bar-fill { height: 100%; border-radius: 10px; transition: width 2s cubic-bezier(0.4,0,0.2,1); width: 0; }
 .bar-foot { display: flex; justify-content: space-between; }
-.bar-pct { font-size: 0.46rem; color: var(--text3); font-weight: 600; }
-.bar-rem { font-size: 0.46rem; color: var(--text2); font-weight: 600; font-variant-numeric: tabular-nums; }
+.bar-pct { font-size: 0.46rem; color: var(--ph-text3); font-weight: 600; }
+.bar-rem { font-size: 0.46rem; color: var(--ph-text2); font-weight: 600; font-variant-numeric: tabular-nums; }
 .bgt-list { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
-.bgt-item {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 8px 9px 7px;
-}
-.bgt-itp { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.bgt-item { background: var(--ph-surf); border: 1px solid var(--ph-bord); border-radius: 10px; padding: 8px 9px 7px; }
+.bgt-itp  { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .bgt-ilft { display: flex; align-items: center; gap: 6px; }
-.bgt-iem { font-size: 0.82rem; }
-.bgt-inm { font-size: 0.58rem; font-weight: 700; color: var(--text); }
-.bgt-iamt { font-size: 0.6rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.bgt-iem  { font-size: 0.82rem; }
+.bgt-inm  { font-size: 0.58rem; font-weight: 700; color: var(--ph-text); }
+.bgt-iamt { font-size: 0.6rem; font-weight: 800; color: var(--ph-text); font-variant-numeric: tabular-nums; }
 
-/* ── Slide 5: year ── */
-.year-hero {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 11px 11px 9px; margin-top: 5px;
-}
-.y-lbl { font-size: 0.47rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin-bottom: 3px; }
+/* ── S5: year ── */
+.year-hero { background: var(--ph-surf); border: 1px solid var(--ph-bord); border-radius: 12px; padding: 11px 11px 9px; margin-top: 5px; }
+.y-lbl { font-size: 0.47rem; color: var(--ph-text3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin-bottom: 3px; }
 .y-bal { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; color: var(--green); margin-bottom: 9px; }
-.y-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border-radius: 8px; overflow: hidden; }
-.y-cell { background: var(--surface2); padding: 7px 9px; }
-.y-cl { font-size: 0.42rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin-bottom: 2px; }
-.y-cv { font-size: 0.68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.y-cv.g { color: var(--green); }
-.y-cv.r { color: var(--red); }
-.y-cv.a { color: var(--accent); }
+.y-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--ph-bord); border-radius: 8px; overflow: hidden; }
+.y-cell { background: var(--ph-surf2); padding: 7px 9px; }
+.y-cl   { font-size: 0.42rem; color: var(--ph-text3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin-bottom: 2px; }
+.y-cv   { font-size: 0.68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.y-cv.g { color: var(--green); } .y-cv.r { color: var(--red); } .y-cv.a { color: #007AFF; }
 .bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 56px; margin-top: 9px; padding: 0 2px; }
 .bc { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .br { width: 100%; border-radius: 3px 3px 0 0; transition: height 1.8s cubic-bezier(0.4,0,0.2,1); min-height: 2px; }
-.bl { font-size: 0.38rem; color: var(--text3); font-weight: 600; }
+.bl { font-size: 0.38rem; color: var(--ph-text3); font-weight: 600; }
 
-/* ── Slide 6: closing screen ── */
-.closing-scr {
-  padding: 20px 14px;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  height: 100%; gap: 12px; margin-top: 40px;
-}
-.app-icon { width: 58px; height: 58px; background: linear-gradient(145deg,#1C1C1E,#2C2C2E); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
-.app-nm { font-size: 0.88rem; font-weight: 700; color: var(--text); }
-.app-tg { font-size: 0.52rem; color: var(--text3); text-align: center; line-height: 1.5; }
-.stk-pills { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
-.sp { font-size: 0.46rem; font-weight: 600; padding: 3px 8px; border-radius: 100px; background: var(--surface2); border: 1px solid var(--border); color: var(--text2); }
-.url-box { background: rgba(0,122,255,0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 7px 11px; text-align: center; }
-.url-l { font-size: 0.42rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
-.url-v { font-size: 0.56rem; font-weight: 700; color: var(--accent); font-family: monospace; }
-
-/* ── Closing copy (s6) ── */
-.tech-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-.tc {
-  font-size: 0.78rem; font-weight: 600;
-  padding: 6px 14px; border-radius: 100px;
-  background: var(--surface); border: 1px solid var(--border); color: var(--text2);
-}
-.tc.a { border-color: var(--accent); color: var(--accent); background: rgba(0,122,255,0.08); }
-.tc.g { border-color: var(--green);  color: var(--green);  background: rgba(52,199,89,0.08); }
-.url-big { padding: 16px 22px; background: rgba(0,122,255,0.08); border: 1px solid var(--accent); border-radius: 14px; text-align: center; }
-.url-big .url-l { font-size: 0.65rem; margin-bottom: 6px; }
-.url-big .url-v { font-size: 1rem; }
-
-/* ── Scroll hint ── */
-.scroll-hint {
-  position: absolute;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  opacity: 0.4;
-  animation: bounce 2s ease-in-out infinite;
-  font-size: 0.6rem; color: var(--text3);
-}
-.scroll-hint svg { width: 18px; height: 18px; opacity: 0.5; }
-@keyframes bounce {
-  0%,100% { transform: translateX(-50%) translateY(0); }
-  50%      { transform: translateX(-50%) translateY(6px); }
-}
-
-/* ── Install section ── */
-.install-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  max-width: 340px;
-}
-.install-step {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px 14px;
-}
-.install-num {
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: 800;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.install-text { font-size: 0.85rem; color: var(--text2); line-height: 1.4; }
+/* ── S6: install ── */
+.install-steps { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 380px; }
+.install-step  { display: flex; align-items: center; gap: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.install-num   { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 0.78rem; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.install-text  { font-size: 0.88rem; color: var(--text2); line-height: 1.45; }
 .install-text strong { color: var(--text); font-weight: 600; }
 .install-text em { font-style: normal; color: var(--accent); }
 
-/* share sheet mockup */
 .share-sheet {
-  position: absolute;
-  bottom: 58px; left: 0; right: 0;
+  position: absolute; bottom: 58px; left: 0; right: 0;
   background: rgba(44,44,46,0.97);
-  border-radius: 14px 14px 0 0;
-  border-top: 0.5px solid var(--border);
+  border-radius: 14px 14px 0 0; border-top: 0.5px solid var(--ph-bord);
   padding: 10px 0 0;
-  transform: translateY(100%);
-  transition: transform 0.5s cubic-bezier(0.34,1.1,0.64,1);
+  transform: translateY(100%); transition: transform 0.5s cubic-bezier(0.34,1.1,0.64,1);
 }
 .share-sheet.open { transform: translateY(0); }
-.share-handle { width: 28px; height: 3px; background: var(--surface3); border-radius: 10px; margin: 0 auto 8px; }
-.share-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 16px;
-  font-size: 0.6rem; color: var(--text2);
-  border-bottom: 0.5px solid rgba(84,84,88,0.2);
+.share-handle { width: 28px; height: 3px; background: rgba(84,84,88,0.5); border-radius: 10px; margin: 0 auto 8px; }
+.share-row { display: flex; align-items: center; gap: 12px; padding: 10px 16px; font-size: 0.6rem; color: var(--ph-text2); border-bottom: 0.5px solid rgba(84,84,88,0.2); }
+.share-row.hl { background: rgba(0,122,255,0.1); }
+.share-ico { width: 26px; height: 26px; border-radius: 6px; background: rgba(84,84,88,0.4); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; flex-shrink: 0; }
+.safari-bar { height: 36px; background: var(--ph-surf2); margin: 8px 10px 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 0.5rem; color: var(--ph-text3); font-family: monospace; position: relative; }
+.safari-share-btn { position: absolute; right: 10px; font-size: 0.9rem; color: #007AFF; }
+
+/* ── Scroll hint ── */
+.scroll-hint {
+  position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  opacity: 0.35; animation: bounce 2.2s ease-in-out infinite;
+  font-size: 0.58rem; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase;
 }
-.share-row.highlight { background: rgba(0,122,255,0.1); color: var(--text); }
-.share-row.highlight .share-ico { background: var(--accent); }
-.share-ico {
-  width: 26px; height: 26px; border-radius: 6px;
-  background: var(--surface3);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.75rem; flex-shrink: 0;
-}
-.safari-bar {
-  height: 36px;
-  background: var(--surface2);
-  margin: 0 10px;
-  border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.5rem; color: var(--text3);
-  font-family: monospace;
-  position: relative;
-  margin-top: 8px;
-}
-.safari-share-btn {
-  position: absolute; right: 10px;
-  font-size: 0.9rem; color: var(--accent);
+.section.dark .scroll-hint { color: rgba(255,255,255,0.3); }
+.scroll-hint svg { width: 16px; height: 16px; }
+@keyframes bounce {
+  0%,100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(5px); }
 }
 
-/* ── Mobile (portrait phone) ── */
+/* ── Mobile ── */
 @media (max-width: 600px) {
-  .section {
-    gap: 10px;
-    padding: 48px 16px 36px;
-    overflow-y: auto;          /* allow section to scroll if content taller than screen */
-    scroll-snap-align: start;
-  }
-  .eyebrow { font-size: 0.6rem; }
-  .headline { font-size: 1.45rem; letter-spacing: -0.02em; }
-  .subtext  { font-size: 0.78rem; max-width: 100%; }
-  .phone {
-    width: 140px;
-    height: 286px;
-    border-radius: 28px;
-    border-width: 4px;
-    flex-shrink: 0;
-  }
-  /* scale inner phone content down proportionally */
-  .phone .screen { transform: scale(0.54); transform-origin: top left; width: 185%; height: 185%; }
-  .hero-val { font-size: 1.5rem; }
-  .side-dots { right: 6px; gap: 6px; }
-  .side-dot  { width: 4px; height: 4px; }
-  .install-steps { max-width: 100%; }
-  .install-step  { padding: 9px 11px; gap: 9px; }
-  .install-text  { font-size: 0.76rem; }
-  .install-num   { width: 24px; height: 24px; font-size: 0.68rem; }
-  .scroll-hint   { display: none; }
-  .tech-row { gap: 6px; }
-  .tc { font-size: 0.68rem; padding: 5px 10px; }
-  .url-big .url-v { font-size: 0.85rem; }
-}
-
-/* very short screens (landscape phone) */
-@media (max-height: 600px) {
-  .phone { display: none; }
-  .section { gap: 12px; }
+  .section { gap: 12px; padding: 50px 18px 42px; overflow-y: auto; }
   .headline { font-size: 1.6rem; }
+  .subtext  { font-size: 0.82rem; }
+  .phone { width: 148px; height: 302px; border-radius: 30px; border-width: 4px; }
+  .phone .screen { transform: scale(0.55); transform-origin: top left; width: 182%; height: 182%; }
+  .side-dots { right: 8px; }
+  .install-step { padding: 11px 13px; gap: 12px; }
+  .install-text { font-size: 0.8rem; }
+  .scroll-hint { display: none; }
+}
+@media (max-height: 620px) {
+  .phone { display: none; }
+  .headline { font-size: 1.8rem; }
 }
 </style>
 
-<!-- Side nav dots -->
+<div class="progress"><div class="progress-fill" id="pgFill"></div></div>
 <div class="side-dots" id="sideDots"></div>
 
 <div class="pres" id="pres">
 
-  <!-- S1: Hero -->
+  <!-- S1: Hero — light -->
   <div class="section" data-idx="0">
     <span class="eyebrow ai">Control personal de finanzas</span>
-    <h1 class="headline ai">Tu economía,<br><em>siempre bajo control</em></h1>
+    <h1 class="headline ai">Tu economía,<br><em>siempre bajo control.</em></h1>
     <div class="phone ai">
       <div class="screen">
         <div class="app-hdr">
           <div><div class="app-title">Mi Economía</div><div class="app-sub">Resumen 2025</div></div>
           <div class="app-actions">
-            <div class="hdr-btn" style="color:var(--accent)">＋</div>
+            <div class="hdr-btn" style="color:#007AFF">＋</div>
             <div class="hdr-avatar">MM</div>
           </div>
         </div>
         <div class="app-cnt">
           <div class="hero-card">
-            <div class="hero-mnav">
-              <div class="hero-arr">‹</div>
-              <div class="hero-mlbl">Junio 2025</div>
-              <div class="hero-arr">›</div>
-            </div>
-            <div class="hero-bal">
-              <span class="hero-lbl">Ahorro del mes</span>
-              <span class="hero-val g">+1.240 €</span>
-            </div>
+            <div class="hero-mnav"><div class="hero-arr">‹</div><div class="hero-mlbl">Junio 2025</div><div class="hero-arr">›</div></div>
+            <div class="hero-bal"><span class="hero-lbl">Ahorro del mes</span><span class="hero-val g">+1.240 €</span></div>
             <div class="hero-stats">
               <div class="hsc"><div class="hsc-l">Ingresos</div><div class="hsc-v g">3.200 €</div></div>
               <div class="hsc"><div class="hsc-l">Gastos</div><div class="hsc-v r">1.960 €</div></div>
@@ -587,7 +411,7 @@ html, body {
         </div>
         <div class="app-nav">
           <div class="nav-i"><div class="nav-ico">📊</div>Año</div>
-          <div class="nav-i on"><div class="nav-ico" style="color:var(--accent)">📅</div>Mes</div>
+          <div class="nav-i on"><div class="nav-ico">📅</div>Mes</div>
           <div class="nav-i"><div class="nav-ico">📈</div>Stats</div>
           <div class="nav-i"><div class="nav-ico">💼</div>Inv.</div>
           <div class="nav-i"><div class="nav-ico">🎯</div>Budget</div>
@@ -599,15 +423,15 @@ html, body {
       <span class="pill g">Gratis</span>
       <span class="pill">Sin registro</span>
     </div>
-    <div class="scroll-hint">
+    <div class="scroll-hint ai">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
     </div>
   </div>
 
-  <!-- S2: Shortcut → Bell -->
-  <div class="section" data-idx="1">
-    <span class="eyebrow ai">iOS Atajos</span>
-    <h1 class="headline ai">Paga sin<br><em>abrir la app</em></h1>
+  <!-- S2: Shortcut — dark -->
+  <div class="section dark" data-idx="1">
+    <span class="eyebrow ai">Paga con tu tarjeta</span>
+    <h1 class="headline ai">Paga sin<br><em>abrir la app.</em></h1>
     <div class="phone ai">
       <div class="screen">
         <div class="app-hdr">
@@ -618,7 +442,7 @@ html, body {
           </div>
         </div>
         <div class="app-cnt">
-          <div class="notif-steps">
+          <div style="margin-top:6px">
             <div class="nstep" id="ns1"><div class="nstep-ico">⚡</div><div class="nstep-txt"><b>Pago registrado</b>34,50 € guardado al instante</div></div>
             <div class="nstep" id="ns2"><div class="nstep-ico">🔔</div><div class="nstep-txt"><b>La campana aparece sola</b>Sin abrir la app, sin hacer nada más</div></div>
             <div class="nstep" id="ns3"><div class="nstep-ico">🗂️</div><div class="nstep-txt"><b>Categoriza cuando quieras</b>Toca la campana para clasificar el gasto</div></div>
@@ -635,7 +459,7 @@ html, body {
           </div>
         </div>
         <div class="app-nav">
-          <div class="nav-i on"><div class="nav-ico" style="color:var(--accent)">📅</div>Mes</div>
+          <div class="nav-i on"><div class="nav-ico">📅</div>Mes</div>
           <div class="nav-i"><div class="nav-ico">📊</div>Año</div>
           <div class="nav-i"><div class="nav-ico">📈</div>Stats</div>
           <div class="nav-i"><div class="nav-ico">💼</div>Inv.</div>
@@ -646,22 +470,20 @@ html, body {
     <p class="subtext ai">Paga con tu tarjeta como siempre. La app lo recibe al instante y te avisa. Categorízalo cuando quieras, sin perder ningún gasto.</p>
   </div>
 
-  <!-- S3: Add manual -->
+  <!-- S3: Add — light -->
   <div class="section" data-idx="2">
     <span class="eyebrow ai">Registro manual</span>
-    <h1 class="headline ai">Añade cualquier<br><em>movimiento</em></h1>
+    <h1 class="headline ai">Añade cualquier<br><em>movimiento.</em></h1>
     <div class="phone ai">
       <div class="screen">
-        <div style="height:44px;background:rgba(28,28,30,0.95);border-bottom:0.5px solid var(--border);display:flex;align-items:flex-end;justify-content:space-between;padding:0 14px 8px;margin-top:36px;flex-shrink:0">
-          <span style="font-size:0.8rem;font-weight:700;color:var(--text)">Nuevo movimiento</span>
-          <div style="width:22px;height:22px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:var(--text3)">✕</div>
+        <div style="height:44px;background:rgba(28,28,30,0.95);border-bottom:0.5px solid var(--ph-bord);display:flex;align-items:flex-end;justify-content:space-between;padding:0 14px 8px;margin-top:36px;flex-shrink:0">
+          <span style="font-size:0.8rem;font-weight:700;color:var(--ph-text)">Nuevo movimiento</span>
+          <div style="width:22px;height:22px;border-radius:50%;background:var(--ph-surf2);display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:var(--ph-text3)">✕</div>
         </div>
         <div style="padding:10px 13px;overflow:hidden;flex:1">
-          <div class="tipo-cards">
-            <div class="tipo-card on"><div class="tc-em">🛍️</div><div class="tc-lb">Gasto Variable</div></div>
-            <div class="tipo-card"><div class="tc-em">🏠</div><div class="tc-lb">Gasto Fijo</div></div>
-            <div class="tipo-card gon"><div class="tc-em">💼</div><div class="tc-lb">Ingreso</div></div>
-          </div>
+          <div class="tipo-card on"><div class="tc-em">🛍️</div><div class="tc-lb">Gasto Variable</div></div>
+          <div class="tipo-card"><div class="tc-em">🏠</div><div class="tc-lb">Gasto Fijo</div></div>
+          <div class="tipo-card gon"><div class="tc-em">💼</div><div class="tc-lb">Ingreso</div></div>
           <div class="fields">
             <div class="field"><div class="fl">Importe</div><div class="fv">€ 34,50</div></div>
             <div class="field"><div class="fl">Fecha</div><div class="fv av">Hoy</div></div>
@@ -677,26 +499,22 @@ html, body {
         </div>
       </div>
     </div>
-    <p class="subtext ai">Pulsa <strong>＋</strong>, elige tipo, selecciona categoría e introduce el importe. ¿No encuentras la categoría? Crea una <strong>nueva directamente ahí</strong>.</p>
+    <p class="subtext ai">Pulsa <strong>＋</strong>, elige el tipo, selecciona la categoría e introduce el importe. ¿No encuentras la categoría? Crea una <strong>nueva directamente ahí</strong>.</p>
   </div>
 
-  <!-- S4: Budget -->
+  <!-- S4: Budget — light -->
   <div class="section" data-idx="3">
     <span class="eyebrow ai">Presupuesto mensual</span>
-    <h1 class="headline ai">Sabe cuánto<br><em>te queda</em></h1>
+    <h1 class="headline ai">Sabe cuánto<br><em>te queda.</em></h1>
     <div class="phone ai">
       <div class="screen">
         <div class="app-hdr">
           <div><div class="app-title">Presupuesto</div><div class="app-sub">Junio 2025</div></div>
-          <div class="app-actions"><div class="hdr-btn" style="font-size:0.52rem;color:var(--text3);width:auto;padding:0 6px;border-radius:8px">Julio ›</div></div>
         </div>
         <div class="app-cnt">
           <div class="bgt-hero">
-            <div class="bgt-top">
-              <div><div class="bgt-ttl">Total Mensual</div><div class="bgt-st">8 días restantes</div></div>
-              <div class="bgt-tot">900 €</div>
-            </div>
-            <div class="bar-bg"><div class="bar-fill" id="bgtMain" style="background:var(--text3)"></div></div>
+            <div class="bgt-top"><div><div class="bgt-ttl">Total Mensual</div><div class="bgt-st">8 días restantes</div></div><div class="bgt-tot">900 €</div></div>
+            <div class="bar-bg"><div class="bar-fill" id="bgtMain" style="background:var(--ph-text3)"></div></div>
             <div class="bar-foot"><span class="bar-pct" id="bgtMainP">Gastado 0%</span><span class="bar-rem">900 € libres</span></div>
           </div>
           <div class="bgt-list">
@@ -719,18 +537,18 @@ html, body {
         </div>
       </div>
     </div>
-    <p class="subtext ai">Crea límites mensuales eligiendo categorías de tus gastos. El gasto real se calcula <strong>automáticamente</strong> desde tus transacciones.</p>
+    <p class="subtext ai">Crea límites mensuales para cada categoría. El gasto real se calcula <strong>automáticamente</strong> desde tus transacciones.</p>
   </div>
 
-  <!-- S5: Year -->
-  <div class="section" data-idx="4">
+  <!-- S5: Year — dark -->
+  <div class="section dark" data-idx="4">
     <span class="eyebrow ai">Visión anual</span>
-    <h1 class="headline ai">Tu año,<br><em>de un vistazo</em></h1>
+    <h1 class="headline ai">Tu año,<br><em>de un vistazo.</em></h1>
     <div class="phone ai">
       <div class="screen">
         <div class="app-hdr">
           <div><div class="app-title">Mi Economía</div><div class="app-sub">Resumen 2025</div></div>
-          <div class="app-actions"><div class="hdr-btn" style="color:var(--accent)">＋</div></div>
+          <div class="app-actions"><div class="hdr-btn" style="color:#007AFF">＋</div></div>
         </div>
         <div class="app-cnt">
           <div class="year-hero">
@@ -746,7 +564,7 @@ html, body {
           </div>
         </div>
         <div class="app-nav">
-          <div class="nav-i on"><div class="nav-ico" style="color:var(--accent)">📊</div>Año</div>
+          <div class="nav-i on"><div class="nav-ico">📊</div>Año</div>
           <div class="nav-i"><div class="nav-ico">📅</div>Mes</div>
           <div class="nav-i"><div class="nav-ico">📈</div>Stats</div>
           <div class="nav-i"><div class="nav-ico">💼</div>Inv.</div>
@@ -757,28 +575,25 @@ html, body {
     <p class="subtext ai">Consulta cuánto has ganado, cuánto has gastado y cuánto has ahorrado en cualquier mes del año. Todo siempre actualizado.</p>
   </div>
 
-  <!-- S6: Install -->
+  <!-- S6: Install — light -->
   <div class="section" data-idx="5">
     <span class="eyebrow ai">Instalación en iPhone</span>
-    <h1 class="headline ai">En tu pantalla<br><em>de inicio</em></h1>
+    <h1 class="headline ai">En tu pantalla<br><em>de inicio.</em></h1>
     <div class="phone ai">
       <div class="screen">
         <div style="margin-top:40px;padding:8px 10px 0;flex-shrink:0">
-          <div class="safari-bar">
-            control-beta-ten.vercel.app
-            <span class="safari-share-btn">⬆</span>
-          </div>
+          <div class="safari-bar">control-beta-ten.vercel.app<span class="safari-share-btn">⬆</span></div>
         </div>
         <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;padding:0 20px">
-          <div style="width:52px;height:52px;background:linear-gradient(145deg,#1C1C1E,#2C2C2E);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;border:1px solid var(--border)">💰</div>
-          <div style="font-size:0.65rem;font-weight:700;color:var(--text)">Mi Economía</div>
-          <div style="font-size:0.5rem;color:var(--text3);text-align:center">control-beta-ten.vercel.app</div>
+          <div style="width:52px;height:52px;background:linear-gradient(145deg,#1C1C1E,#2C2C2E);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;border:1px solid var(--ph-bord)">💰</div>
+          <div style="font-size:0.65rem;font-weight:700;color:var(--ph-text)">Mi Economía</div>
+          <div style="font-size:0.5rem;color:var(--ph-text3);text-align:center">control-beta-ten.vercel.app</div>
         </div>
         <div class="share-sheet" id="shareSheet">
           <div class="share-handle"></div>
           <div class="share-row"><div class="share-ico">📡</div>AirDrop</div>
           <div class="share-row"><div class="share-ico">📋</div>Copiar enlace</div>
-          <div class="share-row highlight"><div class="share-ico" style="background:var(--accent)">＋</div><strong style="font-size:0.62rem;color:var(--text)">Añadir a pantalla de inicio</strong></div>
+          <div class="share-row hl"><div class="share-ico" style="background:#007AFF">＋</div><strong style="font-size:0.62rem;color:var(--ph-text)">Añadir a pantalla de inicio</strong></div>
           <div class="share-row"><div class="share-ico">⋯</div>Más opciones</div>
         </div>
         <div class="app-nav">
@@ -791,195 +606,169 @@ html, body {
       </div>
     </div>
     <div class="install-steps ai">
-      <div class="install-step">
-        <div class="install-num">1</div>
-        <div class="install-text">Abre <strong>Safari</strong> en tu iPhone y ve a <em>control-beta-ten.vercel.app</em></div>
-      </div>
-      <div class="install-step">
-        <div class="install-num">2</div>
-        <div class="install-text">Toca el botón <strong>Compartir</strong> ⬆ de la barra inferior de Safari</div>
-      </div>
-      <div class="install-step">
-        <div class="install-num">3</div>
-        <div class="install-text">Selecciona <em>"Añadir a pantalla de inicio"</em> y toca <strong>Añadir</strong></div>
-      </div>
+      <div class="install-step"><div class="install-num">1</div><div class="install-text">Abre <strong>Safari</strong> en tu iPhone y ve a <em>control-beta-ten.vercel.app</em></div></div>
+      <div class="install-step"><div class="install-num">2</div><div class="install-text">Toca el botón <strong>Compartir ⬆</strong> de la barra inferior</div></div>
+      <div class="install-step"><div class="install-num">3</div><div class="install-text">Selecciona <em>"Añadir a pantalla de inicio"</em> y toca <strong>Añadir</strong></div></div>
     </div>
   </div>
 
-  <!-- S7: Closing -->
-  <div class="section" data-idx="6" style="gap:28px">
+  <!-- S7: Closing — dark -->
+  <div class="section dark" data-idx="6" style="gap:32px">
     <div class="ai" style="display:flex;flex-direction:column;align-items:center;gap:14px">
-      <div style="width:80px;height:80px;background:linear-gradient(145deg,#1C1C1E,#2C2C2E);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:2.2rem;border:1px solid rgba(255,255,255,0.06);box-shadow:0 20px 40px rgba(0,0,0,0.5)">💰</div>
-      <div style="font-size:1rem;font-weight:700;color:var(--text);letter-spacing:-0.01em">Mi Economía</div>
+      <div style="width:88px;height:88px;background:linear-gradient(145deg,#2C2C2E,#1C1C1E);border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:2.4rem;border:1px solid rgba(255,255,255,0.06);box-shadow:0 24px 48px rgba(0,0,0,0.4)">💰</div>
+      <div style="font-size:1.05rem;font-weight:600;color:rgba(255,255,255,0.7);letter-spacing:0.01em">Mi Economía</div>
     </div>
-    <h1 class="headline ai" style="text-align:center;font-size:clamp(2.2rem,5vw,3.8rem)">Tu dinero,<br><em>bajo control.</em></h1>
-    <p class="subtext ai" style="font-size:clamp(0.95rem,1.8vw,1.1rem);max-width:420px">Gratis. Sin registro. Solo abre Safari, añádela a tu pantalla de inicio y empieza hoy.</p>
-    <div class="ai" style="display:flex;flex-direction:column;align-items:center;gap:8px">
-      <div style="font-size:0.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.12em;font-weight:700">Disponible en</div>
-      <div style="background:var(--accent);color:#fff;font-size:1rem;font-weight:700;padding:14px 32px;border-radius:100px;letter-spacing:-0.01em;font-family:monospace">control-beta-ten.vercel.app</div>
+    <h1 class="headline ai" style="font-size:clamp(2.4rem,6vw,4.2rem)">Tu dinero,<br><em>bajo control.</em></h1>
+    <p class="subtext ai" style="font-size:clamp(0.95rem,1.8vw,1.1rem);max-width:440px">Gratis. Sin registro. Abre Safari, añádela a tu pantalla de inicio y empieza hoy.</p>
+    <div class="ai" style="display:flex;flex-direction:column;align-items:center;gap:10px">
+      <div style="font-size:0.62rem;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.12em;font-weight:600">Disponible en</div>
+      <a href="https://control-beta-ten.vercel.app" target="_blank" style="background:var(--accent);color:#fff;font-size:1rem;font-weight:700;padding:16px 36px;border-radius:100px;letter-spacing:-0.01em;text-decoration:none;display:inline-block">control-beta-ten.vercel.app</a>
     </div>
   </div>
 
-</div><!-- /pres -->
+</div>
 
 <script>
-const TOTAL    = 7;
-const AUTO_MS  = 8000;
+const TOTAL = 7, AUTO_MS = 8000;
 const sections = Array.from(document.querySelectorAll('.section'));
-const pres     = document.getElementById('pres');
 const dotsEl   = document.getElementById('sideDots');
+const pgFill   = document.getElementById('pgFill');
+let autoTimer = null, animTimers = [], visibleIdx = 0;
 
-let autoTimer = null;
-let animTimers = [];
-let visibleIdx = 0;
-
-// Build side dots
-sections.forEach((_, i) => {
+sections.forEach((_,i) => {
   const d = document.createElement('button');
-  d.className = 'side-dot' + (i === 0 ? ' active' : '');
-  d.setAttribute('aria-label', `Sección ${i+1}`);
-  d.addEventListener('click', () => scrollTo(i));
+  d.className = 'side-dot';
+  d.addEventListener('click', () => goTo(i));
   dotsEl.appendChild(d);
 });
 
 function getDots() { return dotsEl.querySelectorAll('.side-dot'); }
 
-function scrollTo(idx) {
-  sections[idx].scrollIntoView({ behavior: 'smooth' });
-  resetAuto();
+function updateDots(idx) {
+  const isDark = sections[idx].classList.contains('dark');
+  getDots().forEach((d,i) => {
+    d.classList.toggle('active', i === idx);
+    d.classList.toggle('on-dark', isDark);
+  });
 }
 
-function resetAuto() {
+function goTo(idx) {
   clearTimeout(autoTimer);
-  autoTimer = setTimeout(() => {
-    const next = (visibleIdx + 1) % TOTAL;
-    scrollTo(next);
-  }, AUTO_MS);
+  sections[idx].scrollIntoView({ behavior: 'smooth' });
+  autoTimer = setTimeout(() => goTo((visibleIdx + 1) % TOTAL), AUTO_MS);
 }
 
-// — Slide animations —
-function clearAnimT() { animTimers.forEach(clearTimeout); animTimers = []; }
+// Progress bar
+function resetProgress() {
+  pgFill.classList.remove('run');
+  pgFill.style.width = '0%';
+  void pgFill.offsetWidth;
+  pgFill.classList.add('run');
+}
+
+// Animations
+function clearAT() { animTimers.forEach(clearTimeout); animTimers = []; }
 
 function animS2() {
   const badge = document.getElementById('bellBadge');
-  const ns1   = document.getElementById('ns1');
-  const ns2   = document.getElementById('ns2');
-  const ns3   = document.getElementById('ns3');
+  const ns    = ['ns1','ns2','ns3'].map(id => document.getElementById(id));
   const modal = document.getElementById('catModal');
-
   badge.style.opacity = '0';
   modal.classList.remove('open');
-  [ns1,ns2,ns3].forEach(n => n && n.classList.remove('vis'));
-
-  animTimers.push(setTimeout(() => ns1 && ns1.classList.add('vis'), 600));
-  animTimers.push(setTimeout(() => {
-    badge.style.opacity = '1';
-    ns2 && ns2.classList.add('vis');
-  }, 1500));
-  animTimers.push(setTimeout(() => ns3 && ns3.classList.add('vis'), 2600));
-  animTimers.push(setTimeout(() => modal.classList.add('open'), 3800));
+  ns.forEach(n => n && n.classList.remove('vis'));
+  animTimers.push(setTimeout(() => ns[0] && ns[0].classList.add('vis'), 500));
+  animTimers.push(setTimeout(() => { badge.style.opacity='1'; ns[1] && ns[1].classList.add('vis'); }, 1400));
+  animTimers.push(setTimeout(() => ns[2] && ns[2].classList.add('vis'), 2400));
+  animTimers.push(setTimeout(() => modal.classList.add('open'), 3600));
 }
 
 function animS4() {
-  const els = [
-    { bar: 'bgtMain', pct: 'bgtMainP', w: '68', lbl: 'Gastado 68%' },
-    { bar: 'b1', pct: 'b1p', w: '82', lbl: '82%' },
-    { bar: 'b2', pct: 'b2p', w: '56', lbl: '56%' },
-    { bar: 'b3', pct: 'b3p', w: '97', lbl: '97%' },
+  const bars = [
+    {b:'bgtMain',p:'bgtMainP',w:'68',lbl:'Gastado 68%'},
+    {b:'b1',p:'b1p',w:'82',lbl:'82%'},
+    {b:'b2',p:'b2p',w:'56',lbl:'56%'},
+    {b:'b3',p:'b3p',w:'97',lbl:'97%'},
   ];
-  els.forEach(e => {
-    const bar = document.getElementById(e.bar);
-    const pct = document.getElementById(e.pct);
-    if (bar) bar.style.width = '0';
-    if (pct) pct.textContent = '0%';
-  });
+  bars.forEach(e => { const el=document.getElementById(e.b); if(el) el.style.width='0'; });
   animTimers.push(setTimeout(() => {
-    els.forEach((e, i) => {
-      animTimers.push(setTimeout(() => {
-        const bar = document.getElementById(e.bar);
-        const pct = document.getElementById(e.pct);
-        if (bar) bar.style.width = e.w + '%';
-        if (pct) pct.textContent = e.lbl;
-      }, i * 220));
-    });
-  }, 700));
+    bars.forEach((e,i) => animTimers.push(setTimeout(() => {
+      const bar=document.getElementById(e.b), pct=document.getElementById(e.p);
+      if(bar) bar.style.width=e.w+'%';
+      if(pct) pct.textContent=e.lbl;
+    }, i*220)));
+  }, 600));
 }
 
 function animS5() {
-  const yearBal = document.getElementById('yearBal');
-  const chart   = document.getElementById('barChart');
-
-  if (yearBal) yearBal.textContent = '+0 €';
-  if (chart) {
-    chart.innerHTML = '';
-    const months = ['E','F','M','A','M','J'];
-    const heights = [36,40,52,68,46,58];
-    months.forEach((m, i) => {
-      const col  = document.createElement('div'); col.className = 'bc';
-      const rect = document.createElement('div'); rect.className = 'br';
-      rect.style.height = '0px';
-      rect.style.background = 'var(--green)';
-      const lbl = document.createElement('div'); lbl.className = 'bl'; lbl.textContent = m;
-      col.appendChild(rect); col.appendChild(lbl); chart.appendChild(col);
-      animTimers.push(setTimeout(() => { rect.style.height = heights[i] + 'px'; }, 600 + i * 130));
+  const yb = document.getElementById('yearBal');
+  const ch = document.getElementById('barChart');
+  if(yb) yb.textContent = '+0 €';
+  if(ch) {
+    ch.innerHTML = '';
+    ['E','F','M','A','M','J'].forEach((m,i) => {
+      const col=document.createElement('div'); col.className='bc';
+      const rect=document.createElement('div'); rect.className='br';
+      rect.style.cssText='height:0;background:var(--green)';
+      const lbl=document.createElement('div'); lbl.className='bl'; lbl.textContent=m;
+      col.append(rect,lbl); ch.appendChild(col);
+      animTimers.push(setTimeout(() => { rect.style.height=[36,40,52,68,46,58][i]+'px'; }, 500+i*130));
     });
   }
-
-  let count = 0; const target = 7440;
-  function tick() {
-    count = Math.min(count + target / 38, target);
-    if (yearBal) yearBal.textContent = '+' + Math.round(count).toLocaleString('es-ES') + ' €';
-    if (count < target) animTimers.push(setTimeout(tick, 45));
-  }
-  animTimers.push(setTimeout(tick, 500));
+  let c=0; const target=7440;
+  const tick = () => {
+    c = Math.min(c+target/38, target);
+    if(yb) yb.textContent='+'+Math.round(c).toLocaleString('es-ES')+' €';
+    if(c<target) animTimers.push(setTimeout(tick,45));
+  };
+  animTimers.push(setTimeout(tick, 400));
 }
 
 function animS6() {
-  const sheet = document.getElementById('shareSheet');
-  if (sheet) {
-    sheet.classList.remove('open');
-    animTimers.push(setTimeout(() => sheet.classList.add('open'), 1200));
-  }
+  const s = document.getElementById('shareSheet');
+  if(s) { s.classList.remove('open'); animTimers.push(setTimeout(() => s.classList.add('open'), 1200)); }
 }
 
 function onEnter(idx) {
-  clearAnimT();
-  if (idx === 1) animS2();
-  if (idx === 3) animS4();
-  if (idx === 4) animS5();
-  if (idx === 5) animS6();
+  clearAT();
+  if(idx===1) animS2();
+  if(idx===3) animS4();
+  if(idx===4) animS5();
+  if(idx===5) animS6();
 }
 
-// IntersectionObserver — full-section visibility
 const io = new IntersectionObserver(entries => {
   entries.forEach(entry => {
-    if (!entry.isIntersecting) return;
+    if(!entry.isIntersecting) return;
     const idx = parseInt(entry.target.dataset.idx);
-    if (idx === visibleIdx) return;
+    if(idx === visibleIdx && entry.target.classList.contains('visible')) return;
     visibleIdx = idx;
-
-    sections.forEach((s, i) => {
-      s.classList.toggle('visible', i === idx);
-    });
-    getDots().forEach((d, i) => {
-      d.classList.toggle('active', i === idx);
-    });
-
+    sections.forEach((s,i) => s.classList.toggle('visible', i===idx));
+    updateDots(idx);
     onEnter(idx);
-    resetAuto();
+    resetProgress();
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(() => goTo((visibleIdx+1)%TOTAL), AUTO_MS);
   });
 }, { threshold: 0.55 });
 
 sections.forEach(s => io.observe(s));
 
-// Keyboard nav
 document.addEventListener('keydown', e => {
-  if (e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); scrollTo((visibleIdx + 1) % TOTAL); }
-  if (e.key === 'ArrowUp')                     { e.preventDefault(); scrollTo((visibleIdx - 1 + TOTAL) % TOTAL); }
+  if(e.key==='ArrowDown'||e.key===' ') { e.preventDefault(); goTo((visibleIdx+1)%TOTAL); }
+  if(e.key==='ArrowUp') { e.preventDefault(); goTo((visibleIdx-1+TOTAL)%TOTAL); }
+});
+let tx=null;
+document.addEventListener('touchstart', e => { tx=e.touches[0].clientX; }, {passive:true});
+document.addEventListener('touchend', e => {
+  if(tx===null) return;
+  const dx=e.changedTouches[0].clientX-tx;
+  if(Math.abs(dx)>50) dx<0?goTo((visibleIdx+1)%TOTAL):goTo((visibleIdx-1+TOTAL)%TOTAL);
+  tx=null;
 });
 
-// Init
 sections[0].classList.add('visible');
+updateDots(0);
 onEnter(0);
-resetAuto();
+resetProgress();
+autoTimer = setTimeout(() => goTo(1), AUTO_MS);
 </script>
