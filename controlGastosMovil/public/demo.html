@@ -79,10 +79,10 @@ html, body {
 .section {
   height: 100dvh;
   scroll-snap-align: start;
-  display: flex; flex-direction: column;
+  display: flex; flex-direction: row;
   align-items: center; justify-content: center;
-  padding: 64px 32px 52px;
-  gap: 18px;
+  padding: 48px clamp(32px, 7vw, 110px);
+  gap: clamp(48px, 7vw, 96px);
   background: #F5F5F7;
   position: relative;
 }
@@ -93,6 +93,16 @@ html, body {
 .section.dark .eyebrow { color: rgba(255,255,255,0.5); }
 .section.dark .subtext  { color: rgba(255,255,255,0.6); }
 .section.dark .subtext strong { color: #fff; }
+
+/* ── Text block (right column) ── */
+.txt {
+  display: flex; flex-direction: column; gap: 18px;
+  max-width: 340px; flex-shrink: 0;
+}
+.txt .eyebrow { text-align: left; }
+.txt .headline { text-align: left; font-size: clamp(2rem, 4vw, 3.2rem); }
+.txt .subtext  { text-align: left; font-size: clamp(1rem, 1.5vw, 1.15rem); max-width: 320px; }
+.txt .pill-row { justify-content: flex-start; }
 
 /* ── Animate in ── */
 .ai {
@@ -364,10 +374,13 @@ html, body {
 }
 
 /* ── Mobile ── */
-@media (max-width: 600px) {
-  .section { gap: 12px; padding: 50px 18px 42px; overflow-y: auto; flex-direction: column !important; align-items: center !important; }
+@media (max-width: 680px) {
+  .section { flex-direction: column; gap: 14px; padding: 50px 18px 42px; overflow-y: auto; }
+  .txt { align-items: center; max-width: 100%; }
+  .txt .eyebrow, .txt .headline, .txt .subtext { text-align: center; }
+  .txt .pill-row { justify-content: center; }
   .headline { font-size: 1.6rem; }
-  .subtext  { font-size: 0.82rem; }
+  .subtext  { font-size: 0.9rem; }
   .phone { width: 148px; height: 302px; border-radius: 30px; border-width: 4px; }
   .phone .screen { transform: scale(0.55); transform-origin: top left; width: 182%; height: 182%; }
   .side-dots { right: 8px; }
@@ -388,8 +401,6 @@ html, body {
 
   <!-- S1: Hero — light -->
   <div class="section" data-idx="0">
-    <span class="eyebrow ai">Control personal de finanzas</span>
-    <h1 class="headline ai">Tu economía,<br><em>siempre bajo control.</em></h1>
     <div class="phone ai">
       <div class="screen">
         <div class="app-hdr">
@@ -419,20 +430,22 @@ html, body {
         </div>
       </div>
     </div>
-    <div class="pill-row ai">
-      <span class="pill a">Para iPhone</span>
-      <span class="pill g">Gratis</span>
-      <span class="pill">Sin registro</span>
+    <div class="txt ai">
+      <span class="eyebrow">Control personal de finanzas</span>
+      <h1 class="headline">Tu economía,<br><em>siempre bajo control.</em></h1>
+      <div class="pill-row">
+        <span class="pill a">Para iPhone</span>
+        <span class="pill g">Gratis</span>
+        <span class="pill">Sin registro</span>
+      </div>
     </div>
-    <div class="scroll-hint ai">
+    <div class="scroll-hint">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
     </div>
   </div>
 
   <!-- S2: Shortcut — dark -->
   <div class="section dark" data-idx="1">
-    <span class="eyebrow ai">Paga con tu tarjeta</span>
-    <h1 class="headline ai">Paga sin<br><em>abrir la app.</em></h1>
     <div class="phone ai">
       <div class="screen">
         <div class="app-hdr">
@@ -468,13 +481,15 @@ html, body {
         </div>
       </div>
     </div>
-    <p class="subtext ai">Paga con tu tarjeta como siempre. La app lo recibe al instante y te avisa. Categorízalo cuando quieras, sin perder ningún gasto.</p>
+    <div class="txt ai">
+      <span class="eyebrow">Paga con tu tarjeta</span>
+      <h1 class="headline">Paga sin<br><em>abrir la app.</em></h1>
+      <p class="subtext">Paga con tu tarjeta como siempre. La app lo recibe al instante y te avisa. Categorízalo cuando quieras, sin perder ningún gasto.</p>
+    </div>
   </div>
 
   <!-- S3: Add — light -->
   <div class="section" data-idx="2">
-    <span class="eyebrow ai">Registro manual</span>
-    <h1 class="headline ai">Añade cualquier<br><em>movimiento.</em></h1>
     <div class="phone ai">
       <div class="screen">
         <div style="height:44px;background:rgba(28,28,30,0.95);border-bottom:0.5px solid var(--ph-bord);display:flex;align-items:flex-end;justify-content:space-between;padding:0 14px 8px;margin-top:36px;flex-shrink:0">
@@ -500,11 +515,15 @@ html, body {
         </div>
       </div>
     </div>
-    <p class="subtext ai">Pulsa <strong>＋</strong>, elige el tipo, selecciona la categoría e introduce el importe. ¿No encuentras la categoría? Crea una <strong>nueva directamente ahí</strong>.</p>
+    <div class="txt ai">
+      <span class="eyebrow">Registro manual</span>
+      <h1 class="headline">Añade cualquier<br><em>movimiento.</em></h1>
+      <p class="subtext">Pulsa <strong>＋</strong>, elige el tipo, selecciona la categoría e introduce el importe. ¿No encuentras la categoría? Crea una <strong>nueva directamente ahí</strong>.</p>
+    </div>
   </div>
 
   <!-- S4: Budget — light -->
-  <div class="section" data-idx="3" style="flex-direction:row;gap:clamp(24px,4vw,64px);justify-content:center;align-items:center;padding:48px clamp(24px,5vw,80px)">
+  <div class="section" data-idx="3">
     <div class="phone ai">
       <div class="screen">
         <div class="app-hdr">
@@ -536,17 +555,15 @@ html, body {
         </div>
       </div>
     </div>
-    <div class="ai" style="display:flex;flex-direction:column;gap:14px;max-width:300px;flex-shrink:0">
-      <span class="eyebrow" style="text-align:left">Presupuesto mensual</span>
-      <h1 class="headline" style="text-align:left;font-size:clamp(1.9rem,3.8vw,3rem)">Sabrás cuánto<br><em>te queda.</em></h1>
-      <p class="subtext" style="text-align:left;font-size:clamp(1rem,1.5vw,1.15rem);max-width:280px;color:#6E6E73">Crea límites mensuales para cada categoría. El gasto real se calcula <strong style="color:#1D1D1F">automáticamente</strong> desde tus transacciones.</p>
+    <div class="txt ai">
+      <span class="eyebrow">Presupuesto mensual</span>
+      <h1 class="headline">Sabrás cuánto<br><em>te queda.</em></h1>
+      <p class="subtext">Crea límites mensuales para cada categoría. El gasto real se calcula <strong>automáticamente</strong> desde tus transacciones.</p>
     </div>
   </div>
 
   <!-- S5: Year — dark -->
   <div class="section dark" data-idx="4">
-    <span class="eyebrow ai">Visión anual</span>
-    <h1 class="headline ai">Tu año,<br><em>de un vistazo.</em></h1>
     <div class="phone ai">
       <div class="screen">
         <div class="app-hdr">
@@ -575,13 +592,15 @@ html, body {
         </div>
       </div>
     </div>
-    <p class="subtext ai">Consulta cuánto has ganado, cuánto has gastado y cuánto has ahorrado en cualquier mes del año. Todo siempre actualizado.</p>
+    <div class="txt ai">
+      <span class="eyebrow">Visión anual</span>
+      <h1 class="headline">Tu año,<br><em>de un vistazo.</em></h1>
+      <p class="subtext">Consulta cuánto has ganado, cuánto has gastado y cuánto has ahorrado en cualquier mes del año. Todo siempre actualizado.</p>
+    </div>
   </div>
 
   <!-- S6: Install — light -->
   <div class="section" data-idx="5">
-    <span class="eyebrow ai">Instalación en iPhone</span>
-    <h1 class="headline ai">En tu pantalla<br><em>de inicio.</em></h1>
     <div class="phone ai">
       <div class="screen">
         <div style="margin-top:40px;padding:8px 10px 0;flex-shrink:0">
@@ -608,10 +627,14 @@ html, body {
         </div>
       </div>
     </div>
-    <div class="install-steps ai">
-      <div class="install-step"><div class="install-num">1</div><div class="install-text">Abre <strong>Safari</strong> en tu iPhone y ve a <em>control-beta-ten.vercel.app</em></div></div>
-      <div class="install-step"><div class="install-num">2</div><div class="install-text">Toca el botón <strong>Compartir ⬆</strong> de la barra inferior</div></div>
-      <div class="install-step"><div class="install-num">3</div><div class="install-text">Selecciona <em>"Añadir a pantalla de inicio"</em> y toca <strong>Añadir</strong></div></div>
+    <div class="txt ai">
+      <span class="eyebrow">Instalación en iPhone</span>
+      <h1 class="headline">En tu pantalla<br><em>de inicio.</em></h1>
+      <div class="install-steps">
+        <div class="install-step"><div class="install-num">1</div><div class="install-text">Abre <strong>Safari</strong> y ve a <em>control-beta-ten.vercel.app</em></div></div>
+        <div class="install-step"><div class="install-num">2</div><div class="install-text">Toca el botón <strong>Compartir ⬆</strong> de la barra inferior</div></div>
+        <div class="install-step"><div class="install-num">3</div><div class="install-text">Selecciona <em>"Añadir a pantalla de inicio"</em> y toca <strong>Añadir</strong></div></div>
+      </div>
     </div>
   </div>
 
