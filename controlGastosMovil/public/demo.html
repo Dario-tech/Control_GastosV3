@@ -444,47 +444,72 @@ html, body {
     </div>
   </div>
 
-  <!-- S2: Shortcut — dark -->
+  <!-- S2: Stats — dark -->
   <div class="section dark" data-idx="1">
     <div class="phone ai">
       <div class="screen">
         <div class="app-hdr">
-          <div><div class="app-title">Mi Economía</div><div class="app-sub">Resumen 2025</div></div>
-          <div class="app-actions">
-            <div class="hdr-btn bell-btn" id="bellBtn">🔔<div class="bell-badge" id="bellBadge">1</div></div>
-            <div class="hdr-avatar">MM</div>
-          </div>
+          <div><div class="app-title">Estadísticas</div><div class="app-sub">Junio 2025</div></div>
+          <div class="app-actions"><div class="hdr-avatar">MM</div></div>
         </div>
         <div class="app-cnt">
-          <div style="margin-top:6px">
-            <div class="nstep" id="ns1"><div class="nstep-ico">⚡</div><div class="nstep-txt"><b>Pago registrado</b>34,50 € guardado al instante</div></div>
-            <div class="nstep" id="ns2"><div class="nstep-ico">🔔</div><div class="nstep-txt"><b>La campana aparece sola</b>Sin abrir la app, sin hacer nada más</div></div>
-            <div class="nstep" id="ns3"><div class="nstep-ico">🗂️</div><div class="nstep-txt"><b>Categoriza cuando quieras</b>Toca la campana para clasificar el gasto</div></div>
-          </div>
-        </div>
-        <div class="cat-mini" id="catModal">
-          <div class="cat-handle"></div>
-          <div class="cat-amt">34,50 €</div>
-          <div class="cat-sub">¿Qué tipo de movimiento?</div>
-          <div class="cat-types">
-            <div class="cat-type-btn hl"><div class="ct-em">🛍️</div><div class="ct-lb">Gasto<br>Variable</div></div>
-            <div class="cat-type-btn"><div class="ct-em">🏠</div><div class="ct-lb">Gasto<br>Fijo</div></div>
-            <div class="cat-type-btn"><div class="ct-em">💼</div><div class="ct-lb">Ingreso</div></div>
+          <div style="margin-top:4px">
+            <div style="background:var(--ph-surf);border:1px solid var(--ph-bord);border-radius:12px;padding:9px 11px;margin-bottom:6px">
+              <div style="font-size:.42rem;color:var(--ph-text3);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:3px">Total gastos junio</div>
+              <div style="font-size:1.35rem;font-weight:800;letter-spacing:-.04em;color:var(--red);font-variant-numeric:tabular-nums">1.960 €</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <div style="background:var(--ph-surf);border:1px solid var(--ph-bord);border-radius:9px;padding:7px 9px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                  <div style="display:flex;align-items:center;gap:5px"><span style="font-size:.82rem">🏠</span><span style="font-size:.52rem;font-weight:600;color:var(--ph-text)">Casa</span></div>
+                  <span style="font-size:.52rem;font-weight:800;color:var(--ph-text);font-variant-numeric:tabular-nums">800 €</span>
+                </div>
+                <div class="bar-bg"><div class="bar-fill" style="width:100%;background:#6366f1;transition:none"></div></div>
+              </div>
+              <div style="background:var(--ph-surf);border:1px solid var(--ph-bord);border-radius:9px;padding:7px 9px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                  <div style="display:flex;align-items:center;gap:5px"><span style="font-size:.82rem">🍽️</span><span style="font-size:.52rem;font-weight:600;color:var(--ph-text)">Comida</span></div>
+                  <span style="font-size:.52rem;font-weight:800;color:var(--ph-text);font-variant-numeric:tabular-nums">458 €</span>
+                </div>
+                <div class="bar-bg"><div class="bar-fill" style="width:57%;background:var(--orange);transition:none"></div></div>
+              </div>
+              <div style="background:var(--ph-surf);border:1px solid var(--ph-bord);border-radius:9px;padding:7px 9px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                  <div style="display:flex;align-items:center;gap:5px"><span style="font-size:.82rem">🎉</span><span style="font-size:.52rem;font-weight:600;color:var(--ph-text)">Ocio</span></div>
+                  <span style="font-size:.52rem;font-weight:800;color:var(--ph-text);font-variant-numeric:tabular-nums">164 €</span>
+                </div>
+                <div class="bar-bg"><div class="bar-fill" style="width:20%;background:var(--green);transition:none"></div></div>
+              </div>
+              <div style="background:var(--ph-surf);border:1px solid var(--ph-bord);border-radius:9px;padding:7px 9px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                  <div style="display:flex;align-items:center;gap:5px"><span style="font-size:.82rem">✈️</span><span style="font-size:.52rem;font-weight:600;color:var(--ph-text)">Vuelos</span></div>
+                  <span style="font-size:.52rem;font-weight:800;color:var(--ph-text);font-variant-numeric:tabular-nums">234 €</span>
+                </div>
+                <div class="bar-bg"><div class="bar-fill" style="width:29%;background:#007AFF;transition:none"></div></div>
+              </div>
+              <div style="background:var(--ph-surf);border:1px solid var(--ph-bord);border-radius:9px;padding:7px 9px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                  <div style="display:flex;align-items:center;gap:5px"><span style="font-size:.82rem">👗</span><span style="font-size:.52rem;font-weight:600;color:var(--ph-text)">Ropa</span></div>
+                  <span style="font-size:.52rem;font-weight:800;color:var(--ph-text);font-variant-numeric:tabular-nums">145 €</span>
+                </div>
+                <div class="bar-bg"><div class="bar-fill" style="width:18%;background:var(--red);transition:none"></div></div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="app-nav">
-          <div class="nav-i on"><div class="nav-ico">📅</div>Mes</div>
           <div class="nav-i"><div class="nav-ico">📊</div>Año</div>
-          <div class="nav-i"><div class="nav-ico">📈</div>Stats</div>
+          <div class="nav-i"><div class="nav-ico">📅</div>Mes</div>
+          <div class="nav-i on"><div class="nav-ico">📈</div>Stats</div>
           <div class="nav-i"><div class="nav-ico">💼</div>Inv.</div>
           <div class="nav-i"><div class="nav-ico">🎯</div>Budget</div>
         </div>
       </div>
     </div>
     <div class="txt ai">
-      <span class="eyebrow">Paga con tu tarjeta</span>
-      <h1 class="headline">Paga sin<br><em>abrir la app.</em></h1>
-      <p class="subtext">Paga con tu tarjeta como siempre. La app lo recibe al instante y te avisa. Categorízalo cuando quieras, sin perder ningún gasto.</p>
+      <span class="eyebrow">Estadísticas</span>
+      <h1 class="headline">Entiende en qué<br><em>gastas de verdad.</em></h1>
+      <p class="subtext">Tus gastos agrupados por categoría, mes a mes. Gráficos claros que te dicen de un vistazo dónde va tu dinero — sin sorpresas a final de mes.</p>
     </div>
   </div>
 
@@ -628,12 +653,25 @@ html, body {
       </div>
     </div>
     <div class="txt ai">
-      <span class="eyebrow">Instalación en iPhone</span>
-      <h1 class="headline">En tu pantalla<br><em>de inicio.</em></h1>
-      <div class="install-steps">
-        <div class="install-step"><div class="install-num">1</div><div class="install-text">Abre <strong>Safari</strong> y ve a <em>control-beta-ten.vercel.app</em></div></div>
-        <div class="install-step"><div class="install-num">2</div><div class="install-text">Toca el botón <strong>Compartir ⬆</strong> de la barra inferior</div></div>
-        <div class="install-step"><div class="install-num">3</div><div class="install-text">Selecciona <em>"Añadir a pantalla de inicio"</em> y toca <strong>Añadir</strong></div></div>
+      <span class="eyebrow">iOS y Android</span>
+      <h1 class="headline">Sin App Store.<br><em>Ya en tu móvil.</em></h1>
+      <div style="display:flex;flex-direction:column;gap:14px;width:100%">
+        <div>
+          <div style="font-size:0.68rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">🍎 iPhone — Safari</div>
+          <div class="install-steps" style="gap:7px">
+            <div class="install-step"><div class="install-num">1</div><div class="install-text">Abre <strong>Safari</strong> y ve a <em>control-beta-ten.vercel.app</em></div></div>
+            <div class="install-step"><div class="install-num">2</div><div class="install-text">Toca <strong>Compartir ⬆</strong> en la barra inferior</div></div>
+            <div class="install-step"><div class="install-num">3</div><div class="install-text">Pulsa <em>"Añadir a pantalla de inicio"</em></div></div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:0.68rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">🤖 Android — Chrome</div>
+          <div class="install-steps" style="gap:7px">
+            <div class="install-step"><div class="install-num">1</div><div class="install-text">Abre <strong>Chrome</strong> y ve a <em>control-beta-ten.vercel.app</em></div></div>
+            <div class="install-step"><div class="install-num">2</div><div class="install-text">Toca el menú <strong>⋮</strong> arriba a la derecha</div></div>
+            <div class="install-step"><div class="install-num">3</div><div class="install-text">Pulsa <em>"Añadir a pantalla de inicio"</em></div></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -649,12 +687,6 @@ html, body {
     <div class="ai" style="display:flex;flex-direction:column;align-items:center;gap:10px">
       <div style="font-size:0.62rem;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.12em;font-weight:600">Disponible en</div>
       <a href="https://control-beta-ten.vercel.app" target="_blank" style="background:var(--accent);color:#fff;font-size:1rem;font-weight:700;padding:16px 36px;border-radius:100px;letter-spacing:-0.01em;text-decoration:none;display:inline-block">control-beta-ten.vercel.app</a>
-    </div>
-    <div class="ai" style="margin-top:8px;border-top:1px solid rgba(255,255,255,0.08);padding-top:24px;display:flex;flex-direction:column;align-items:center;gap:12px">
-      <p style="font-size:clamp(0.9rem,1.4vw,1rem);color:rgba(255,255,255,0.5);text-align:center">¿Quieres que tu tarjeta lo registre sola,<br>sin tocar nada?</p>
-      <a href="demo-atajo.html" style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#fff;font-size:0.88rem;font-weight:600;padding:12px 24px;border-radius:100px;text-decoration:none;transition:background 0.2s">
-        Descubre cómo automatizarlo →
-      </a>
     </div>
   </div>
 
@@ -701,18 +733,6 @@ function resetProgress() {
 // Animations
 function clearAT() { animTimers.forEach(clearTimeout); animTimers = []; }
 
-function animS2() {
-  const badge = document.getElementById('bellBadge');
-  const ns    = ['ns1','ns2','ns3'].map(id => document.getElementById(id));
-  const modal = document.getElementById('catModal');
-  badge.style.opacity = '0';
-  modal.classList.remove('open');
-  ns.forEach(n => n && n.classList.remove('vis'));
-  animTimers.push(setTimeout(() => ns[0] && ns[0].classList.add('vis'), 500));
-  animTimers.push(setTimeout(() => { badge.style.opacity='1'; ns[1] && ns[1].classList.add('vis'); }, 1400));
-  animTimers.push(setTimeout(() => ns[2] && ns[2].classList.add('vis'), 2400));
-  animTimers.push(setTimeout(() => modal.classList.add('open'), 3600));
-}
 
 function animS4() {
   const bars = [
@@ -762,8 +782,7 @@ function animS6() {
 
 function onEnter(idx) {
   clearAT();
-  if(idx===1) animS2();
-  if(idx===3) animS4();
+if(idx===3) animS4();
   if(idx===4) animS5();
   if(idx===5) animS6();
 }
