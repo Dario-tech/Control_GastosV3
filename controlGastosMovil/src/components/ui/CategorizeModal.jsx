@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
-import { TYPES, DEFAULT_CATEGORIES } from '../../data/categories'
+import { TYPES } from '../../data/categories'
+import { useCategories } from '../../hooks/useCategories'
 
 const DATE_FMT = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
 
@@ -16,6 +17,7 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip }
   const [error, setError]     = useState(null)
   const { refresh }           = useFinanceData()
   const { customCategories }  = useSettings()
+  const DEFAULT_CATEGORIES = useCategories()
 
   const fmt = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(pending.importe)
 

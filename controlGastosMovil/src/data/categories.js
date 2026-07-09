@@ -30,6 +30,14 @@ export const DEFAULT_CATEGORIES = {
   ],
 }
 
+// Categorías ocultas por usuario (comparación por nombre, insensible a mayúsculas)
+export const HIDDEN_CATEGORIES_BY_USER = [
+  {
+    match: name => name?.toLowerCase().startsWith('julia'),
+    hide:  ['Inversiones', 'Cripto'],
+  },
+]
+
 export const EMOJI_SUGGESTIONS = [
   '💶','🎉','🍽️','👗','✈️','💪','📺','🏠','⚡','🔥',
   '🚿','📡','🚇','📈','₿','💊','🐾','🎮','🛍️','🚗',

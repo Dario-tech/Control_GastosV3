@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
 import { postTransaction } from '../../services/api'
-import { TYPES, DEFAULT_CATEGORIES, EMOJI_SUGGESTIONS } from '../../data/categories'
+import { TYPES, EMOJI_SUGGESTIONS } from '../../data/categories'
+import { useCategories } from '../../hooks/useCategories'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -24,6 +25,7 @@ export default function AddTransactionModal({ onClose }) {
 
   const { refresh }          = useFinanceData()
   const { customCategories, addCategory } = useSettings()
+  const DEFAULT_CATEGORIES = useCategories()
 
   function handleType(t) { setTipo(t); setStep(2); setShowNewCat(false) }
 

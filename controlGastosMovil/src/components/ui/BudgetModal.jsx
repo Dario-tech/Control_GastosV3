@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import { BUDGET_COLORS } from '../../hooks/useBudget'
 import { DEFAULT_CATEGORIES } from '../../data/categories'
+import { useCategories } from '../../hooks/useCategories'
 import { useSettings } from '../../context/SettingsContext'
 
 const TIPOS = [
@@ -21,6 +22,7 @@ export default function BudgetModal({ item, onSave, onClose, onDelete }) {
   useLockBodyScroll()
   const isEdit = !!item
   const { customCategories } = useSettings()
+  const filteredCategories = useCategories()
 
   const [tipo, setTipo]           = useState(item?.tipo || inferTipo(item?.name))
   const [selectedCat, setSelectedCat] = useState(
@@ -29,7 +31,7 @@ export default function BudgetModal({ item, onSave, onClose, onDelete }) {
   const [limit, setLimit] = useState(item?.limit != null ? item.limit.toString() : '')
   const [color, setColor] = useState(item?.color || BUDGET_COLORS[0])
 
-  const allCats = [...DEFAULT_CATEGORIES[tipo], ...(customCategories[tipo] || [])]
+  const allCats = [...filteredCategories[tipo], ...(customCategories[tipo] || [])]
   const canSave = selectedCat && limit && parseFloat(limit) > 0
 
   function handleTipoChange(t) {
