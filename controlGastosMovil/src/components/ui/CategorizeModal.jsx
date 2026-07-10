@@ -23,11 +23,11 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip }
 
   function handleType(t) { setTipo(t); setStep(2) }
 
-  async function handleConcepto(concepto) {
+  async function saveCategory(tipoValue, concepto) {
     setLoading(true)
     setError(null)
     try {
-      await onCategorize(pending.id, tipo, concepto)
+      await onCategorize(pending.id, tipoValue, concepto)
       refresh()
       setStep(1)
       setTipo(null)
@@ -38,7 +38,16 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip }
     }
   }
 
+  const handleConcepto = concepto => saveCategory(tipo, concepto)
+
   const allCats = tipo ? [...DEFAULT_CATEGORIES[tipo], ...(customCategories[tipo] || [])] : []
+
+  // Emoji de la categoría sugerida, buscándolo en las categorías del usuario
+  const suggested = pending.suggested
+  const suggestedEmoji = suggested
+    ? ([...(DEFAULT_CATEGORIES[suggested.tipo] || []), ...(customCategories[suggested.tipo] || [])]
+        .find(c => c.concepto === suggested.concepto)?.emoji || '✨')
+    : null
 
   return (
     <div className="catmodal-overlay">
@@ -49,6 +58,21 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip }
         <p className="catmodal-subtitle">
           {step === 1 ? '¿Qué tipo de movimiento es?' : `${tipo} — ¿qué concepto?`}
         </p>
+
+        {step === 1 && suggested && (
+          <button
+            className="catmodal-suggested"
+            onClick={() => saveCategory(suggested.tipo, suggested.concepto)}
+            disabled={loading}
+          >
+            <span className="catmodal-suggested-badge">✨ Sugerido</span>
+            <span className="catmodal-suggested-cat">
+              <span className="catmodal-suggested-emoji">{suggestedEmoji}</span>
+              {suggested.concepto}
+            </span>
+            <span className="catmodal-suggested-tipo">{suggested.tipo}</span>
+          </button>
+        )}
 
         {step === 1 && (
           <div className="catmodal-types">
