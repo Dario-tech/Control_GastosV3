@@ -8,6 +8,7 @@ import BottomNav from './components/layout/BottomNav'
 import ProfilePanel from './components/layout/ProfilePanel'
 import CategorizeModal from './components/ui/CategorizeModal'
 import AddTransactionModal from './components/ui/AddTransactionModal'
+import TransactionSearchModal from './components/ui/TransactionSearchModal'
 import Toast from './components/ui/Toast'
 import { usePendingTransaction } from './hooks/usePendingTransaction'
 import LoginScreen from './components/auth/LoginScreen'
@@ -46,6 +47,7 @@ function AppContent() {
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [categorizeOpen, setCategorizeOpen] = useState(false)
   const [addOpen,        setAddOpen]        = useState(false)
+  const [searchOpen,     setSearchOpen]     = useState(false)
   const { queue, fetchQueue, categorizePending } = usePendingTransaction()
 
   const current = queue[0] ?? null
@@ -58,6 +60,7 @@ function AppContent() {
         pendingCount={queue.length}
         onPendingClick={async () => { await fetchQueue(); setCategorizeOpen(true) }}
         onAddClick={() => setAddOpen(true)}
+        onSearchClick={() => setSearchOpen(true)}
       />
       <main className="main">
         <ErrorBoundary>
@@ -80,6 +83,7 @@ function AppContent() {
         />
       )}
       {addOpen && <AddTransactionModal onClose={() => setAddOpen(false)} />}
+      {searchOpen && <TransactionSearchModal onClose={() => setSearchOpen(false)} />}
     </div>
   )
 }

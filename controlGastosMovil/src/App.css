@@ -1194,6 +1194,48 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
 .add-tx-btn:active { background: var(--accent); color: white; transform: scale(0.9); }
 .add-tx-btn svg { width: 18px; height: 18px; }
 
+.search-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border, var(--surface2));
+  border-radius: 50%;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text2);
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.search-btn:active { background: var(--accent); color: white; transform: scale(0.9); }
+.search-btn svg { width: 17px; height: 17px; }
+
+/* ===== SEARCH MODAL ===== */
+.search-sheet { display: flex; flex-direction: column; max-height: 85vh; }
+.search-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.search-input {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border, transparent);
+  border-radius: 12px; padding: 12px 14px; color: var(--text); font-size: 0.9rem; outline: none;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-close { background: none; border: none; color: var(--text2); font-size: 1.1rem; cursor: pointer; padding: 4px 8px; flex-shrink: 0; }
+.search-filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.search-filter-chip {
+  background: var(--surface2); border: 1px solid transparent; border-radius: 100px;
+  padding: 6px 14px; font-size: 0.78rem; font-weight: 600; color: var(--text2); cursor: pointer; transition: all 0.15s;
+}
+.search-filter-chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+.search-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.search-row { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 0.5px solid var(--border, rgba(255,255,255,0.06)); }
+.search-date-block { display: flex; flex-direction: column; align-items: center; width: 32px; flex-shrink: 0; }
+.search-day { font-size: 0.9rem; font-weight: 700; color: var(--text); line-height: 1; }
+.search-month-short { font-size: 0.62rem; color: var(--text3, var(--text2)); text-transform: uppercase; }
+.search-concepto { flex: 1; font-size: 0.85rem; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-importe { font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.search-importe.pos { color: var(--green, #2dd4a0); }
+.search-importe.neg { color: var(--red, #ff5f7e); }
+.search-empty { text-align: center; color: var(--text2); padding: 32px; font-size: 0.85rem; }
+.search-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--border, rgba(255,255,255,0.08)); }
+.search-footer-label { font-size: 0.78rem; color: var(--text2); }
+.search-footer-total { font-size: 0.95rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+
 /* ===== ADD TRANSACTION MODAL ===== */
 .add-tx-sheet {
   display: flex;
