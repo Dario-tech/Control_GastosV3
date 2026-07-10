@@ -63,6 +63,33 @@ export function getCumulativeBalance(data) {
   })
 }
 
+export function getMonthlyReport(data, m) {
+  const activeIdxs = getActiveMonths(data).map(x => x.index)
+  const pos = activeIdxs.indexOf(m)
+  if (pos <= 0) return null  // sin mes anterior con datos, no hay comparación
+
+  const prevMonth = activeIdxs[pos - 1]
+  const cur  = getMonthStats(data, m)
+  const prev = getMonthStats(data, prevMonth)
+
+  const expDelta = cur.expenses - prev.expenses
+  const expPct   = prev.expenses > 0 ? Math.round((expDelta / prev.expenses) * 100) : null
+  const savingsDelta = cur.balance - prev.balance
+
+  // Categorías que más se movieron respecto al mes anterior
+  const movers = [...data.fixedExpenses, ...data.variableExpenses]
+    .map(i => ({
+      name:  i.concept,
+      emoji: i.emoji,
+      delta: (i.amounts[m] || 0) - (i.amounts[prevMonth] || 0),
+    }))
+    .filter(c => Math.abs(c.delta) >= 1)
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+    .slice(0, 2)
+
+  return { prevMonth, month: m, cur, prev, expDelta, expPct, savingsDelta, movers }
+}
+
 export function getTopExpenses(data, limit = 6) {
   return [...data.fixedExpenses, ...data.variableExpenses]
     .map(i => ({ name: i.concept, emoji: i.emoji, total: sumConceptAll(i) }))

@@ -579,6 +579,19 @@ html, body, #root {
 .top-bar-fill { height: 100%; border-radius: 20px; background: linear-gradient(90deg, var(--accent), var(--purple)); }
 .top-amount { font-size: 0.85rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; flex-shrink: 0; min-width: 64px; text-align: right; }
 
+/* Monthly report */
+.report-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 14px; }
+.report-headline { font-size: 0.9rem; line-height: 1.5; color: var(--text); }
+.report-headline strong { font-weight: 700; }
+.report-headline .pos { color: var(--green, #2dd4a0); }
+.report-headline .neg { color: var(--red, #ff5f7e); }
+.report-stats { display: flex; gap: 10px; }
+.report-stat { flex: 1; background: var(--surface2); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+.report-stat-label { font-size: 0.68rem; color: var(--text2); }
+.report-stat-value { font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.report-stat-value.pos { color: var(--green, #2dd4a0); }
+.report-stat-value.neg { color: var(--red, #ff5f7e); }
+
 /* Recurring / subscriptions */
 .recur-list { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
 .recur-item { display: flex; align-items: center; gap: 12px; }

@@ -5,7 +5,7 @@ import DonutChart from '../charts/DonutChart'
 import TransactionLogModal from '../ui/TransactionLogModal'
 import DayHeatmap from '../ui/DayHeatmap'
 import { useApp } from '../../context/AppContext'
-import { getMonthStats, getActiveMonths, fmt } from '../../utils'
+import { getMonthStats, getActiveMonths, getMonthlyReport, fmt } from '../../utils'
 import { MONTH_NAMES } from '../../data/mockData'
 import { useFinanceData } from '../../context/FinanceDataContext'
 
@@ -26,6 +26,7 @@ export default function MonthTab() {
   }
   const currentIdx = active.findIndex(m => m.index === selectedMonth)
   const stats = getMonthStats(data, selectedMonth)
+  const report = getMonthlyReport(data, selectedMonth)
 
   function prev() {
     if (currentIdx > 0) setSelectedMonth(active[currentIdx - 1].index)
@@ -69,6 +70,44 @@ export default function MonthTab() {
           </div>
         </div>
       </div>
+
+      {/* Informe de cierre vs mes anterior */}
+      {report && (report.expPct !== null || report.movers.length > 0) && (
+        <Card title="Resumen del mes" noPad>
+          <div className="report-body">
+            <p className="report-headline">
+              {report.expPct !== null && (
+                <>Gastaste un <strong className={report.expDelta > 0 ? 'neg' : 'pos'}>
+                  {Math.abs(report.expPct)}% {report.expDelta > 0 ? 'más' : 'menos'}
+                </strong> que en {MONTH_NAMES[report.prevMonth]}
+                {report.movers.length > 0 ? ', ' : '.'}</>
+              )}
+              {report.movers.length > 0 && (
+                <>{report.expPct !== null ? 'sobre todo en ' : 'Este mes destaca '}
+                  {report.movers.map((mv, i) => (
+                    <span key={mv.name}>
+                      {i > 0 ? ' y ' : ''}<strong>{mv.emoji} {mv.name}</strong>
+                    </span>
+                  ))}.</>
+              )}
+            </p>
+            <div className="report-stats">
+              <div className="report-stat">
+                <span className="report-stat-label">Gasto vs {MONTH_NAMES[report.prevMonth].slice(0, 3)}.</span>
+                <span className={`report-stat-value ${report.expDelta > 0 ? 'neg' : 'pos'}`}>
+                  {report.expDelta > 0 ? '+' : ''}{fmt(report.expDelta)}
+                </span>
+              </div>
+              <div className="report-stat">
+                <span className="report-stat-label">Ahorro vs {MONTH_NAMES[report.prevMonth].slice(0, 3)}.</span>
+                <span className={`report-stat-value ${report.savingsDelta >= 0 ? 'pos' : 'neg'}`}>
+                  {report.savingsDelta >= 0 ? '+' : ''}{fmt(report.savingsDelta)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Distribución */}
       <Card title="Distribución de gastos" noPad>
