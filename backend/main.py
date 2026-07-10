@@ -12,6 +12,7 @@ from services.auth import verify_google_token, create_jwt, get_current_user
 from services.users import get_user, ensure_user, get_email_by_shortcut_token
 from services.db import init_pool
 from services.pending import create_pending, get_pending, categorize_pending
+from services.recurring import get_recurring
 
 
 @asynccontextmanager
@@ -226,6 +227,17 @@ async def shortcut_create_pending(request: Request):
     result = await create_pending(email, importe)
     await _broadcast()  # la PWA recibe SSE y actualiza la campana en tiempo real
     return result
+
+
+# ── Recurrentes / Suscripciones ───────────────────────────────────────────────
+
+@app.get("/api/recurring")
+async def recurring_expenses(email: str = Depends(get_current_user)):
+    """Detecta gastos recurrentes (suscripciones) en el historial del usuario."""
+    try:
+        return await get_recurring(email)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── Inversiones ───────────────────────────────────────────────────────────────

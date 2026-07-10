@@ -17,6 +17,15 @@ export async function fetchPrices() {
   return res.json()
 }
 
+export async function fetchRecurring() {
+  const res = await fetch(`${BASE}/api/recurring`, {
+    headers: authHeaders(),
+    signal:  AbortSignal.timeout(15000),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}`)
+  return res.json()
+}
+
 export async function fetchFinanceData() {
   const res = await fetch(`${BASE}/api/finance`, {
     headers: authHeaders(),

@@ -3,11 +3,18 @@ import SavingsChart from '../charts/SavingsChart'
 import BalanceAreaChart from '../charts/BalanceAreaChart'
 import { getTopExpenses, getYearStats, sumAll, fmt } from '../../utils'
 import { useFinanceData } from '../../context/FinanceDataContext'
+import { useRecurring } from '../../hooks/useRecurring'
 
 const BREAKDOWN_COLORS = ['#5b7cff','#2dd4a0','#ff9f43','#ff5f7e','#ffd93d','#6bcfff','#a78bff']
 
+const RECUR_DATE_FMT = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' })
+function fmtRecurDate(dateStr) {
+  try { return RECUR_DATE_FMT.format(new Date(dateStr + 'T12:00:00')) } catch { return dateStr }
+}
+
 export default function StatsTab() {
   const { data } = useFinanceData()
+  const { items: recurring, status: recurStatus } = useRecurring()
   const top = getTopExpenses(data, 6)
   const maxTop = top[0]?.total || 1
   const { income, expenses } = getYearStats(data)
@@ -54,6 +61,24 @@ export default function StatsTab() {
           <BalanceAreaChart data={data} />
         </div>
       </Card>
+
+      {recurStatus === 'ready' && recurring.length > 0 && (
+        <Card title="Suscripciones detectadas" noPad>
+          <div className="recur-list">
+            {recurring.map((r, i) => (
+              <div key={i} className="recur-item">
+                <div className="recur-info">
+                  <span className="recur-name">{r.concepto}</span>
+                  <span className="recur-meta">
+                    {r.frecuencia} · próximo ≈ {fmtRecurDate(r.proxima)}
+                  </span>
+                </div>
+                <span className="recur-amount">{fmt(r.importe)}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card title="Top categorías de gasto" noPad>
         <div className="top-list">
