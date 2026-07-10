@@ -579,6 +579,34 @@ html, body, #root {
 .top-bar-fill { height: 100%; border-radius: 20px; background: linear-gradient(90deg, var(--accent), var(--purple)); }
 .top-amount { font-size: 0.85rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; flex-shrink: 0; min-width: 64px; text-align: right; }
 
+/* Savings goals */
+.goals-section { margin-top: 20px; }
+.goals-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.goals-title { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+.goals-add-btn { background: var(--accent-dim); color: var(--accent); border: none; border-radius: 8px; padding: 6px 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.goals-empty { font-size: 0.82rem; color: var(--text2); text-align: center; padding: 16px; background: var(--surface); border-radius: 14px; }
+.goals-list { display: flex; flex-direction: column; gap: 10px; }
+.goal-item { background: var(--surface); border-radius: 14px; padding: 14px; cursor: pointer; transition: transform 0.1s; }
+.goal-item:active { transform: scale(0.99); }
+.goal-item-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.goal-item-name { font-size: 0.88rem; font-weight: 600; color: var(--text); }
+.goal-item-amount { font-size: 0.82rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.goal-bar-bg { height: 7px; background: var(--surface2); border-radius: 20px; overflow: hidden; }
+.goal-bar-fill { height: 100%; border-radius: 20px; transition: width 0.4s ease; }
+.goal-item-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+.goal-pct { font-size: 0.72rem; font-weight: 600; color: var(--text2); }
+.goal-date { font-size: 0.72rem; color: var(--text3, var(--text2)); }
+
+/* Goal modal */
+.goal-sheet { display: flex; flex-direction: column; }
+.goal-modal-title { font-size: 1.05rem; font-weight: 700; color: var(--text); text-align: center; margin-bottom: 14px; }
+.goal-emoji-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 14px; }
+.goal-emoji-btn { width: 38px; height: 38px; border-radius: 10px; border: 1.5px solid var(--border, var(--surface2)); background: var(--surface2); font-size: 1.2rem; cursor: pointer; }
+.goal-emoji-btn.active { border-color: var(--accent); background: var(--accent-dim); }
+.goal-field-label { font-size: 0.72rem; font-weight: 600; color: var(--text2); margin: 10px 0 5px; display: block; }
+.goal-field-row { display: flex; gap: 10px; }
+.goal-delete-btn { background: none; border: none; color: var(--red, #ff5f7e); font-size: 0.82rem; font-weight: 600; padding: 12px; cursor: pointer; margin-top: 4px; }
+
 /* Monthly report */
 .report-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 14px; }
 .report-headline { font-size: 0.9rem; line-height: 1.5; color: var(--text); }
