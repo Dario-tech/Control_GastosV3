@@ -29,13 +29,37 @@ export function AuthProvider({ children }) {
     return stored
   }
 
+  async function authWithEmail(path, payload) {
+    const res = await fetch(`${BASE}${path}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(data.detail || 'Error de autenticación')
+    }
+    const stored = { ...data.user, sessionToken: data.session_token }
+    localStorage.setItem(LS_KEY, JSON.stringify(stored))
+    setUser(stored)
+    return stored
+  }
+
+  function registerWithEmail(email, name, password) {
+    return authWithEmail('/api/auth/register', { email, name, password })
+  }
+
+  function loginWithEmail(email, password) {
+    return authWithEmail('/api/auth/login-email', { email, password })
+  }
+
   function logout() {
     localStorage.removeItem(LS_KEY)
     setUser(null)
   }
 
   return (
-    <AuthCtx.Provider value={{ user, loginWithGoogle, logout }}>
+    <AuthCtx.Provider value={{ user, loginWithGoogle, registerWithEmail, loginWithEmail, logout }}>
       {children}
     </AuthCtx.Provider>
   )

@@ -8,8 +8,14 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from services.prices import get_all_prices
 from services.sheets import get_finance_data, get_raw_transactions, delete_transaction, post_transaction
-from services.auth import verify_google_token, create_jwt, get_current_user
-from services.users import get_user, ensure_user, get_email_by_shortcut_token
+from services.auth import (
+    verify_google_token, create_jwt, get_current_user,
+    hash_password, verify_password,
+)
+from services.users import (
+    get_user, ensure_user, get_email_by_shortcut_token,
+    ensure_password_column, get_password_hash, create_user_with_password,
+)
 from services.db import init_pool
 from services.pending import create_pending, get_pending, categorize_pending
 from services.recurring import get_recurring
@@ -18,6 +24,7 @@ from services.recurring import get_recurring
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_pool()
+    ensure_password_column()  # migración aditiva idempotente (columna password_hash)
     yield
 
 
@@ -69,6 +76,66 @@ async def auth_login(body: GoogleLoginIn):
 async def auth_me(email: str = Depends(get_current_user)):
     user = await get_user(email)
     return {"email": email, "name": (user or {}).get("name", "")}
+
+
+# ── Auth por email + contraseña ───────────────────────────────────────────────
+
+import re
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class RegisterIn(BaseModel):
+    email:    str
+    name:     str
+    password: str
+
+
+class EmailLoginIn(BaseModel):
+    email:    str
+    password: str
+
+
+def _session_response(email: str, name: str, shortcut_token: str) -> dict:
+    return {
+        "session_token": create_jwt(email),
+        "needs_setup":   False,
+        "user": {
+            "email":          email,
+            "name":           name,
+            "picture":        "",
+            "shortcut_token": shortcut_token,
+        },
+    }
+
+
+@app.post("/api/auth/register")
+async def auth_register(body: RegisterIn):
+    email = body.email.strip().lower()
+    name  = body.name.strip() or email.split("@")[0]
+
+    if not _EMAIL_RE.match(email):
+        raise HTTPException(status_code=422, detail="Email no válido")
+    if len(body.password) < 8:
+        raise HTTPException(status_code=422, detail="La contraseña debe tener al menos 8 caracteres")
+
+    created = await create_user_with_password(email, name, hash_password(body.password))
+    if created is None:
+        raise HTTPException(status_code=409, detail="Ya existe una cuenta con este email")
+
+    return _session_response(email, created["name"], created["shortcut_token"])
+
+
+@app.post("/api/auth/login-email")
+async def auth_login_email(body: EmailLoginIn):
+    email = body.email.strip().lower()
+    pw_hash = await get_password_hash(email)
+
+    # Error genérico: no revela si el email existe (evita enumeración de usuarios)
+    if not pw_hash or not verify_password(body.password, pw_hash):
+        raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
+
+    user = await get_user(email)
+    return _session_response(email, (user or {}).get("name", ""), (user or {}).get("shortcut_token", ""))
 
 
 # ── SSE ───────────────────────────────────────────────────────────────────────

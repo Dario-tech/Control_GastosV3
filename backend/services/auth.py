@@ -1,4 +1,5 @@
 import os
+import bcrypt
 import httpx
 from datetime import datetime, timedelta
 from fastapi import HTTPException, Header
@@ -56,3 +57,20 @@ def get_current_user(authorization: str = Header(default="")) -> str:
         return payload["sub"]
     except JWTError:
         raise HTTPException(status_code=401, detail="Token de sesión inválido o expirado")
+
+
+# ── Contraseñas (bcrypt) ──────────────────────────────────────────────────────
+
+def hash_password(password: str) -> str:
+    """Hashea una contraseña con bcrypt (cost 12). bcrypt limita a 72 bytes."""
+    pw = password.encode("utf-8")[:72]
+    return bcrypt.hashpw(pw, bcrypt.gensalt(rounds=12)).decode("utf-8")
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    if not password_hash:
+        return False
+    try:
+        return bcrypt.checkpw(password.encode("utf-8")[:72], password_hash.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
