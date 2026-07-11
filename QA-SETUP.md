@@ -1,14 +1,22 @@
 # Entorno de QA — guía de montaje
 
-Entorno de pruebas **aislado de producción** para probar la rama
-`feature/mejoras-fase2` (login por email + las 5 mejoras) sin tocar los datos ni
-la infraestructura reales.
+Entorno de pruebas **aislado de producción** para probar cambios antes de
+pasarlos a `main`, sin tocar los datos ni la infraestructura reales.
+
+La rama de integración de QA es **`qa`** — es **permanente**, no se borra. Las
+ramas de feature se mergean a `qa` para probarlas y luego a `main`:
+
+```
+feature/*  ──merge──►  qa  ──merge──►  main
+                        │                │
+                     Render+Vercel QA   producción
+```
 
 Arquitectura de QA (espejo de producción, pero separado):
 
 ```
-Vercel (preview de la rama)  ──►  Render (backend QA)  ──►  Supabase (BD QA)
-   VITE_API_URL=backend QA        rama feature/mejoras-fase2     schema.sql + seed_qa.sql
+Vercel (rama qa)  ──►  Render (backend QA, rama qa)  ──►  Supabase (BD QA)
+   VITE_API_URL=backend QA                                schema.sql + seed_qa.sql
 ```
 
 **Credenciales de test** (creadas por `seed_qa.sql`):
@@ -33,7 +41,7 @@ Vercel (preview de la rama)  ──►  Render (backend QA)  ──►  Supabase
 
 1. En [render.com](https://render.com) → **New → Web Service** → conecta el repo `Control_GastosV3`.
 2. Configuración:
-   - **Branch**: `feature/mejoras-fase2`  ← clave, la rama de QA
+   - **Branch**: `qa`  ← rama permanente de QA (no la de feature)
    - **Root Directory**: `backend`
    - **Build Command**: `pip install -r requirements.txt`
    - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
@@ -101,4 +109,5 @@ O crea tu propia cuenta con **"Crear cuenta"** para probar el registro de cero.
 - **Nada de esto toca producción**: BD, backend y frontend son recursos nuevos y separados.
 - Para **tirar** el entorno QA: borra el proyecto de Render, el de Vercel y el de Supabase. Sin residuos.
 - El **plan gratis** de Render duerme el servicio tras inactividad: la primera petición tras un rato tarda ~30 s en despertar. Normal en QA.
-- Cuando validemos todo en QA, el paso a producción sería un merge de la rama a `main` (con su propio `JWT_SECRET` ya verificado).
+- Flujo para futuros cambios: mergea tu `feature/*` a **`qa`** → Render y Vercel redespliegan solos y pruebas ahí → cuando esté validado, mergea `qa` a **`main`** (producción, con su propio `JWT_SECRET` ya verificado).
+- La rama `qa` **no se borra**. Las ramas de feature sí se pueden borrar tras mergearlas.
