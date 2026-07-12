@@ -1,4 +1,5 @@
-import { Component, useState } from 'react'
+import { Component, useEffect, useState } from 'react'
+import { wakeBackend } from './services/api'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppProvider, useApp } from './context/AppContext'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
@@ -101,6 +102,10 @@ function AuthGate() {
 }
 
 export default function App() {
+  // Despierta el backend en segundo plano en cuanto se abre la app, antes de
+  // que el usuario intente guardar algo (Render free tier duerme el servicio).
+  useEffect(() => { wakeBackend() }, [])
+
   return (
     <AuthProvider>
       <SettingsProvider>
