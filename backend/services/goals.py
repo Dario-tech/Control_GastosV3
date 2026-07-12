@@ -24,6 +24,8 @@ def ensure_goals_tables():
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )
         """)
+        # Migración aditiva: metas ya existentes en QA no tienen esta columna.
+        cur.execute("ALTER TABLE savings_goals ADD COLUMN IF NOT EXISTS imagen_url TEXT")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS savings_goal_members (
                 goal_id    INTEGER NOT NULL REFERENCES savings_goals(id) ON DELETE CASCADE,
@@ -47,7 +49,7 @@ async def get_goals_for_user(email: str) -> list[dict]:
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                """SELECT g.id, g.nombre, g.objetivo, g.emoji, g.fecha::text, g.created_by
+                """SELECT g.id, g.nombre, g.objetivo, g.emoji, g.imagen_url, g.fecha::text, g.created_by
                    FROM savings_goals g
                    JOIN savings_goal_members m ON m.goal_id = g.id
                    WHERE m.user_email = %s
@@ -62,10 +64,27 @@ async def get_goals_for_user(email: str) -> list[dict]:
                 )
                 g["ahorrado"] = float(cur.fetchone()["total"])
                 cur.execute(
-                    "SELECT user_email FROM savings_goal_members WHERE goal_id = %s ORDER BY joined_at",
+                    """SELECT m.user_email, COALESCE(u.name, m.user_email) AS name
+                       FROM savings_goal_members m
+                       JOIN users u ON u.email = m.user_email
+                       WHERE m.goal_id = %s ORDER BY m.joined_at""",
                     (g["id"],),
                 )
-                g["members"] = [r["user_email"] for r in cur.fetchall()]
+                members = [dict(r) for r in cur.fetchall()]
+                g["members"] = [m["user_email"] for m in members]  # compat: lista de emails
+                g["memberNames"] = members  # [{user_email, name}]
+                cur.execute(
+                    """SELECT c.user_email, COALESCE(u.name, c.user_email) AS name,
+                              c.importe, c.created_at::text AS fecha
+                       FROM savings_goal_contributions c
+                       JOIN users u ON u.email = c.user_email
+                       WHERE c.goal_id = %s ORDER BY c.created_at DESC""",
+                    (g["id"],),
+                )
+                contributions = [dict(r) for r in cur.fetchall()]
+                for c in contributions:
+                    c["importe"] = float(c["importe"])
+                g["contributions"] = contributions
             return goals
     return await run_in_thread(_q)
 
@@ -101,15 +120,18 @@ async def _require_creator(goal_id: int, email: str):
         raise HTTPException(status_code=403, detail="Solo quien creó la meta puede hacer esto")
 
 
-async def create_goal(email: str, nombre: str, objetivo: float, emoji: str, fecha: str | None) -> dict:
+async def create_goal(
+    email: str, nombre: str, objetivo: float, emoji: str, fecha: str | None, imagen_url: str | None = None
+) -> dict:
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                """INSERT INTO savings_goals (nombre, objetivo, emoji, fecha, created_by)
-                   VALUES (%s, %s, %s, %s::date, %s) RETURNING id""" if fecha else
-                """INSERT INTO savings_goals (nombre, objetivo, emoji, created_by)
-                   VALUES (%s, %s, %s, %s) RETURNING id""",
-                (nombre, objetivo, emoji, fecha, email) if fecha else (nombre, objetivo, emoji, email),
+                """INSERT INTO savings_goals (nombre, objetivo, emoji, fecha, created_by, imagen_url)
+                   VALUES (%s, %s, %s, %s::date, %s, %s) RETURNING id""" if fecha else
+                """INSERT INTO savings_goals (nombre, objetivo, emoji, created_by, imagen_url)
+                   VALUES (%s, %s, %s, %s, %s) RETURNING id""",
+                (nombre, objetivo, emoji, fecha, email, imagen_url) if fecha
+                else (nombre, objetivo, emoji, email, imagen_url),
             )
             goal_id = cur.fetchone()["id"]
             cur.execute(
@@ -121,14 +143,17 @@ async def create_goal(email: str, nombre: str, objetivo: float, emoji: str, fech
     return await get_goal(goal_id, email)
 
 
-async def update_goal(goal_id: int, email: str, nombre: str, objetivo: float, emoji: str, fecha: str | None) -> dict:
+async def update_goal(
+    goal_id: int, email: str, nombre: str, objetivo: float, emoji: str, fecha: str | None,
+    imagen_url: str | None = None,
+) -> dict:
     await _require_creator(goal_id, email)
 
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                "UPDATE savings_goals SET nombre=%s, objetivo=%s, emoji=%s, fecha=%s::date WHERE id=%s",
-                (nombre, objetivo, emoji, fecha, goal_id),
+                "UPDATE savings_goals SET nombre=%s, objetivo=%s, emoji=%s, fecha=%s::date, imagen_url=%s WHERE id=%s",
+                (nombre, objetivo, emoji, fecha, imagen_url, goal_id),
             )
     await run_in_thread(_q)
     return await get_goal(goal_id, email)

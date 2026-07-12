@@ -19,12 +19,12 @@ export function useSavingsGoals() {
   useEffect(() => { refresh() }, [refresh])
 
   async function addGoal(data) {
-    await createGoal(data.nombre, data.objetivo, data.emoji, data.fecha || null)
+    await createGoal(data.nombre, data.objetivo, data.emoji, data.fecha || null, data.imagen_url || null)
     await refresh()
   }
 
   async function editGoal(id, data) {
-    await updateGoal(id, data.nombre, data.objetivo, data.emoji, data.fecha || null)
+    await updateGoal(id, data.nombre, data.objetivo, data.emoji, data.fecha || null, data.imagen_url || null)
     await refresh()
   }
 

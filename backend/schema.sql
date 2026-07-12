@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS savings_goals (
     nombre     TEXT NOT NULL,
     objetivo   NUMERIC(12,2) NOT NULL,
     emoji      TEXT NOT NULL DEFAULT '🎯',
+    imagen_url TEXT,  -- gif/imagen personalizada, alternativa al emoji
     fecha      DATE,
     created_by TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()

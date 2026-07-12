@@ -691,6 +691,30 @@ html, body, #root {
 
 .goal-detail-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border, var(--surface2)); }
 
+/* Custom GIF/image icon — overrides the emoji span with an <img> of the same footprint */
+img.goal-square-emoji { width: 1.3rem; height: 1.3rem; border-radius: 6px; object-fit: cover; }
+img.goal-detail-emoji { width: 2rem; height: 2rem; border-radius: 10px; object-fit: cover; }
+
+/* Emoji vs. GIF toggle in the create/edit modal */
+.goal-icon-toggle { display: flex; gap: 6px; margin-bottom: 12px; background: var(--surface2); border-radius: 10px; padding: 3px; }
+.goal-icon-toggle-btn {
+  flex: 1; background: none; border: none; border-radius: 8px; padding: 8px 0;
+  font-size: 0.78rem; font-weight: 600; color: var(--text2); cursor: pointer;
+}
+.goal-icon-toggle-btn.active { background: var(--surface); color: var(--text); }
+.goal-gif-picker { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 14px; }
+.goal-gif-picker .setup-input { width: 100%; }
+.goal-gif-preview { width: 72px; height: 72px; border-radius: 12px; object-fit: cover; background: var(--surface2); }
+
+/* Contributions — per-user list with name and date instead of a raw email */
+.goal-contributions { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border, var(--surface2)); }
+.goal-contributions-label { font-size: 0.78rem; font-weight: 600; color: var(--text2); display: block; margin-bottom: 8px; }
+.goal-contributions-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+.goal-contribution-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
+.goal-contribution-name { font-weight: 600; color: var(--text); flex-shrink: 0; }
+.goal-contribution-date { color: var(--text3, var(--text2)); flex: 1; font-size: 0.72rem; }
+.goal-contribution-amount { font-weight: 700; color: var(--green, #2dd4a0); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
 /* Balance forecast */
 .forecast-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 14px; }
 .forecast-main { display: flex; flex-direction: column; gap: 4px; }

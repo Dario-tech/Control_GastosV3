@@ -6,14 +6,27 @@ import { fmt } from '../../utils'
 
 const GOAL_EMOJIS = ['🎯', '🏖️', '🚗', '🏠', '💍', '🎓', '✈️', '💻', '🛟', '🎁']
 
+function formatContribDate(iso) {
+  try {
+    return new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+  } catch { return iso }
+}
+
+function GoalIcon({ goal, className }) {
+  if (goal.imagen_url) return <img className={className} src={goal.imagen_url} alt={goal.nombre} />
+  return <span className={className}>{goal.emoji}</span>
+}
+
 function GoalFormModal({ goal, onSave, onClose }) {
   useLockBodyScroll()
-  const [nombre, setNombre]     = useState(goal?.nombre ?? '')
-  const [objetivo, setObjetivo] = useState(goal?.objetivo != null ? String(goal.objetivo) : '')
-  const [fecha, setFecha]       = useState(goal?.fecha ?? '')
-  const [emoji, setEmoji]       = useState(goal?.emoji ?? '🎯')
-  const [saving, setSaving]     = useState(false)
-  const [error, setError]       = useState('')
+  const [nombre, setNombre]         = useState(goal?.nombre ?? '')
+  const [objetivo, setObjetivo]     = useState(goal?.objetivo != null ? String(goal.objetivo) : '')
+  const [fecha, setFecha]           = useState(goal?.fecha ?? '')
+  const [emoji, setEmoji]           = useState(goal?.emoji ?? '🎯')
+  const [imagenUrl, setImagenUrl]   = useState(goal?.imagen_url ?? '')
+  const [useGif, setUseGif]         = useState(Boolean(goal?.imagen_url))
+  const [saving, setSaving]         = useState(false)
+  const [error, setError]           = useState('')
 
   const objetivoNum = parseFloat(String(objetivo).replace(',', '.'))
   const canSave = nombre.trim() && objetivoNum > 0 && !saving
@@ -23,7 +36,10 @@ function GoalFormModal({ goal, onSave, onClose }) {
     setSaving(true)
     setError('')
     try {
-      await onSave({ nombre: nombre.trim(), objetivo: objetivoNum, fecha: fecha || null, emoji })
+      await onSave({
+        nombre: nombre.trim(), objetivo: objetivoNum, fecha: fecha || null, emoji,
+        imagen_url: useGif ? (imagenUrl.trim() || null) : null,
+      })
     } catch (e) {
       setError(e.message || 'No se pudo guardar')
       setSaving(false)
@@ -36,15 +52,34 @@ function GoalFormModal({ goal, onSave, onClose }) {
         <div className="modal-drag-handle" />
         <div className="goal-modal-title">{goal ? 'Editar meta' : 'Nueva meta de ahorro'}</div>
 
-        <div className="goal-emoji-row">
-          {GOAL_EMOJIS.map(e => (
-            <button
-              key={e}
-              className={`goal-emoji-btn${emoji === e ? ' active' : ''}`}
-              onClick={() => setEmoji(e)}
-            >{e}</button>
-          ))}
+        <div className="goal-icon-toggle">
+          <button className={`goal-icon-toggle-btn${!useGif ? ' active' : ''}`} onClick={() => setUseGif(false)}>
+            Emoji
+          </button>
+          <button className={`goal-icon-toggle-btn${useGif ? ' active' : ''}`} onClick={() => setUseGif(true)}>
+            GIF / imagen
+          </button>
         </div>
+
+        {!useGif ? (
+          <div className="goal-emoji-row">
+            {GOAL_EMOJIS.map(e => (
+              <button
+                key={e}
+                className={`goal-emoji-btn${emoji === e ? ' active' : ''}`}
+                onClick={() => setEmoji(e)}
+              >{e}</button>
+            ))}
+          </div>
+        ) : (
+          <div className="goal-gif-picker">
+            <input className="setup-input" value={imagenUrl} onChange={e => setImagenUrl(e.target.value)}
+              placeholder="Pega la URL de un GIF o imagen (https://…)" />
+            {imagenUrl.trim() && (
+              <img className="goal-gif-preview" src={imagenUrl.trim()} alt="Vista previa" />
+            )}
+          </div>
+        )}
 
         <label className="goal-field-label">Nombre</label>
         <input className="setup-input" value={nombre} onChange={e => setNombre(e.target.value)}
@@ -137,7 +172,7 @@ function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, 
         <div className="modal-drag-handle" />
 
         <div className="goal-detail-header">
-          <span className="goal-detail-emoji">{goal.emoji}</span>
+          <GoalIcon goal={goal} className="goal-detail-emoji" />
           <div className="goal-detail-headtext">
             <div className="goal-detail-name">{goal.nombre}</div>
             {goal.fecha && <div className="goal-detail-date">para {goal.fecha}</div>}
@@ -186,6 +221,23 @@ function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, 
           </div>
         )}
         {shareErr && <p className="cat-err">{shareErr}</p>}
+
+        {goal.contributions?.length > 0 && (
+          <div className="goal-contributions">
+            <span className="goal-contributions-label">Aportaciones</span>
+            <div className="goal-contributions-list">
+              {goal.contributions.map((c, i) => (
+                <div key={i} className="goal-contribution-row">
+                  <span className="goal-contribution-name">
+                    {c.user_email === myEmail ? 'Tú' : c.name}
+                  </span>
+                  <span className="goal-contribution-date">{formatContribDate(c.fecha)}</span>
+                  <span className="goal-contribution-amount">+{fmt(c.importe)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {isCreator && (
           <div className="goal-detail-actions">
@@ -240,7 +292,7 @@ export default function SavingsGoals() {
           return (
             <button key={g.id} className="goal-square" onClick={() => setDetailGoal(g)}>
               {shared && <span className="goal-square-shared">👥</span>}
-              <span className="goal-square-emoji">{g.emoji}</span>
+              <GoalIcon goal={g} className="goal-square-emoji" />
               <span className="goal-square-name">{g.nombre}</span>
               <div className="goal-square-bar-bg">
                 <div className="goal-square-bar-fill" style={{

@@ -253,6 +253,9 @@ export default function BudgetTab() {
         </button>
       </div>
 
+      {/* Metas de ahorro (arriba: es lo primero que se ve, incluye las compartidas) */}
+      <SavingsGoals />
+
       {/* Banners de notificación */}
       {settings.budgetAlerts && notifPermission === 'default' && (
         <button className="notif-banner" onClick={requestNotifPermission}>
@@ -291,9 +294,6 @@ export default function BudgetTab() {
           </button>
         </>
       )}
-
-      {/* Metas de ahorro */}
-      <SavingsGoals />
 
       {/* Month picker */}
       {showMonthPicker && (

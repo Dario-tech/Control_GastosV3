@@ -106,21 +106,21 @@ export async function fetchGoals() {
   return goalsJson(res)
 }
 
-export async function createGoal(nombre, objetivo, emoji, fecha) {
+export async function createGoal(nombre, objetivo, emoji, fecha, imagen_url) {
   const res = await fetch(`${BASE}/api/goals`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body:    JSON.stringify({ nombre, objetivo, emoji, fecha }),
+    body:    JSON.stringify({ nombre, objetivo, emoji, fecha, imagen_url }),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
   return goalsJson(res)
 }
 
-export async function updateGoal(id, nombre, objetivo, emoji, fecha) {
+export async function updateGoal(id, nombre, objetivo, emoji, fecha, imagen_url) {
   const res = await fetch(`${BASE}/api/goals/${id}`, {
     method:  'PATCH',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body:    JSON.stringify({ nombre, objetivo, emoji, fecha }),
+    body:    JSON.stringify({ nombre, objetivo, emoji, fecha, imagen_url }),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
   return goalsJson(res)

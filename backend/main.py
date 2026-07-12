@@ -356,10 +356,11 @@ async def send_all_monthly_reports(request: Request):
 # ── Metas de ahorro (compartibles entre usuarios) ────────────────────────────
 
 class GoalIn(BaseModel):
-    nombre:   str
-    objetivo: float
-    emoji:    str = "🎯"
-    fecha:    str | None = None
+    nombre:     str
+    objetivo:   float
+    emoji:      str = "🎯"
+    fecha:      str | None = None
+    imagen_url: str | None = None  # gif/imagen personalizada, alternativa al emoji
 
 
 class ContributeIn(BaseModel):
@@ -375,13 +376,23 @@ async def list_goals_endpoint(email: str = Depends(get_current_user)):
     return await get_goals_for_user(email)
 
 
+def _clean_imagen_url(raw: str | None) -> str | None:
+    url = (raw or "").strip()
+    if not url:
+        return None
+    if not (url.startswith("http://") or url.startswith("https://")):
+        raise HTTPException(status_code=422, detail="La URL de la imagen debe empezar por http:// o https://")
+    return url
+
+
 @app.post("/api/goals")
 async def create_goal_endpoint(body: GoalIn, email: str = Depends(get_current_user)):
     if not body.nombre.strip():
         raise HTTPException(status_code=422, detail="Escribe un nombre")
     if body.objetivo <= 0:
         raise HTTPException(status_code=422, detail="El objetivo debe ser mayor que 0")
-    return await create_goal(email, body.nombre.strip(), body.objetivo, body.emoji, body.fecha)
+    imagen_url = _clean_imagen_url(body.imagen_url)
+    return await create_goal(email, body.nombre.strip(), body.objetivo, body.emoji, body.fecha, imagen_url)
 
 
 @app.patch("/api/goals/{goal_id}")
@@ -390,7 +401,8 @@ async def update_goal_endpoint(goal_id: int, body: GoalIn, email: str = Depends(
         raise HTTPException(status_code=422, detail="Escribe un nombre")
     if body.objetivo <= 0:
         raise HTTPException(status_code=422, detail="El objetivo debe ser mayor que 0")
-    return await update_goal(goal_id, email, body.nombre.strip(), body.objetivo, body.emoji, body.fecha)
+    imagen_url = _clean_imagen_url(body.imagen_url)
+    return await update_goal(goal_id, email, body.nombre.strip(), body.objetivo, body.emoji, body.fecha, imagen_url)
 
 
 @app.delete("/api/goals/{goal_id}")
