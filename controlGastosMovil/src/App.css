@@ -261,6 +261,76 @@ html, body, #root {
 }
 .profile-logout-btn:active { background: var(--red); color: white; }
 
+.profile-guide-btn {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border, var(--surface2));
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 0.92rem; font-weight: 600;
+  padding: 13px;
+  cursor: pointer;
+  margin-top: 14px;
+}
+.profile-guide-btn:active { background: var(--surface2); }
+
+/* ===== ONBOARDING ===== */
+.onboarding-overlay {
+  position: fixed; inset: 0; z-index: 400;
+  background: var(--bg, #12151f);
+  display: flex; flex-direction: column;
+  padding: calc(20px + env(safe-area-inset-top)) 28px calc(28px + env(safe-area-inset-bottom));
+}
+.onboarding-skip {
+  align-self: flex-end;
+  background: none; border: none; color: var(--text2);
+  font-size: 0.85rem; font-weight: 600; cursor: pointer; padding: 8px;
+}
+.onboarding-slide {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 18px;
+  animation: onboardingFade 0.35s ease;
+}
+@keyframes onboardingFade {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.onboarding-emoji { font-size: 4rem; }
+.onboarding-title {
+  font-size: 1.35rem; font-weight: 800; color: var(--text);
+  text-wrap: balance;
+}
+.onboarding-body {
+  font-size: 0.95rem; color: var(--text2); line-height: 1.55;
+  max-width: 32ch;
+}
+.onboarding-footer { display: flex; flex-direction: column; gap: 20px; align-items: center; }
+.onboarding-dots { display: flex; gap: 8px; }
+.onboarding-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--surface2); border: none; padding: 0; cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.onboarding-dot.active { background: var(--accent); transform: scale(1.3); }
+.onboarding-nav { display: flex; gap: 12px; width: 100%; }
+.onboarding-back {
+  flex: 1;
+  background: var(--surface); border: 1px solid var(--border, var(--surface2));
+  border-radius: 14px; color: var(--text); font-size: 0.95rem; font-weight: 600;
+  padding: 15px; cursor: pointer;
+}
+.onboarding-next {
+  flex: 2;
+  background: var(--accent); border: none; border-radius: 14px;
+  color: white; font-size: 0.95rem; font-weight: 700;
+  padding: 15px; cursor: pointer;
+}
+.onboarding-next:active { opacity: 0.85; }
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-slide { animation: none; }
+}
+
 /* ===== MAIN ===== */
 .main {
   flex: 1;
@@ -696,20 +766,57 @@ html, body, #root {
 
 .goal-detail-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border, var(--surface2)); }
 
-/* Custom GIF/image icon — overrides the emoji span with an <img> of the same footprint */
+/* Legacy: metas antiguas con imagen_url siguen mostrando su imagen como icono */
 img.goal-square-emoji { width: 1.3rem; height: 1.3rem; border-radius: 6px; object-fit: cover; }
 img.goal-detail-emoji { width: 2rem; height: 2rem; border-radius: 10px; object-fit: cover; }
 
-/* Emoji vs. GIF toggle in the create/edit modal */
-.goal-icon-toggle { display: flex; gap: 6px; margin-bottom: 12px; background: var(--surface2); border-radius: 10px; padding: 3px; }
-.goal-icon-toggle-btn {
-  flex: 1; background: none; border: none; border-radius: 8px; padding: 8px 0;
-  font-size: 0.78rem; font-weight: 600; color: var(--text2); cursor: pointer;
+/* Foto adjunta a una aportación (botón cámara + vista previa) */
+.goal-photo-btn {
+  background: none; border: none; font-size: 1.05rem; cursor: pointer;
+  padding: 6px; flex-shrink: 0; opacity: 0.6; line-height: 1;
+  -webkit-tap-highlight-color: transparent;
 }
-.goal-icon-toggle-btn.active { background: var(--surface); color: var(--text); }
-.goal-gif-picker { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 14px; }
-.goal-gif-picker .setup-input { width: 100%; }
-.goal-gif-preview { width: 72px; height: 72px; border-radius: 12px; object-fit: cover; background: var(--surface2); }
+.goal-photo-btn.has-photo { opacity: 1; }
+.goal-photo-preview-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 8px; padding: 6px 8px;
+  background: var(--surface2); border-radius: 12px;
+}
+.goal-photo-preview { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+.goal-photo-preview-hint { flex: 1; font-size: 0.72rem; color: var(--text2); }
+.goal-photo-remove {
+  background: none; border: none; color: var(--text3, var(--text2));
+  font-size: 0.8rem; cursor: pointer; padding: 6px; flex-shrink: 0;
+}
+
+/* Álbum de recuerdos dentro del detalle de la meta */
+.goal-memories { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border, var(--surface2)); }
+.goal-memories-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.goal-memory {
+  position: relative; border: none; padding: 0; background: var(--surface2);
+  border-radius: 12px; overflow: hidden; aspect-ratio: 1; cursor: pointer;
+}
+.goal-memory-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.goal-memory-caption {
+  position: absolute; bottom: 4px; right: 6px;
+  font-size: 0.62rem; font-weight: 700; color: #fff;
+  background: rgba(0,0,0,0.55); border-radius: 8px; padding: 2px 6px;
+  font-variant-numeric: tabular-nums;
+}
+.goal-contribution-thumb {
+  width: 26px; height: 26px; border-radius: 6px; object-fit: cover;
+  flex-shrink: 0; cursor: pointer;
+}
+
+/* Lightbox para ampliar una foto */
+.goal-lightbox {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,0.88);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 24px; cursor: pointer;
+}
+.goal-lightbox-img { max-width: 100%; max-height: 78vh; border-radius: 14px; object-fit: contain; }
+.goal-lightbox-caption { font-size: 0.82rem; color: #fff; font-weight: 600; text-align: center; }
 
 /* Contributions — per-user list with name and date instead of a raw email */
 .goal-contributions { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border, var(--surface2)); }

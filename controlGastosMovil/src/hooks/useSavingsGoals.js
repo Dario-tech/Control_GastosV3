@@ -33,8 +33,8 @@ export function useSavingsGoals() {
     await refresh()
   }
 
-  async function addMoney(id, importe) {
-    await contributeToGoal(id, importe)
+  async function addMoney(id, importe, foto = null) {
+    await contributeToGoal(id, importe, foto)
     await refresh()
   }
 

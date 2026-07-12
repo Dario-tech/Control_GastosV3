@@ -147,11 +147,11 @@ export async function deleteGoal(id) {
   return goalsJson(res)
 }
 
-export async function contributeToGoal(id, importe) {
+export async function contributeToGoal(id, importe, foto = null) {
   const res = await fetch(`${BASE}/api/goals/${id}/contribute`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body:    JSON.stringify({ importe }),
+    body:    JSON.stringify({ importe, foto }),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
   return goalsJson(res)

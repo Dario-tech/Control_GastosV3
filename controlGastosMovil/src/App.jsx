@@ -11,6 +11,7 @@ import CategorizeModal from './components/ui/CategorizeModal'
 import AddTransactionModal from './components/ui/AddTransactionModal'
 import TransactionSearchModal from './components/ui/TransactionSearchModal'
 import Toast from './components/ui/Toast'
+import OnboardingGuide, { shouldShowOnboarding } from './components/ui/OnboardingGuide'
 import { usePendingTransaction } from './hooks/usePendingTransaction'
 import LoginScreen from './components/auth/LoginScreen'
 import YearTab from './components/tabs/YearTab'
@@ -49,6 +50,7 @@ function AppContent() {
   const [categorizeOpen, setCategorizeOpen] = useState(false)
   const [addOpen,        setAddOpen]        = useState(false)
   const [searchOpen,     setSearchOpen]     = useState(false)
+  const [guideOpen,      setGuideOpen]      = useState(shouldShowOnboarding)
   const { queue, fetchQueue, categorizePending } = usePendingTransaction()
 
   const current = queue[0] ?? null
@@ -74,7 +76,12 @@ function AppContent() {
       </main>
       <BottomNav onTabChange={() => setProfileOpen(false)} />
       <Toast />
-      <ProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
+      <ProfilePanel
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onShowGuide={() => { setProfileOpen(false); setGuideOpen(true) }}
+      />
+      {guideOpen && <OnboardingGuide onFinish={() => setGuideOpen(false)} />}
       {categorizeOpen && current && (
         <CategorizeModal
           pending={current}

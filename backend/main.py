@@ -391,6 +391,23 @@ class GoalIn(BaseModel):
 
 class ContributeIn(BaseModel):
     importe: float
+    foto:    str | None = None  # data-URL JPEG, comprimida en el cliente
+
+
+# El cliente redimensiona a ~800px y comprime a JPEG antes de subir, así que
+# una foto normal ronda los 50-150KB. El límite alto es solo un cortafuegos.
+_FOTO_MAX_CHARS = 800_000  # ~600KB reales en base64
+
+
+def _clean_foto(raw: str | None) -> str | None:
+    foto = (raw or "").strip()
+    if not foto:
+        return None
+    if not foto.startswith("data:image/"):
+        raise HTTPException(status_code=422, detail="La foto debe ser una imagen")
+    if len(foto) > _FOTO_MAX_CHARS:
+        raise HTTPException(status_code=422, detail="La foto es demasiado grande, inténtalo con otra")
+    return foto
 
 
 class ShareIn(BaseModel):
@@ -439,7 +456,7 @@ async def delete_goal_endpoint(goal_id: int, email: str = Depends(get_current_us
 
 @app.post("/api/goals/{goal_id}/contribute")
 async def contribute_endpoint(goal_id: int, body: ContributeIn, email: str = Depends(get_current_user)):
-    return await contribute(goal_id, email, body.importe)
+    return await contribute(goal_id, email, body.importe, _clean_foto(body.foto))
 
 
 @app.delete("/api/goals/{goal_id}/contributions/{contribution_id}")

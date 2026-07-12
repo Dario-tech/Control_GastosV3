@@ -43,6 +43,8 @@ def ensure_goals_tables():
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )
         """)
+        # Foto opcional por aportación (data-URL JPEG comprimida en el cliente).
+        cur.execute("ALTER TABLE savings_goal_contributions ADD COLUMN IF NOT EXISTS foto TEXT")
 
 
 async def get_goals_for_user(email: str) -> list[dict]:
@@ -75,7 +77,7 @@ async def get_goals_for_user(email: str) -> list[dict]:
                 g["memberNames"] = members  # [{user_email, name}]
                 cur.execute(
                     """SELECT c.id, c.user_email, COALESCE(u.name, c.user_email) AS name,
-                              c.importe, c.created_at::text AS fecha
+                              c.importe, c.created_at::text AS fecha, c.foto
                        FROM savings_goal_contributions c
                        JOIN users u ON u.email = c.user_email
                        WHERE c.goal_id = %s ORDER BY c.created_at DESC""",
@@ -168,7 +170,7 @@ async def delete_goal(goal_id: int, email: str) -> None:
     await run_in_thread(_q)
 
 
-async def contribute(goal_id: int, email: str, importe: float) -> dict:
+async def contribute(goal_id: int, email: str, importe: float, foto: str | None = None) -> dict:
     await _require_member(goal_id, email)
     if importe <= 0:
         raise HTTPException(status_code=422, detail="El importe debe ser mayor que 0")
@@ -176,8 +178,8 @@ async def contribute(goal_id: int, email: str, importe: float) -> dict:
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                "INSERT INTO savings_goal_contributions (goal_id, user_email, importe) VALUES (%s, %s, %s)",
-                (goal_id, email, importe),
+                "INSERT INTO savings_goal_contributions (goal_id, user_email, importe, foto) VALUES (%s, %s, %s, %s)",
+                (goal_id, email, importe, foto),
             )
     await run_in_thread(_q)
     return await get_goal(goal_id, email)

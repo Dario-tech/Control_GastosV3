@@ -59,5 +59,6 @@ CREATE TABLE IF NOT EXISTS savings_goal_contributions (
     goal_id    INTEGER NOT NULL REFERENCES savings_goals(id) ON DELETE CASCADE,
     user_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
     importe    NUMERIC(12,2) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    foto       TEXT  -- opcional: data-URL JPEG comprimida en cliente ("álbum de recuerdos")
 );

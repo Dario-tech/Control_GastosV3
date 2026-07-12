@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import SettingsTab from '../tabs/SettingsTab'
 
-export default function ProfilePanel({ open, onClose }) {
+export default function ProfilePanel({ open, onClose, onShowGuide }) {
   const { user, logout } = useAuth()
   const touchStartX = useRef(null)
 
@@ -74,6 +74,11 @@ export default function ProfilePanel({ open, onClose }) {
           </div>
         )}
         <SettingsTab />
+        {onShowGuide && (
+          <button className="profile-guide-btn" onClick={onShowGuide}>
+            📖 Ver guía de la app
+          </button>
+        )}
         <div className="profile-logout-wrap">
           <button className="profile-logout-btn" onClick={handleLogout}>
             Cerrar sesión
