@@ -2520,6 +2520,12 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
   color: var(--text3);
   font-weight: 500;
 }
+.s-link {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+.s-link:active { opacity: 0.7; }
 
 /* Toggle */
 .s-toggle {

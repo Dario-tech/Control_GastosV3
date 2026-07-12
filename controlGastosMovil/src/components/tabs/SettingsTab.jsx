@@ -55,9 +55,11 @@ function ThemeCard({ theme, selected, onSelect }) {
   )
 }
 import { useBudget } from '../../hooks/useBudget'
-import { useFinanceData } from '../../context/FinanceDataContext'
 import { useApp } from '../../context/AppContext'
 import { sendMonthlyReport } from '../../services/api'
+
+const SUPPORT_EMAIL_DISPLAY = 'soporte@mieconomia.app'
+const SUPPORT_EMAIL_REAL    = 'marioomc00@gmail.com'
 
 function Section({ title, children }) {
   return (
@@ -113,7 +115,6 @@ function Segmented({ options, value, onChange }) {
 export default function SettingsTab() {
   const { settings, update } = useSettings()
   const { allItems: budgetItems, removeItem } = useBudget()
-  const { status, lastUpdated, errorMsg, refresh } = useFinanceData()
   const { showToast } = useApp()
   const [sendingReport, setSendingReport] = useState(false)
 
@@ -152,14 +153,6 @@ export default function SettingsTab() {
       budgetItems.forEach(i => removeItem(i.id))
     }
   }
-
-  const backendStatus = {
-    live:    '✅ Conectado al backend',
-    loading: '⏳ Conectando…',
-    offline: '⚠️ Backend no disponible — usando datos de ejemplo',
-    idle:    '⚙️ Backend activo — Google Sheets pendiente de configurar',
-    error:   `⚠️ ${errorMsg || 'Error de conexión'}`,
-  }[status] ?? ''
 
   return (
     <div className="tab-panel">
@@ -226,20 +219,6 @@ export default function SettingsTab() {
         </Row>
       </Section>
 
-      <Section title="Backend">
-        <Row icon="🔌" label="Estado" last>
-          <span className="s-value-text" style={{ fontSize: '0.75rem' }}>{backendStatus}</span>
-        </Row>
-        {status === 'live' && lastUpdated && (
-          <div className="api-key-ok">
-            Actualizado a las {lastUpdated.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-            <button className="s-action-btn" style={{ marginLeft: 10 }} onClick={refresh}>
-              Recargar
-            </button>
-          </div>
-        )}
-      </Section>
-
       <Section title="Datos">
         <Row icon="📤" label="Exportar datos">
           <button className="s-action-btn" onClick={exportData}>Exportar</button>
@@ -254,18 +233,17 @@ export default function SettingsTab() {
         </Row>
       </Section>
 
-      <Section title="Sobre la app">
-        <Row icon="📱" label="Versión">
-          <span className="s-value-text">1.0.0</span>
+      <Section title="Ayuda">
+        <Row icon="❓" label="¿Tienes dudas o algo no funciona?">
+          <span className="s-value-text" style={{ fontSize: '0.75rem' }}>Escríbenos</span>
         </Row>
-        <Row icon="👨‍💻" label="Desarrollador">
-          <span className="s-value-text">Mario</span>
-        </Row>
-        <Row icon="⚛️" label="Frontend">
-          <span className="s-value-text">React + Vite</span>
-        </Row>
-        <Row icon="🐍" label="Backend" last>
-          <span className="s-value-text">Python + FastAPI</span>
+        <Row icon="✉️" label="Contacto" last>
+          <a
+            className="s-value-text s-link"
+            href={`mailto:${SUPPORT_EMAIL_REAL}?subject=${encodeURIComponent('Ayuda con Mi Economía')}`}
+          >
+            {SUPPORT_EMAIL_DISPLAY}
+          </a>
         </Row>
       </Section>
 

@@ -341,7 +341,11 @@ function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, 
 // `compact`: bloque de solo consulta para la pantalla principal — muestra las
 // metas existentes (y abre su detalle) pero no permite crear nuevas; la
 // gestión completa vive en la pestaña Presupuesto.
-export default function SavingsGoals({ compact = false }) {
+// `alignRight`: solo cambia el layout (bloque a la derecha, mitad de ancho),
+// sin afectar a si se puede crear/gestionar. `compact` ya implica alineado
+// a la derecha.
+export default function SavingsGoals({ compact = false, alignRight = false }) {
+  const rightAligned = compact || alignRight
   const { goals, status, addGoal, editGoal, removeGoal, addMoney, share, removeContribution } = useSavingsGoals()
   const { user } = useAuth()
   const [showForm, setShowForm]     = useState(false)
@@ -372,7 +376,7 @@ export default function SavingsGoals({ compact = false }) {
 
   return (
     <div
-      className={`goals-section${compact ? ' goals-section--compact' : ''}`}
+      className={`goals-section${rightAligned ? ' goals-section--compact' : ''}`}
       data-tour={compact ? undefined : 'goals'}
     >
       <div className="goals-header">
@@ -381,7 +385,7 @@ export default function SavingsGoals({ compact = false }) {
 
       {status === 'error' && <p className="goals-empty">No se pudieron cargar las metas.</p>}
 
-      <div className={`goals-grid${compact ? ' goals-grid--compact' : ''}`}>
+      <div className={`goals-grid${rightAligned ? ' goals-grid--compact' : ''}`}>
         {goals.map(g => {
           const pct    = g.objetivo > 0 ? Math.min(100, (g.ahorrado / g.objetivo) * 100) : 0
           const done   = g.ahorrado >= g.objetivo

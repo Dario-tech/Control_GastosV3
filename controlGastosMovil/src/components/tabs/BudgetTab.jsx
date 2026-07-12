@@ -293,7 +293,7 @@ export default function BudgetTab() {
       )}
 
       {/* Metas de ahorro: aquí vive la gestión completa (crear, editar, compartir…) */}
-      <SavingsGoals />
+      <SavingsGoals alignRight />
 
       {/* Month picker */}
       {showMonthPicker && (
