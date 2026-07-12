@@ -12,6 +12,8 @@ import AddTransactionModal from './components/ui/AddTransactionModal'
 import TransactionSearchModal from './components/ui/TransactionSearchModal'
 import Toast from './components/ui/Toast'
 import SpotlightTour, { shouldShowTour } from './components/ui/SpotlightTour'
+import { REVOLUT_RETURN_PARAM } from './components/ui/RevolutConnection'
+import { confirmRevolutConnection, syncRevolut } from './services/api'
 import { usePendingTransaction } from './hooks/usePendingTransaction'
 import LoginScreen from './components/auth/LoginScreen'
 import YearTab from './components/tabs/YearTab'
@@ -46,6 +48,7 @@ class ErrorBoundary extends Component {
 function AppContent() {
   const { activeTab } = useApp()
   const { settings }  = useSettings()
+  const { showToast } = useApp()
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [categorizeOpen, setCategorizeOpen] = useState(false)
   const [addOpen,        setAddOpen]        = useState(false)
@@ -54,6 +57,28 @@ function AppContent() {
   const { queue, fetchQueue, categorizePending } = usePendingTransaction()
 
   const current = queue[0] ?? null
+
+  // Vuelta de autorizar Revolut en GoCardless: confirma la conexión, importa
+  // los movimientos y limpia el parámetro de la URL.
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has(REVOLUT_RETURN_PARAM)) return
+    url.searchParams.delete(REVOLUT_RETURN_PARAM)
+    window.history.replaceState({}, '', url.toString())
+    setProfileOpen(true)
+    confirmRevolutConnection()
+      .then(({ status }) => {
+        if (status !== 'connected') {
+          showToast('⚠️ No se pudo confirmar la conexión con Revolut')
+          return
+        }
+        return syncRevolut().then(({ imported }) => {
+          showToast(imported > 0 ? `🏦 Revolut conectado: ${imported} movimientos importados` : '🏦 Revolut conectado')
+        })
+      })
+      .catch(() => showToast('⚠️ No se pudo conectar con Revolut'))
+      .finally(() => window.dispatchEvent(new Event('revolut-updated')))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
 
   return (

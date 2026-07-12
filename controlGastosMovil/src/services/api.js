@@ -175,3 +175,56 @@ export async function shareGoal(id, email) {
   })
   return goalsJson(res)
 }
+
+// ── Premium / Revolut ───────────────────────────────────────────────────────
+
+async function jsonOrThrow(res) {
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(body.detail || `API ${res.status}`)
+  return body
+}
+
+export async function fetchPremiumStatus() {
+  const res = await fetch(`${BASE}/api/premium/status`, {
+    headers: authHeaders(), signal: AbortSignal.timeout(15000),
+  })
+  return jsonOrThrow(res)
+}
+
+export async function fetchRevolutConnection() {
+  const res = await fetch(`${BASE}/api/revolut/connection`, {
+    headers: authHeaders(), signal: AbortSignal.timeout(15000),
+  })
+  return jsonOrThrow(res)
+}
+
+export async function connectRevolut(redirectUrl) {
+  const res = await fetch(`${BASE}/api/revolut/connect`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify({ redirect_url: redirectUrl }),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return jsonOrThrow(res)
+}
+
+export async function confirmRevolutConnection() {
+  const res = await fetch(`${BASE}/api/revolut/confirm`, {
+    method: 'POST', headers: authHeaders(), signal: AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return jsonOrThrow(res)
+}
+
+export async function syncRevolut() {
+  const res = await fetch(`${BASE}/api/revolut/sync`, {
+    method: 'POST', headers: authHeaders(), signal: AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return jsonOrThrow(res)
+}
+
+export async function disconnectRevolut() {
+  const res = await fetch(`${BASE}/api/revolut/connection`, {
+    method: 'DELETE', headers: authHeaders(), signal: AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return jsonOrThrow(res)
+}

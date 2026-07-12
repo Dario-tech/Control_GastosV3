@@ -28,6 +28,12 @@ from services.goals import (
     ensure_goals_tables, get_goals_for_user, create_goal, update_goal,
     delete_goal, contribute, delete_contribution, share_goal,
 )
+from services.premium import ensure_premium_column, is_premium
+from services.revolut import (
+    ensure_bank_connections_table, get_connection, connect as revolut_connect,
+    confirm as revolut_confirm, disconnect as revolut_disconnect, sync as revolut_sync,
+    RevolutNotConfigured,
+)
 
 
 @asynccontextmanager
@@ -36,6 +42,8 @@ async def lifespan(app: FastAPI):
     ensure_password_column()  # migración aditiva idempotente (columna password_hash)
     ensure_goals_tables()     # migración aditiva idempotente (metas de ahorro compartidas)
     ensure_comentario_column()  # migración aditiva idempotente (comentario libre en transacciones)
+    ensure_premium_column()          # migración aditiva idempotente (freemium)
+    ensure_bank_connections_table()  # migración aditiva idempotente (conexión Revolut/GoCardless)
     yield
 
 
@@ -477,6 +485,65 @@ async def investment_prices():
         return await get_all_prices()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Premium / Revolut ─────────────────────────────────────────────────────────
+
+@app.get("/api/premium/status")
+async def premium_status(email: str = Depends(get_current_user)):
+    return {"is_premium": await is_premium(email)}
+
+
+async def _require_premium(email: str):
+    if not await is_premium(email):
+        raise HTTPException(status_code=402, detail="Esta función es Premium")
+
+
+class RevolutConnectIn(BaseModel):
+    redirect_url: str
+
+
+@app.get("/api/revolut/connection")
+async def revolut_connection_endpoint(email: str = Depends(get_current_user)):
+    conn = await get_connection(email)
+    if not conn:
+        return {"status": "disconnected"}
+    return conn
+
+
+@app.post("/api/revolut/connect")
+async def revolut_connect_endpoint(body: RevolutConnectIn, email: str = Depends(get_current_user)):
+    await _require_premium(email)
+    try:
+        return await revolut_connect(email, body.redirect_url)
+    except RevolutNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@app.post("/api/revolut/confirm")
+async def revolut_confirm_endpoint(email: str = Depends(get_current_user)):
+    await _require_premium(email)
+    try:
+        return await revolut_confirm(email)
+    except RevolutNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@app.post("/api/revolut/sync")
+async def revolut_sync_endpoint(email: str = Depends(get_current_user)):
+    await _require_premium(email)
+    try:
+        result = await revolut_sync(email)
+    except RevolutNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    await _broadcast()
+    return result
+
+
+@app.delete("/api/revolut/connection")
+async def revolut_disconnect_endpoint(email: str = Depends(get_current_user)):
+    await revolut_disconnect(email)
+    return {"status": "ok"}
 
 
 # ── Debug ─────────────────────────────────────────────────────────────────────
