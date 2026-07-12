@@ -132,6 +132,14 @@ export function getBalanceForecast(data, m, now = new Date()) {
   }
 }
 
+export function isUnusualAmount(data, concepto, importe, factor = 2) {
+  const txs = (data.transactions || []).filter(t => t.concepto === concepto)
+  if (txs.length < 3) return null  // sin historial suficiente para comparar
+  const avg = txs.reduce((s, t) => s + t.importe, 0) / txs.length
+  if (avg <= 0 || importe < avg * factor) return null
+  return { avg, ratio: Math.round((importe / avg) * 10) / 10 }
+}
+
 export function getAntExpenses(data, threshold = 15) {
   const txs = (data.transactions || []).filter(t =>
     t.bucket === 'variableExpenses' && t.importe < threshold

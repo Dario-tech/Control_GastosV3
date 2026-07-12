@@ -3,6 +3,7 @@ import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
 import { postTransaction, suggestEmoji } from '../../services/api'
 import { TYPES, EMOJI_SUGGESTIONS } from '../../data/categories'
+import { isUnusualAmount } from '../../utils'
 import { useCategories } from '../../hooks/useCategories'
 
 function today() {
@@ -24,7 +25,7 @@ export default function AddTransactionModal({ onClose }) {
   const [newCatErr, setNewCatErr]   = useState('')
   const [suggesting, setSuggesting] = useState(false)
 
-  const { refresh }          = useFinanceData()
+  const { refresh, data }    = useFinanceData()
   const { customCategories, addCategory } = useSettings()
   const DEFAULT_CATEGORIES = useCategories()
 
@@ -136,14 +137,20 @@ export default function AddTransactionModal({ onClose }) {
             {/* Category grid */}
             <p className="modal-label" style={{ marginBottom: 10, marginTop: 4 }}>Categoría</p>
             <div className="catmodal-grid">
-              {allCats.map(c => (
-                <button key={c.concepto} className="catmodal-cat-card"
-                  disabled={loading}
-                  onClick={() => handleSubmit(c.concepto)}>
-                  <span className="catmodal-cat-emoji">{c.emoji}</span>
-                  <span className="catmodal-cat-label">{c.concepto}</span>
-                </button>
-              ))}
+              {allCats.map(c => {
+                const amt = parseFloat(String(importe).replace(',', '.'))
+                const unusual = amt > 0 ? isUnusualAmount(data, c.concepto, amt) : null
+                return (
+                  <button key={c.concepto} className={`catmodal-cat-card${unusual ? ' unusual' : ''}`}
+                    disabled={loading}
+                    onClick={() => handleSubmit(c.concepto)}
+                    title={unusual ? `${unusual.ratio}× tu gasto medio en ${c.concepto}` : undefined}>
+                    {unusual && <span className="catmodal-cat-warn">⚠️</span>}
+                    <span className="catmodal-cat-emoji">{c.emoji}</span>
+                    <span className="catmodal-cat-label">{c.concepto}</span>
+                  </button>
+                )
+              })}
 
               {/* + Nueva categoría */}
               {!showNewCat && (

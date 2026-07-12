@@ -776,6 +776,8 @@ html, body, #root {
 }
 .catmodal-cat-card:active  { transform: scale(0.95); background: var(--accent-dim); border-color: var(--accent); }
 .catmodal-cat-card:disabled { opacity: 0.5; }
+.catmodal-cat-card.unusual { border-color: var(--orange, #ff9500); position: relative; }
+.catmodal-cat-warn { position: absolute; top: 4px; right: 6px; font-size: 0.62rem; }
 .catmodal-cat-emoji { font-size: 1.5rem; }
 .catmodal-cat-label { font-size: 0.7rem; font-weight: 600; color: var(--text2); text-align: center; line-height: 1.2; }
 

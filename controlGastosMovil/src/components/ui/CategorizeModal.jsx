@@ -3,6 +3,7 @@ import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
 import { TYPES } from '../../data/categories'
 import { useCategories } from '../../hooks/useCategories'
+import { isUnusualAmount } from '../../utils'
 
 const DATE_FMT = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
 
@@ -15,7 +16,7 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip }
   const [tipo, setTipo]       = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState(null)
-  const { refresh }           = useFinanceData()
+  const { refresh, data }     = useFinanceData()
   const { customCategories }  = useSettings()
   const DEFAULT_CATEGORIES = useCategories()
 
@@ -88,13 +89,18 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip }
 
         {step === 2 && (
           <div className="catmodal-grid">
-            {allCats.map(c => (
-              <button key={c.concepto} className="catmodal-cat-card"
-                onClick={() => handleConcepto(c.concepto)} disabled={loading}>
-                <span className="catmodal-cat-emoji">{c.emoji}</span>
-                <span className="catmodal-cat-label">{c.concepto}</span>
-              </button>
-            ))}
+            {allCats.map(c => {
+              const unusual = isUnusualAmount(data, c.concepto, pending.importe)
+              return (
+                <button key={c.concepto} className={`catmodal-cat-card${unusual ? ' unusual' : ''}`}
+                  onClick={() => handleConcepto(c.concepto)} disabled={loading}
+                  title={unusual ? `${unusual.ratio}× tu gasto medio en ${c.concepto}` : undefined}>
+                  {unusual && <span className="catmodal-cat-warn">⚠️</span>}
+                  <span className="catmodal-cat-emoji">{c.emoji}</span>
+                  <span className="catmodal-cat-label">{c.concepto}</span>
+                </button>
+              )
+            })}
           </div>
         )}
 
