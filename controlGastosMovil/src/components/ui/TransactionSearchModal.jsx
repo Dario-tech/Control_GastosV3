@@ -69,7 +69,10 @@ export default function TransactionSearchModal({ onClose }) {
                     <span className="search-day">{day}</span>
                     <span className="search-month-short">{MONTH_SHORT[mIdx] ?? ''}</span>
                   </div>
-                  <span className="search-concepto">{t.concepto}</span>
+                  <div className="search-info">
+                    <span className="search-concepto">{t.concepto}</span>
+                    {t.comentario && <span className="search-comentario">💬 {t.comentario}</span>}
+                  </div>
                   <span className={`search-importe ${isIncome ? 'pos' : 'neg'}`}>
                     {isIncome ? '+' : '-'}{fmt(t.importe)}
                   </span>

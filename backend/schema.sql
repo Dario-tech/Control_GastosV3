@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     fecha      DATE NOT NULL DEFAULT CURRENT_DATE,
     tipo       TEXT NOT NULL DEFAULT '',
     concepto   TEXT NOT NULL DEFAULT '',
-    importe    NUMERIC(12,2) NOT NULL DEFAULT 0
+    importe    NUMERIC(12,2) NOT NULL DEFAULT 0,
+    comentario TEXT  -- nota libre opcional, se puede añadir al crear o después
 );
 CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_email);
 

@@ -7,7 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from services.prices import get_all_prices
-from services.sheets import get_finance_data, get_raw_transactions, delete_transaction, post_transaction
+from services.sheets import (
+    get_finance_data, get_raw_transactions, delete_transaction, post_transaction,
+    ensure_comentario_column, update_transaction_comment,
+)
 from services.auth import (
     verify_google_token, create_jwt, get_current_user,
     hash_password, verify_password,
@@ -32,6 +35,7 @@ async def lifespan(app: FastAPI):
     init_pool()
     ensure_password_column()  # migración aditiva idempotente (columna password_hash)
     ensure_goals_tables()     # migración aditiva idempotente (metas de ahorro compartidas)
+    ensure_comentario_column()  # migración aditiva idempotente (comentario libre en transacciones)
     yield
 
 
@@ -46,7 +50,7 @@ origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_methods=["GET", "DELETE", "POST"],
+    allow_methods=["GET", "DELETE", "POST", "PATCH"],
     allow_headers=["*"],
 )
 
@@ -210,11 +214,12 @@ async def delete_transaction_endpoint(row_index: int, email: str = Depends(get_c
 
 
 class TransactionIn(BaseModel):
-    importe:  float
-    tipo:     str
-    concepto: str
-    fecha:    str | None = None  # YYYY-MM-DD; si no se pasa, usa CURRENT_DATE
-    source:   str = "shortcut"
+    importe:    float
+    tipo:       str
+    concepto:   str
+    fecha:      str | None = None  # YYYY-MM-DD; si no se pasa, usa CURRENT_DATE
+    source:     str = "shortcut"
+    comentario: str | None = None
 
 
 @app.post("/api/transaction")
@@ -229,12 +234,33 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
         raise HTTPException(status_code=422, detail=f"Body inválido: {e}")
 
     try:
-        result = await post_transaction(tx.importe, tx.tipo, tx.concepto, email, tx.source, tx.fecha)
+        result = await post_transaction(
+            tx.importe, tx.tipo, tx.concepto, email, tx.source, tx.fecha,
+            (tx.comentario or "").strip() or None,
+        )
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Error al escribir en la base de datos: {e}")
 
+    await _broadcast()
+    return result
+
+
+class CommentIn(BaseModel):
+    comentario: str
+
+
+@app.patch("/api/transactions/{row_index}/comment")
+async def update_transaction_comment_endpoint(
+    row_index: int, body: CommentIn, email: str = Depends(get_current_user)
+):
+    try:
+        result = await update_transaction_comment(row_index, email, body.comentario.strip())
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     await _broadcast()
     return result
 

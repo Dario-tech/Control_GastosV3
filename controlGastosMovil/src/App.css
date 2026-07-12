@@ -1376,7 +1376,9 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
 .search-date-block { display: flex; flex-direction: column; align-items: center; width: 32px; flex-shrink: 0; }
 .search-day { font-size: 0.9rem; font-weight: 700; color: var(--text); line-height: 1; }
 .search-month-short { font-size: 0.62rem; color: var(--text3, var(--text2)); text-transform: uppercase; }
-.search-concepto { flex: 1; font-size: 0.85rem; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.search-concepto { font-size: 0.85rem; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-comentario { font-size: 0.7rem; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .search-importe { font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .search-importe.pos { color: var(--green, #2dd4a0); }
 .search-importe.neg { color: var(--red, #ff5f7e); }
@@ -2653,22 +2655,25 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
   padding: 6px 0;
 }
 
-.txlog-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 20px;
-  transition: background 0.1s;
+.txlog-row-wrap {
   position: relative;
 }
-.txlog-row::after {
+.txlog-row-wrap::after {
   content: '';
   position: absolute;
   bottom: 0; left: 20px; right: 20px;
   height: 1px;
   background: var(--border);
 }
-.txlog-row:last-child::after { display: none; }
+.txlog-row-wrap:last-child::after { display: none; }
+
+.txlog-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  transition: background 0.1s;
+}
 .txlog-row:active { background: rgba(255,255,255,0.03); }
 
 .txlog-date-block {
@@ -2697,6 +2702,9 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
 .txlog-row-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .txlog-concepto {
   font-size: 0.9rem;
@@ -2706,6 +2714,53 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.txlog-comentario {
+  font-size: 0.74rem;
+  color: var(--text2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.txlog-comment-btn {
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.55;
+  padding: 6px;
+  -webkit-tap-highlight-color: transparent;
+}
+.txlog-comment-btn:active { opacity: 1; }
+
+.txlog-comment-edit {
+  display: flex;
+  gap: 8px;
+  padding: 0 20px 12px calc(20px + 36px + 10px);
+}
+.txlog-comment-input {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border, transparent);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  color: var(--text);
+  min-width: 0;
+}
+.txlog-comment-save {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.txlog-comment-save:disabled { opacity: 0.5; }
 
 .txlog-importe {
   font-size: 0.95rem;

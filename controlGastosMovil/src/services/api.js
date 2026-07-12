@@ -70,9 +70,10 @@ export async function fetchFinanceData() {
   return res.json()
 }
 
-export async function postTransaction(importe, tipo, concepto, fecha = null) {
+export async function postTransaction(importe, tipo, concepto, fecha = null, comentario = null) {
   const body = { importe, tipo, concepto, source: 'app' }
   if (fecha) body.fecha = fecha
+  if (comentario) body.comentario = comentario
   const res = await fetch(`${BASE}/api/transaction`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -90,6 +91,17 @@ export async function deleteTransaction(rowIndex) {
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
   if (!res.ok) throw new Error(`Delete ${res.status}`)
+  return res.json()
+}
+
+export async function updateTransactionComment(rowIndex, comentario) {
+  const res = await fetch(`${BASE}/api/transactions/${rowIndex}/comment`, {
+    method:  'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify({ comentario }),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}`)
   return res.json()
 }
 

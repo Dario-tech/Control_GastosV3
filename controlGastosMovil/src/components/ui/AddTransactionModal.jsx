@@ -15,6 +15,7 @@ export default function AddTransactionModal({ onClose }) {
   const [tipo, setTipo]         = useState(null)
   const [importe, setImporte]   = useState('')
   const [fecha, setFecha]       = useState(today())
+  const [comentario, setComentario] = useState('')
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState(null)
 
@@ -37,7 +38,7 @@ export default function AddTransactionModal({ onClose }) {
     setLoading(true)
     setError(null)
     try {
-      await postTransaction(amt, tipo, concepto, fecha)
+      await postTransaction(amt, tipo, concepto, fecha, comentario.trim() || null)
       refresh()
       onClose()
     } catch (err) {
@@ -135,6 +136,18 @@ export default function AddTransactionModal({ onClose }) {
                     />
                   </div>
                 </div>
+              </div>
+
+              <div className="modal-field">
+                <label className="modal-label">Comentario (opcional)</label>
+                <input
+                  className="modal-input"
+                  type="text"
+                  placeholder="Añade una nota…"
+                  value={comentario}
+                  onChange={e => setComentario(e.target.value)}
+                  maxLength={200}
+                />
               </div>
             </div>
 

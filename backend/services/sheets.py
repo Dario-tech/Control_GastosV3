@@ -3,6 +3,12 @@ from fastapi import HTTPException
 from .db import db_cursor, run_in_thread
 
 
+def ensure_comentario_column():
+    """Migración aditiva e idempotente: comentario libre en cada transacción."""
+    with db_cursor() as cur:
+        cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS comentario TEXT")
+
+
 # ── Helpers (lógica pura, sin I/O) ────────────────────────────────────────────
 
 def _month_index(date_str: str) -> int | None:
@@ -79,6 +85,7 @@ def _build_finance(rows: list[dict]) -> dict:
         concepto = str(row.get("concepto", "") or "").strip() or "Sin categoría"
         importe  = float(row.get("importe", 0) or 0)
         row_id   = row.get("_rowIndex")
+        comentario = row.get("comentario") or ""
 
         m_idx = _month_index(fecha)
         if m_idx is None or not (0 <= m_idx <= 11):
@@ -97,12 +104,13 @@ def _build_finance(rows: list[dict]) -> dict:
         buckets[concepto]["amounts"][m_idx] += abs(importe)
 
         transactions.append({
-            "rowIndex": row_id,
-            "fecha":    fecha[:10],
-            "concepto": concepto,
-            "importe":  abs(importe),
-            "bucket":   bucket,
-            "month":    m_idx,
+            "rowIndex":   row_id,
+            "fecha":      fecha[:10],
+            "concepto":   concepto,
+            "importe":    abs(importe),
+            "bucket":     bucket,
+            "month":      m_idx,
+            "comentario": comentario,
         })
 
     year = max(year_counts, key=year_counts.get) if year_counts else date_type.today().year
@@ -136,7 +144,7 @@ async def get_finance_data(email: str) -> dict:
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                "SELECT id, fecha::text, tipo, concepto, importe FROM transactions WHERE user_email = %s ORDER BY fecha, id",
+                "SELECT id, fecha::text, tipo, concepto, importe, comentario FROM transactions WHERE user_email = %s ORDER BY fecha, id",
                 (email,),
             )
             return cur.fetchall()
@@ -157,7 +165,7 @@ async def get_finance_data(email: str) -> dict:
 
     data_rows = [
         {"_rowIndex": r["id"], "fecha": r["fecha"], "tipo": r["tipo"],
-         "concepto": r["concepto"], "importe": float(r["importe"])}
+         "concepto": r["concepto"], "importe": float(r["importe"]), "comentario": r["comentario"]}
         for r in rows
     ]
     return _build_finance(data_rows)
@@ -178,18 +186,23 @@ async def delete_transaction(row_index: int, email: str = "") -> dict:
     return {"status": "ok", "deleted": row_index}
 
 
-async def post_transaction(importe: float, tipo: str, concepto: str, email: str = "", source: str = "shortcut", fecha: str | None = None) -> dict:
+async def post_transaction(
+    importe: float, tipo: str, concepto: str, email: str = "", source: str = "shortcut",
+    fecha: str | None = None, comentario: str | None = None,
+) -> dict:
     def _q():
         with db_cursor() as cur:
             if fecha:
                 cur.execute(
-                    "INSERT INTO transactions (user_email, tipo, concepto, importe, fecha) VALUES (%s, %s, %s, %s, %s::date) RETURNING id, fecha::text",
-                    (email, tipo, concepto, importe, fecha),
+                    """INSERT INTO transactions (user_email, tipo, concepto, importe, fecha, comentario)
+                       VALUES (%s, %s, %s, %s, %s::date, %s) RETURNING id, fecha::text""",
+                    (email, tipo, concepto, importe, fecha, comentario),
                 )
             else:
                 cur.execute(
-                    "INSERT INTO transactions (user_email, tipo, concepto, importe) VALUES (%s, %s, %s, %s) RETURNING id, fecha::text",
-                    (email, tipo, concepto, importe),
+                    """INSERT INTO transactions (user_email, tipo, concepto, importe, comentario)
+                       VALUES (%s, %s, %s, %s, %s) RETURNING id, fecha::text""",
+                    (email, tipo, concepto, importe, comentario),
                 )
             return cur.fetchone()
 
@@ -197,11 +210,27 @@ async def post_transaction(importe: float, tipo: str, concepto: str, email: str 
     return {"status": "ok", "id": row["id"], "fecha": row["fecha"]}
 
 
+async def update_transaction_comment(row_index: int, email: str, comentario: str) -> dict:
+    """Añadir o editar el comentario de una transacción ya guardada."""
+    def _q():
+        with db_cursor() as cur:
+            cur.execute(
+                "UPDATE transactions SET comentario = %s WHERE id = %s AND user_email = %s",
+                (comentario, row_index, email),
+            )
+            return cur.rowcount
+
+    updated = await run_in_thread(_q)
+    if updated == 0:
+        raise HTTPException(status_code=404, detail="Transacción no encontrada")
+    return {"status": "ok", "id": row_index, "comentario": comentario}
+
+
 async def get_raw_transactions(email: str = "") -> dict:
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                "SELECT id, fecha::text, tipo, concepto, importe FROM transactions WHERE user_email = %s ORDER BY fecha DESC, id DESC LIMIT 100",
+                "SELECT id, fecha::text, tipo, concepto, importe, comentario FROM transactions WHERE user_email = %s ORDER BY fecha DESC, id DESC LIMIT 100",
                 (email,),
             )
             return cur.fetchall()
