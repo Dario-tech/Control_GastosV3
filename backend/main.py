@@ -32,7 +32,7 @@ from services.premium import ensure_premium_column, is_premium
 from services.revolut import (
     ensure_bank_connections_table, get_connection, connect as revolut_connect,
     confirm as revolut_confirm, disconnect as revolut_disconnect, sync as revolut_sync,
-    is_configured as revolut_is_configured, RevolutNotConfigured,
+    RevolutNotConfigured,
 )
 
 
@@ -503,18 +503,6 @@ class RevolutConnectIn(BaseModel):
     redirect_url: str
 
 
-# Mensaje único y sencillo para cualquier fallo de Revolut: nunca se le
-# enseña al usuario un detalle técnico (nombres de variables de entorno, etc.).
-_REVOLUT_GENERIC_ERROR = "No se pudo conectar con tu banco ahora mismo. Inténtalo más tarde."
-
-
-@app.get("/api/revolut/available")
-async def revolut_available_endpoint():
-    """Sin autenticar: para que el frontend oculte la función entera si no
-    está lista, en vez de dejar que el usuario la intente y falle."""
-    return {"available": revolut_is_configured()}
-
-
 @app.get("/api/revolut/connection")
 async def revolut_connection_endpoint(email: str = Depends(get_current_user)):
     conn = await get_connection(email)
@@ -528,8 +516,8 @@ async def revolut_connect_endpoint(body: RevolutConnectIn, email: str = Depends(
     await _require_premium(email)
     try:
         return await revolut_connect(email, body.redirect_url)
-    except RevolutNotConfigured:
-        raise HTTPException(status_code=503, detail=_REVOLUT_GENERIC_ERROR)
+    except RevolutNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 
 @app.post("/api/revolut/confirm")
@@ -537,8 +525,8 @@ async def revolut_confirm_endpoint(email: str = Depends(get_current_user)):
     await _require_premium(email)
     try:
         return await revolut_confirm(email)
-    except RevolutNotConfigured:
-        raise HTTPException(status_code=503, detail=_REVOLUT_GENERIC_ERROR)
+    except RevolutNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 
 @app.post("/api/revolut/sync")
@@ -546,8 +534,8 @@ async def revolut_sync_endpoint(email: str = Depends(get_current_user)):
     await _require_premium(email)
     try:
         result = await revolut_sync(email)
-    except RevolutNotConfigured:
-        raise HTTPException(status_code=503, detail=_REVOLUT_GENERIC_ERROR)
+    except RevolutNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e))
     await _broadcast()
     return result
 

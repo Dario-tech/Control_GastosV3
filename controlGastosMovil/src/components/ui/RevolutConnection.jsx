@@ -1,19 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { usePremium } from '../../hooks/usePremium'
 import {
-  fetchRevolutAvailable, fetchRevolutConnection, connectRevolut, syncRevolut, disconnectRevolut,
+  fetchRevolutConnection, connectRevolut, syncRevolut, disconnectRevolut,
 } from '../../services/api'
 import PremiumPaywall from './PremiumPaywall'
 
 const REVOLUT_RETURN_PARAM = 'revolut_return'
 
-// Mensaje único y sencillo ante cualquier fallo: nunca se muestra el detalle
-// técnico que pueda venir del backend (nombres de variables, etc.).
-const GENERIC_ERROR = 'No se pudo conectar. Inténtalo de nuevo en unos minutos.'
-
 function statusLabel(status) {
   return {
-    disconnected: 'Sincroniza tus movimientos automáticamente',
+    disconnected: 'No conectado',
     pending:      'Autorización pendiente…',
     connected:    'Conectado',
   }[status] ?? status
@@ -21,20 +17,15 @@ function statusLabel(status) {
 
 export default function RevolutConnection() {
   const { isPremium, loading: loadingPremium } = usePremium()
-  const [available, setAvailable] = useState(null) // null = aún no se sabe
-  const [conn, setConn]           = useState(null)
-  const [busy, setBusy]           = useState(false)
-  const [error, setError]         = useState(false)
+  const [conn, setConn]         = useState(null)
+  const [busy, setBusy]         = useState(false)
+  const [error, setError]       = useState('')
   const [showPaywall, setShowPaywall] = useState(false)
 
-  useEffect(() => {
-    fetchRevolutAvailable().then(d => setAvailable(Boolean(d.available))).catch(() => setAvailable(false))
-  }, [])
-
   const refresh = useCallback(() => {
-    if (!isPremium || !available) return
+    if (!isPremium) return
     fetchRevolutConnection().then(setConn).catch(() => {})
-  }, [isPremium, available])
+  }, [isPremium])
 
   useEffect(() => { refresh() }, [refresh])
 
@@ -44,32 +35,30 @@ export default function RevolutConnection() {
     return () => window.removeEventListener('revolut-updated', refresh)
   }, [refresh])
 
-  // Un solo toque: la app crea la conexión, redirige a Revolut para autorizar,
-  // y al volver confirma y sincroniza sola (ver App.jsx) — el usuario no hace
-  // nada más que autorizar en la pantalla de Revolut.
   async function handleConnect() {
     setBusy(true)
-    setError(false)
+    setError('')
     try {
       const url = new URL(window.location.href)
       url.searchParams.set(REVOLUT_RETURN_PARAM, '1')
       const { link } = await connectRevolut(url.toString())
       window.location.href = link
-    } catch {
-      setError(true)
+    } catch (e) {
+      setError(e.message || 'No se pudo iniciar la conexión con Revolut')
       setBusy(false)
     }
   }
 
   async function handleSync() {
     setBusy(true)
-    setError(false)
+    setError('')
     try {
       const { imported } = await syncRevolut()
       await refresh()
+      setError(imported > 0 ? '' : '') // sin error; el contador se ve en el toast del padre si hiciera falta
       alert(imported > 0 ? `Se importaron ${imported} movimientos nuevos` : 'No hay movimientos nuevos')
-    } catch {
-      setError(true)
+    } catch (e) {
+      setError(e.message || 'No se pudo sincronizar')
     } finally {
       setBusy(false)
     }
@@ -86,20 +75,7 @@ export default function RevolutConnection() {
     }
   }
 
-  if (loadingPremium || available === null) return null
-
-  // Sin credenciales configuradas en el backend: nadie ve un botón roto.
-  if (!available) {
-    return (
-      <div className="revolut-card revolut-card--soon">
-        <div className="revolut-card-icon">🏦</div>
-        <div className="revolut-card-text">
-          <div className="revolut-card-title">Conectar con el banco</div>
-          <div className="revolut-card-sub">Muy pronto podrás sincronizar tus movimientos automáticamente</div>
-        </div>
-      </div>
-    )
-  }
+  if (loadingPremium) return null
 
   if (!isPremium) {
     return (
@@ -127,7 +103,7 @@ export default function RevolutConnection() {
         <div className="revolut-card-sub">{statusLabel(status)}</div>
       </div>
       <div className="revolut-card-actions">
-        {status !== 'connected' && (
+        {status === 'disconnected' && (
           <button className="s-action-btn" onClick={handleConnect} disabled={busy}>
             {busy ? '…' : 'Conectar'}
           </button>
@@ -142,8 +118,13 @@ export default function RevolutConnection() {
             </button>
           </>
         )}
+        {status === 'pending' && (
+          <button className="s-action-btn" onClick={handleConnect} disabled={busy}>
+            Reintentar
+          </button>
+        )}
       </div>
-      {error && <p className="cat-err" style={{ marginTop: 6 }}>{GENERIC_ERROR}</p>}
+      {error && <p className="cat-err" style={{ marginTop: 6 }}>{error}</p>}
     </div>
   )
 }
