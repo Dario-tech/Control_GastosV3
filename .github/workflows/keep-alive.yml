@@ -2,7 +2,7 @@ name: Keep Render Alive
 
 on:
   schedule:
-    - cron: '*/14 * * * *'  # cada 14 min — Render duerme tras 15 min sin tráfico
+    - cron: '*/10 * * * *'  # cada 10 min — margen frente a retrasos de GitHub Actions (Render duerme tras 15 min sin tráfico)
 
 jobs:
   ping:
