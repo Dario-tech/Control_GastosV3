@@ -38,8 +38,12 @@ export default function AddTransactionModal({ onClose }) {
       await postTransaction(amt, tipo, concepto, fecha)
       refresh()
       onClose()
-    } catch {
-      setError('Error al guardar. Inténtalo de nuevo.')
+    } catch (err) {
+      setError(
+        err?.name === 'TimeoutError' || err?.name === 'AbortError'
+          ? 'El servidor está despertando, puede tardar unos segundos. Vuelve a intentarlo.'
+          : 'Error al guardar. Inténtalo de nuevo.'
+      )
       setLoading(false)
     }
   }
