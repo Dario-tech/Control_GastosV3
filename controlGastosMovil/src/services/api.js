@@ -191,6 +191,11 @@ export async function fetchPremiumStatus() {
   return jsonOrThrow(res)
 }
 
+export async function fetchRevolutAvailable() {
+  const res = await fetch(`${BASE}/api/revolut/available`, { signal: AbortSignal.timeout(15000) })
+  return jsonOrThrow(res)
+}
+
 export async function fetchRevolutConnection() {
   const res = await fetch(`${BASE}/api/revolut/connection`, {
     headers: authHeaders(), signal: AbortSignal.timeout(15000),

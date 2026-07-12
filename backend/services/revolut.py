@@ -30,15 +30,18 @@ class RevolutNotConfigured(RuntimeError):
     pass
 
 
+def is_configured() -> bool:
+    """Para el frontend: si no hay credenciales, la función se oculta/deshabilita
+    en vez de dejar que el usuario intente conectar y reciba un error técnico."""
+    return bool(os.getenv("GOCARDLESS_SECRET_ID") and os.getenv("GOCARDLESS_SECRET_KEY"))
+
+
 def _credentials() -> tuple[str, str]:
     sid = os.getenv("GOCARDLESS_SECRET_ID", "")
     key = os.getenv("GOCARDLESS_SECRET_KEY", "")
     if not sid or not key:
-        raise RevolutNotConfigured(
-            "GOCARDLESS_SECRET_ID / GOCARDLESS_SECRET_KEY no configuradas. "
-            "Crea una cuenta gratuita en https://bankaccountdata.gocardless.com/ "
-            "y añade las credenciales como variables de entorno."
-        )
+        # Detalle técnico solo en logs/backend — al usuario nunca le llega esto.
+        raise RevolutNotConfigured("GOCARDLESS_SECRET_ID / GOCARDLESS_SECRET_KEY no configuradas")
     return sid, key
 
 

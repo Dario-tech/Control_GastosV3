@@ -2656,6 +2656,7 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
 }
 .revolut-card--locked { cursor: pointer; }
 .revolut-card--locked:active { opacity: 0.85; }
+.revolut-card--soon { opacity: 0.6; }
 .revolut-card-icon { font-size: 1.5rem; flex-shrink: 0; }
 .revolut-card-text { flex: 1; min-width: 0; }
 .revolut-card-title { font-size: 0.9rem; font-weight: 700; color: var(--text); }
