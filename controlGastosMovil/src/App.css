@@ -1432,6 +1432,20 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
   -webkit-tap-highlight-color: transparent;
 }
 .cat-add-btn:active { opacity: 0.8; }
+.cat-suggest-btn {
+  background: var(--accent-dim, var(--surface2));
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-xs);
+  padding: 9px 12px;
+  color: var(--accent);
+  font-size: 0.95rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cat-suggest-btn:active { opacity: 0.7; }
+.cat-suggest-btn:disabled { opacity: 0.4; cursor: default; }
 .cat-err { font-size: 0.75rem; color: var(--red); }
 
 /* ===== HIDE AMOUNTS ===== */

@@ -17,6 +17,17 @@ export async function fetchPrices() {
   return res.json()
 }
 
+export async function suggestEmoji(nombre) {
+  const res = await fetch(`${BASE}/api/categorize/suggest-emoji`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify({ nombre }),
+    signal:  AbortSignal.timeout(10000),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}`)
+  return res.json()
+}
+
 export async function fetchRecurring() {
   const res = await fetch(`${BASE}/api/recurring`, {
     headers: authHeaders(),

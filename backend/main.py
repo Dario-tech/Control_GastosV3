@@ -19,6 +19,7 @@ from services.users import (
 from services.db import init_pool
 from services.pending import create_pending, get_pending, categorize_pending
 from services.recurring import get_recurring
+from services.ai_categorize import suggest_emoji
 
 
 @asynccontextmanager
@@ -305,6 +306,19 @@ async def recurring_expenses(email: str = Depends(get_current_user)):
         return await get_recurring(email)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Categorización con IA ───────────────────────────────────────────────────
+
+class EmojiSuggestIn(BaseModel):
+    nombre: str
+
+
+@app.post("/api/categorize/suggest-emoji")
+async def suggest_emoji_endpoint(body: EmojiSuggestIn, email: str = Depends(get_current_user)):
+    """Sugiere un emoji para una categoría nueva a partir de su nombre (Claude API)."""
+    emoji = await suggest_emoji(body.nombre.strip())
+    return {"emoji": emoji}
 
 
 # ── Inversiones ───────────────────────────────────────────────────────────────

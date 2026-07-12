@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
-import { postTransaction } from '../../services/api'
+import { postTransaction, suggestEmoji } from '../../services/api'
 import { TYPES, EMOJI_SUGGESTIONS } from '../../data/categories'
 import { useCategories } from '../../hooks/useCategories'
 
@@ -22,6 +22,7 @@ export default function AddTransactionModal({ onClose }) {
   const [newEmoji, setNewEmoji]     = useState('💶')
   const [newName, setNewName]       = useState('')
   const [newCatErr, setNewCatErr]   = useState('')
+  const [suggesting, setSuggesting] = useState(false)
 
   const { refresh }          = useFinanceData()
   const { customCategories, addCategory } = useSettings()
@@ -41,6 +42,20 @@ export default function AddTransactionModal({ onClose }) {
     } catch {
       setError('Error al guardar. Inténtalo de nuevo.')
       setLoading(false)
+    }
+  }
+
+  async function handleSuggestEmoji() {
+    const name = newName.trim()
+    if (!name || suggesting) return
+    setSuggesting(true)
+    try {
+      const { emoji } = await suggestEmoji(name)
+      setNewEmoji(emoji)
+    } catch {
+      // silencioso: el usuario sigue pudiendo elegir emoji a mano
+    } finally {
+      setSuggesting(false)
     }
   }
 
@@ -160,6 +175,14 @@ export default function AddTransactionModal({ onClose }) {
                     maxLength={32}
                     autoFocus
                   />
+                  <button
+                    className="cat-suggest-btn"
+                    onClick={handleSuggestEmoji}
+                    disabled={!newName.trim() || suggesting}
+                    title="Sugerir emoji con IA"
+                  >
+                    {suggesting ? '…' : '✨'}
+                  </button>
                   <button className="cat-add-btn" onClick={handleAddNewCat}>Añadir</button>
                 </div>
                 {newCatErr && <p className="cat-err">{newCatErr}</p>}
