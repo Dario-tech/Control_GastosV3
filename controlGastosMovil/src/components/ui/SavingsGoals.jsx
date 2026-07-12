@@ -371,7 +371,10 @@ export default function SavingsGoals({ compact = false }) {
   if (compact && status !== 'error' && goals.length === 0) return null
 
   return (
-    <div className={`goals-section${compact ? ' goals-section--compact' : ''}`}>
+    <div
+      className={`goals-section${compact ? ' goals-section--compact' : ''}`}
+      data-tour={compact ? undefined : 'goals'}
+    >
       <div className="goals-header">
         <span className="goals-title">🎯 Metas de ahorro</span>
       </div>

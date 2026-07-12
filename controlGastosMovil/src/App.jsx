@@ -11,7 +11,7 @@ import CategorizeModal from './components/ui/CategorizeModal'
 import AddTransactionModal from './components/ui/AddTransactionModal'
 import TransactionSearchModal from './components/ui/TransactionSearchModal'
 import Toast from './components/ui/Toast'
-import OnboardingGuide, { shouldShowOnboarding } from './components/ui/OnboardingGuide'
+import SpotlightTour, { shouldShowTour } from './components/ui/SpotlightTour'
 import { usePendingTransaction } from './hooks/usePendingTransaction'
 import LoginScreen from './components/auth/LoginScreen'
 import YearTab from './components/tabs/YearTab'
@@ -50,7 +50,7 @@ function AppContent() {
   const [categorizeOpen, setCategorizeOpen] = useState(false)
   const [addOpen,        setAddOpen]        = useState(false)
   const [searchOpen,     setSearchOpen]     = useState(false)
-  const [guideOpen,      setGuideOpen]      = useState(shouldShowOnboarding)
+  const [guideOpen,      setGuideOpen]      = useState(shouldShowTour)
   const { queue, fetchQueue, categorizePending } = usePendingTransaction()
 
   const current = queue[0] ?? null
@@ -81,7 +81,12 @@ function AppContent() {
         onClose={() => setProfileOpen(false)}
         onShowGuide={() => { setProfileOpen(false); setGuideOpen(true) }}
       />
-      {guideOpen && <OnboardingGuide onFinish={() => setGuideOpen(false)} />}
+      {guideOpen && (
+        <SpotlightTour
+          onFinish={() => setGuideOpen(false)}
+          modalOpen={addOpen || searchOpen || categorizeOpen}
+        />
+      )}
       {categorizeOpen && current && (
         <CategorizeModal
           pending={current}

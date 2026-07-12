@@ -37,6 +37,7 @@ export default function BottomNav({ onTabChange }) {
         <button
           key={tab.id}
           className={`nav-btn${activeTab === tab.id ? ' active' : ''}`}
+          data-tour={`tab-${tab.id}`}
           onClick={() => handleTab(tab.id)}
           aria-label={tab.label}
         >
