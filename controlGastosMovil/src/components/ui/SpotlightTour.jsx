@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 
-// Tour interactivo tipo "spotlight": la pantalla se oscurece y solo queda
-// iluminado el elemento real que se está enseñando. El usuario avanza tocando
-// ese elemento (el clic atraviesa la capa solo en la zona iluminada y ejecuta
-// la acción real de la app); el resto de la pantalla queda bloqueado.
+// Tour interactivo tipo "spotlight". Dos formas de avanzar:
+//  - "click": la pantalla se oscurece salvo un círculo/óvalo alrededor del
+//    elemento real que se enseña; el usuario avanza tocándolo de verdad.
+//  - "explore": tras tocar (o directamente, si no hay target) se desbloquea
+//    TODA la pantalla actual para que el usuario mire/haga scroll con
+//    calma — solo quedan bloqueadas la cabecera y la barra inferior, para
+//    que no se salga del paso — y avanza con un botón "Siguiente" explícito
+//    cuando ya ha terminado de mirar.
 export const TOUR_LS_KEY = 'mi-economia-tour-v1'
 
 export function shouldShowTour() {
@@ -22,19 +26,27 @@ const STEPS = [
     waitModal: true, // se abre el modal real; el tour espera a que lo cierres
   },
   {
+    explore: true,
+    text: 'Este es tu resumen: el balance acumulado del año, ingresos y gastos, y cómo evolucionan mes a mes. Echa un vistazo con calma — puedes hacer scroll.',
+    buttonLabel: 'Ya lo he visto',
+  },
+  {
     target: '[data-tour="tab-month"]',
-    text: 'Toca la pestaña Mes: ahí ves el detalle de cada mes con su calendario de actividad.',
+    text: 'Toca la pestaña Mes para ver el detalle de cada mes.',
     advance: 'click',
+    thenExplore: 'Aquí tienes el desglose del mes: en qué has gastado, por categoría, y el calendario de actividad diaria. Mira lo que quieras.',
   },
   {
     target: '[data-tour="tab-stats"]',
     text: 'Toca Stats para ver las tendencias de tus gastos.',
     advance: 'click',
+    thenExplore: 'Aquí ves cómo evolucionan tus gastos a lo largo del tiempo.',
   },
   {
     target: '[data-tour="tab-budget"]',
     text: 'Toca Presupuesto: ahí pones límites de gasto por categoría y la app te avisa si te acercas.',
     advance: 'click',
+    thenExplore: 'Pon límites por categoría, y más abajo tienes tus metas de ahorro compartidas.',
   },
   {
     target: '[data-tour="goals"]',
@@ -55,8 +67,11 @@ export default function SpotlightTour({ onFinish, modalOpen }) {
   const [stepIdx, setStepIdx]           = useState(0)
   const [rect, setRect]                 = useState(null)
   const [waitingModal, setWaitingModal] = useState(false)
+  const [exploring, setExploring]       = useState(false) // fase "explora libremente" dentro de un paso 'click'
+  const [chrome, setChrome]             = useState(null)  // alto de cabecera/nav, para el modo explorar
   const modalWasOpen = useRef(false)
   const step = STEPS[stepIdx]
+  const isExploreStep = step.explore || exploring
 
   function finish() {
     markTourSeen()
@@ -67,13 +82,16 @@ export default function SpotlightTour({ onFinish, modalOpen }) {
     if (stepIdx + 1 >= STEPS.length) { finish(); return }
     setRect(null)
     setWaitingModal(false)
+    setExploring(false)
     setStepIdx(stepIdx + 1)
   }
 
   // Localiza el elemento del paso (esperando a que exista: al cambiar de
   // pestaña tarda un render), hace scroll hasta él y sigue su posición ante
-  // resize, scroll o cambios de layout.
+  // resize, scroll o cambios de layout. No aplica en pasos de exploración
+  // libre (no señalan un elemento concreto).
   useEffect(() => {
+    if (isExploreStep || !step.target) return
     let el = null
     let scrolled = false
 
@@ -102,20 +120,38 @@ export default function SpotlightTour({ onFinish, modalOpen }) {
       window.removeEventListener('resize', measure)
       window.removeEventListener('scroll', measure, true)
     }
-  }, [stepIdx])
+  }, [stepIdx, isExploreStep]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Modo "explorar": mide la cabecera y la barra inferior para bloquear solo
+  // esas franjas y dejar todo el contenido central libre (scroll y toques).
+  useEffect(() => {
+    if (!isExploreStep) return
+    function measureChrome() {
+      const header = document.querySelector('.header')?.getBoundingClientRect()
+      const nav    = document.querySelector('.bottom-nav')?.getBoundingClientRect()
+      setChrome({
+        headerBottom: header ? header.bottom : 0,
+        navTop:       nav ? nav.top : window.innerHeight,
+      })
+    }
+    measureChrome()
+    window.addEventListener('resize', measureChrome)
+    return () => window.removeEventListener('resize', measureChrome)
+  }, [isExploreStep])
 
   // Pasos interactivos: detecta el clic real sobre el elemento señalado.
   useEffect(() => {
-    if (step.advance !== 'click') return
+    if (step.advance !== 'click' || exploring) return
     function onClick(e) {
       const el = document.querySelector(step.target)
       if (!el || !el.contains(e.target)) return
       if (step.waitModal) setWaitingModal(true)
+      else if (step.thenExplore) setTimeout(() => setExploring(true), 200)
       else setTimeout(next, 200) // pequeño margen para que la acción real termine de renderizar
     }
     document.addEventListener('click', onClick, true)
     return () => document.removeEventListener('click', onClick, true)
-  }, [stepIdx]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [stepIdx, exploring]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Paso con modal (botón +): el tour se oculta mientras el modal real está
   // abierto y avanza cuando el usuario lo cierra.
@@ -134,6 +170,29 @@ export default function SpotlightTour({ onFinish, modalOpen }) {
 
   const vw = window.innerWidth
   const vh = window.innerHeight
+  const isLast = stepIdx === STEPS.length - 1
+
+  // ── Modo "explorar libremente": solo bloquea cabecera y barra inferior ──
+  if (isExploreStep) {
+    const headerBottom = chrome?.headerBottom ?? 0
+    const navTop       = chrome?.navTop ?? vh
+    return (
+      <div className="tour-root">
+        <div className="tour-block tour-block--dim" style={{ left: 0, top: 0, width: '100vw', height: headerBottom }} />
+        <div className="tour-block tour-block--dim" style={{ left: 0, top: navTop, width: '100vw', height: Math.max(0, vh - navTop) }} />
+        <div className="tour-tip tour-tip--explore" style={{ top: headerBottom + 12 }}>
+          <p className="tour-tip-text">{exploring ? step.thenExplore : step.text}</p>
+          <div className="tour-tip-footer">
+            <button className="tour-skip" onClick={finish}>Saltar tour</button>
+            <span className="tour-progress">{stepIdx + 1} / {STEPS.length}</span>
+            <button className="tour-next-btn" onClick={next}>
+              {step.buttonLabel ?? 'Siguiente'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const hole = rect
     ? {
@@ -154,8 +213,6 @@ export default function SpotlightTour({ onFinish, modalOpen }) {
       ? { top: hole.top + hole.height + 18 }
       : { bottom: vh - hole.top + 18 }
     : { top: '40%' }
-
-  const isLast = stepIdx === STEPS.length - 1
 
   return (
     <div className="tour-root">
