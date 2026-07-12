@@ -20,6 +20,7 @@ from services.db import init_pool
 from services.pending import create_pending, get_pending, categorize_pending
 from services.recurring import get_recurring
 from services.ai_categorize import suggest_emoji
+from services.email_report import send_monthly_report, send_monthly_reports_to_all
 
 
 @asynccontextmanager
@@ -319,6 +320,32 @@ async def suggest_emoji_endpoint(body: EmojiSuggestIn, email: str = Depends(get_
     """Sugiere un emoji para una categoría nueva a partir de su nombre (Claude API)."""
     emoji = await suggest_emoji(body.nombre.strip())
     return {"emoji": emoji}
+
+
+# ── Informe mensual por email ─────────────────────────────────────────────────
+
+CRON_SECRET = os.getenv("CRON_SECRET", "")
+
+
+@app.post("/api/reports/monthly/send")
+async def send_my_monthly_report(email: str = Depends(get_current_user)):
+    """El usuario logado se envía su propio informe del mes anterior."""
+    user = await get_user(email)
+    result = await send_monthly_report(email, (user or {}).get("name", ""))
+    if not result.get("sent"):
+        raise HTTPException(status_code=422, detail=result.get("reason", "No se pudo enviar"))
+    return result
+
+
+@app.post("/api/reports/monthly/send-all")
+async def send_all_monthly_reports(request: Request):
+    """Envía el informe del mes anterior a todos los usuarios.
+    Pensado para un cron externo — protegido por un secreto compartido,
+    no por sesión de usuario."""
+    secret = request.headers.get("x-cron-secret", "")
+    if not CRON_SECRET or secret != CRON_SECRET:
+        raise HTTPException(status_code=401, detail="No autorizado")
+    return {"results": await send_monthly_reports_to_all()}
 
 
 # ── Inversiones ───────────────────────────────────────────────────────────────

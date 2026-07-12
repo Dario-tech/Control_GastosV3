@@ -56,6 +56,8 @@ function ThemeCard({ theme, selected, onSelect }) {
 }
 import { useBudget } from '../../hooks/useBudget'
 import { useFinanceData } from '../../context/FinanceDataContext'
+import { useApp } from '../../context/AppContext'
+import { sendMonthlyReport } from '../../services/api'
 
 function Section({ title, children }) {
   return (
@@ -112,6 +114,22 @@ export default function SettingsTab() {
   const { settings, update } = useSettings()
   const { allItems: budgetItems, removeItem } = useBudget()
   const { status, lastUpdated, errorMsg, refresh } = useFinanceData()
+  const { showToast } = useApp()
+  const [sendingReport, setSendingReport] = useState(false)
+
+  async function handleSendReport() {
+    setSendingReport(true)
+    try {
+      await sendMonthlyReport()
+      showToast('📧 Informe enviado a tu email')
+    } catch (e) {
+      showToast(e.message.includes('RESEND_API_KEY')
+        ? '⚠️ Envío de email no configurado'
+        : '⚠️ No se pudo enviar el informe')
+    } finally {
+      setSendingReport(false)
+    }
+  }
 
   function exportData() {
     const payload = {
@@ -225,6 +243,11 @@ export default function SettingsTab() {
       <Section title="Datos">
         <Row icon="📤" label="Exportar datos">
           <button className="s-action-btn" onClick={exportData}>Exportar</button>
+        </Row>
+        <Row icon="📧" label="Informe mensual por email">
+          <button className="s-action-btn" onClick={handleSendReport} disabled={sendingReport}>
+            {sendingReport ? 'Enviando…' : 'Enviar ahora'}
+          </button>
         </Row>
         <Row icon="🗑️" label="Borrar presupuesto" danger last>
           <button className="s-action-btn danger" onClick={clearBudget}>Borrar</button>

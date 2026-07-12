@@ -28,6 +28,17 @@ export async function suggestEmoji(nombre) {
   return res.json()
 }
 
+export async function sendMonthlyReport() {
+  const res = await fetch(`${BASE}/api/reports/monthly/send`, {
+    method:  'POST',
+    headers: authHeaders(),
+    signal:  AbortSignal.timeout(20000),
+  })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(body.detail || `API ${res.status}`)
+  return body
+}
+
 export async function fetchRecurring() {
   const res = await fetch(`${BASE}/api/recurring`, {
     headers: authHeaders(),

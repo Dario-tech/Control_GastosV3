@@ -62,6 +62,15 @@ async def ensure_user(email: str, name: str) -> dict:
     return dict(row)
 
 
+async def get_all_users() -> list[dict]:
+    def _q():
+        with db_cursor() as cur:
+            cur.execute("SELECT email, name FROM users")
+            return cur.fetchall()
+    rows = await run_in_thread(_q)
+    return [dict(r) for r in rows]
+
+
 async def get_email_by_shortcut_token(token: str) -> str | None:
     def _q():
         with db_cursor() as cur:
