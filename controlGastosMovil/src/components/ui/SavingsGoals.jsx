@@ -138,17 +138,28 @@ function AddMoneyRow({ onAdd }) {
   )
 }
 
-function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, onDelete }) {
+function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, onDelete, onDeleteContribution }) {
   useLockBodyScroll()
-  const [shareEmail, setShareEmail] = useState('')
-  const [sharing, setSharing]       = useState(false)
-  const [shareErr, setShareErr]     = useState('')
-  const [showShare, setShowShare]   = useState(false)
+  const [shareEmail, setShareEmail]   = useState('')
+  const [sharing, setSharing]         = useState(false)
+  const [shareErr, setShareErr]       = useState('')
+  const [showShare, setShowShare]     = useState(false)
+  const [removingId, setRemovingId]   = useState(null)
 
   const isCreator = goal.created_by === myEmail
   const others    = goal.members.filter(m => m !== myEmail).length
   const pct       = goal.objetivo > 0 ? Math.min(100, (goal.ahorrado / goal.objetivo) * 100) : 0
   const done      = goal.ahorrado >= goal.objetivo
+
+  async function handleDeleteContribution(c) {
+    if (!window.confirm(`¿Eliminar esta aportación de ${fmt(c.importe)}?`)) return
+    setRemovingId(c.id)
+    try {
+      await onDeleteContribution(c.id)
+    } finally {
+      setRemovingId(null)
+    }
+  }
 
   async function submitShare() {
     const email = shareEmail.trim()
@@ -168,9 +179,7 @@ function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, 
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-sheet goal-detail-sheet" onClick={e => e.stopPropagation()}>
-        <div className="modal-drag-handle" />
-
+      <div className="modal-sheet goal-detail-sheet fullscreen" onClick={e => e.stopPropagation()}>
         <div className="goal-detail-header">
           <GoalIcon goal={goal} className="goal-detail-emoji" />
           <div className="goal-detail-headtext">
@@ -226,13 +235,23 @@ function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, 
           <div className="goal-contributions">
             <span className="goal-contributions-label">Aportaciones</span>
             <div className="goal-contributions-list">
-              {goal.contributions.map((c, i) => (
-                <div key={i} className="goal-contribution-row">
+              {goal.contributions.map(c => (
+                <div key={c.id} className="goal-contribution-row">
                   <span className="goal-contribution-name">
                     {c.user_email === myEmail ? 'Tú' : c.name}
                   </span>
                   <span className="goal-contribution-date">{formatContribDate(c.fecha)}</span>
                   <span className="goal-contribution-amount">+{fmt(c.importe)}</span>
+                  {(c.user_email === myEmail || isCreator) && (
+                    <button
+                      className="goal-contribution-delete"
+                      onClick={() => handleDeleteContribution(c)}
+                      disabled={removingId === c.id}
+                      aria-label="Eliminar aportación"
+                    >
+                      {removingId === c.id ? '…' : '✕'}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -251,7 +270,7 @@ function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, 
 }
 
 export default function SavingsGoals() {
-  const { goals, status, addGoal, editGoal, removeGoal, addMoney, share } = useSavingsGoals()
+  const { goals, status, addGoal, editGoal, removeGoal, addMoney, share, removeContribution } = useSavingsGoals()
   const { user } = useAuth()
   const [showForm, setShowForm]     = useState(false)
   const [formGoal, setFormGoal]     = useState(null)
@@ -323,6 +342,7 @@ export default function SavingsGoals() {
           onShare={email => share(liveDetail.id, email)}
           onEdit={() => openEditForm(liveDetail)}
           onDelete={handleDelete}
+          onDeleteContribution={contribId => removeContribution(liveDetail.id, contribId)}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 import KpiCard from '../ui/KpiCard'
 import Card from '../ui/Card'
 import IncomeExpenseChart from '../charts/IncomeExpenseChart'
+import SavingsGoals from '../ui/SavingsGoals'
 import { getYearStats, getActiveMonths, getMonthStats, fmt } from '../../utils'
 import { MONTH_NAMES } from '../../data/mockData'
 import { useApp } from '../../context/AppContext'
@@ -14,6 +15,9 @@ export default function YearTab() {
 
   return (
     <div className="tab-panel">
+
+      {/* Metas de ahorro: lo primero que se ve al entrar en la app */}
+      <SavingsGoals />
 
       {/* Year hero */}
       <div className="year-hero">

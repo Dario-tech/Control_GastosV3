@@ -74,7 +74,7 @@ async def get_goals_for_user(email: str) -> list[dict]:
                 g["members"] = [m["user_email"] for m in members]  # compat: lista de emails
                 g["memberNames"] = members  # [{user_email, name}]
                 cur.execute(
-                    """SELECT c.user_email, COALESCE(u.name, c.user_email) AS name,
+                    """SELECT c.id, c.user_email, COALESCE(u.name, c.user_email) AS name,
                               c.importe, c.created_at::text AS fecha
                        FROM savings_goal_contributions c
                        JOIN users u ON u.email = c.user_email
@@ -180,6 +180,39 @@ async def contribute(goal_id: int, email: str, importe: float) -> dict:
                 (goal_id, email, importe),
             )
     await run_in_thread(_q)
+    return await get_goal(goal_id, email)
+
+
+async def delete_contribution(goal_id: int, contribution_id: int, email: str) -> dict:
+    """Corregir una aportación equivocada. Solo puede borrarla quien la hizo,
+    o quien creó la meta (por si el error lo cometió la otra persona)."""
+    await _require_member(goal_id, email)
+
+    def _get_creator():
+        with db_cursor() as cur:
+            cur.execute("SELECT created_by FROM savings_goals WHERE id = %s", (goal_id,))
+            return cur.fetchone()
+    goal_row = await run_in_thread(_get_creator)
+    if not goal_row:
+        raise HTTPException(status_code=404, detail="Meta no encontrada")
+    is_creator = goal_row["created_by"] == email
+
+    def _q():
+        with db_cursor() as cur:
+            if is_creator:
+                cur.execute(
+                    "DELETE FROM savings_goal_contributions WHERE id = %s AND goal_id = %s",
+                    (contribution_id, goal_id),
+                )
+            else:
+                cur.execute(
+                    "DELETE FROM savings_goal_contributions WHERE id = %s AND goal_id = %s AND user_email = %s",
+                    (contribution_id, goal_id, email),
+                )
+            return cur.rowcount
+    deleted = await run_in_thread(_q)
+    if deleted == 0:
+        raise HTTPException(status_code=404, detail="Aportación no encontrada")
     return await get_goal(goal_id, email)
 
 

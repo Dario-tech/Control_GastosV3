@@ -714,6 +714,12 @@ img.goal-detail-emoji { width: 2rem; height: 2rem; border-radius: 10px; object-f
 .goal-contribution-name { font-weight: 600; color: var(--text); flex-shrink: 0; }
 .goal-contribution-date { color: var(--text3, var(--text2)); flex: 1; font-size: 0.72rem; }
 .goal-contribution-amount { font-weight: 700; color: var(--green, #2dd4a0); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.goal-contribution-delete {
+  background: none; border: none; color: var(--text3, var(--text2)); cursor: pointer;
+  font-size: 0.72rem; padding: 2px 4px; flex-shrink: 0; line-height: 1;
+}
+.goal-contribution-delete:hover, .goal-contribution-delete:active { color: var(--red, #ff5f7e); }
+.goal-contribution-delete:disabled { opacity: 0.5; cursor: default; }
 
 /* Balance forecast */
 .forecast-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 14px; }
@@ -1935,6 +1941,15 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
 @keyframes sheetUp {
   from { transform: translateY(100%); }
   to   { transform: translateY(0); }
+}
+
+/* Variante a pantalla completa (detalle de meta, etc.) — mismo overlay, sin
+   dejar ver el fondo ni recorte a 90dvh: ocupa toda la pantalla. */
+.modal-sheet.fullscreen {
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+  padding-top: calc(20px + env(safe-area-inset-top));
 }
 .modal-handle {
   width: 36px; height: 4px;

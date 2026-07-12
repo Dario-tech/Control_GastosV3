@@ -5,7 +5,6 @@ import { useApp } from '../../context/AppContext'
 import { useSettings } from '../../context/SettingsContext'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import BudgetModal from '../ui/BudgetModal'
-import SavingsGoals from '../ui/SavingsGoals'
 import { fmt } from '../../utils'
 
 const NOTIF_LS_KEY = 'mi-economia-notif-v1'
@@ -252,9 +251,6 @@ export default function BudgetTab() {
           </svg>
         </button>
       </div>
-
-      {/* Metas de ahorro (arriba: es lo primero que se ve, incluye las compartidas) */}
-      <SavingsGoals />
 
       {/* Banners de notificación */}
       {settings.budgetAlerts && notifPermission === 'default' && (

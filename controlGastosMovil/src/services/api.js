@@ -145,6 +145,15 @@ export async function contributeToGoal(id, importe) {
   return goalsJson(res)
 }
 
+export async function deleteContribution(goalId, contributionId) {
+  const res = await fetch(`${BASE}/api/goals/${goalId}/contributions/${contributionId}`, {
+    method:  'DELETE',
+    headers: authHeaders(),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return goalsJson(res)
+}
+
 export async function shareGoal(id, email) {
   const res = await fetch(`${BASE}/api/goals/${id}/share`, {
     method:  'POST',

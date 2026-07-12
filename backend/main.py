@@ -23,7 +23,7 @@ from services.ai_categorize import suggest_emoji
 from services.email_report import send_monthly_report, send_monthly_reports_to_all
 from services.goals import (
     ensure_goals_tables, get_goals_for_user, create_goal, update_goal,
-    delete_goal, contribute, share_goal,
+    delete_goal, contribute, delete_contribution, share_goal,
 )
 
 
@@ -414,6 +414,11 @@ async def delete_goal_endpoint(goal_id: int, email: str = Depends(get_current_us
 @app.post("/api/goals/{goal_id}/contribute")
 async def contribute_endpoint(goal_id: int, body: ContributeIn, email: str = Depends(get_current_user)):
     return await contribute(goal_id, email, body.importe)
+
+
+@app.delete("/api/goals/{goal_id}/contributions/{contribution_id}")
+async def delete_contribution_endpoint(goal_id: int, contribution_id: int, email: str = Depends(get_current_user)):
+    return await delete_contribution(goal_id, contribution_id, email)
 
 
 @app.post("/api/goals/{goal_id}/share")

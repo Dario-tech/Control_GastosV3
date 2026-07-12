@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  fetchGoals, createGoal, updateGoal, deleteGoal, contributeToGoal, shareGoal,
+  fetchGoals, createGoal, updateGoal, deleteGoal, contributeToGoal, deleteContribution, shareGoal,
 } from '../services/api'
 
 // Antes vivían en localStorage; ahora en el backend, porque compartir una
@@ -43,5 +43,10 @@ export function useSavingsGoals() {
     await refresh()
   }
 
-  return { goals, status, refresh, addGoal, editGoal, removeGoal, addMoney, share }
+  async function removeContribution(goalId, contributionId) {
+    await deleteContribution(goalId, contributionId)
+    await refresh()
+  }
+
+  return { goals, status, refresh, addGoal, editGoal, removeGoal, addMoney, share, removeContribution }
 }
