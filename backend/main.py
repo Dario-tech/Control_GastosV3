@@ -21,12 +21,17 @@ from services.pending import create_pending, get_pending, categorize_pending
 from services.recurring import get_recurring
 from services.ai_categorize import suggest_emoji
 from services.email_report import send_monthly_report, send_monthly_reports_to_all
+from services.goals import (
+    ensure_goals_tables, get_goals_for_user, create_goal, update_goal,
+    delete_goal, contribute, share_goal,
+)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_pool()
     ensure_password_column()  # migración aditiva idempotente (columna password_hash)
+    ensure_goals_tables()     # migración aditiva idempotente (metas de ahorro compartidas)
     yield
 
 
@@ -346,6 +351,62 @@ async def send_all_monthly_reports(request: Request):
     if not CRON_SECRET or secret != CRON_SECRET:
         raise HTTPException(status_code=401, detail="No autorizado")
     return {"results": await send_monthly_reports_to_all()}
+
+
+# ── Metas de ahorro (compartibles entre usuarios) ────────────────────────────
+
+class GoalIn(BaseModel):
+    nombre:   str
+    objetivo: float
+    emoji:    str = "🎯"
+    fecha:    str | None = None
+
+
+class ContributeIn(BaseModel):
+    importe: float
+
+
+class ShareIn(BaseModel):
+    email: str
+
+
+@app.get("/api/goals")
+async def list_goals_endpoint(email: str = Depends(get_current_user)):
+    return await get_goals_for_user(email)
+
+
+@app.post("/api/goals")
+async def create_goal_endpoint(body: GoalIn, email: str = Depends(get_current_user)):
+    if not body.nombre.strip():
+        raise HTTPException(status_code=422, detail="Escribe un nombre")
+    if body.objetivo <= 0:
+        raise HTTPException(status_code=422, detail="El objetivo debe ser mayor que 0")
+    return await create_goal(email, body.nombre.strip(), body.objetivo, body.emoji, body.fecha)
+
+
+@app.patch("/api/goals/{goal_id}")
+async def update_goal_endpoint(goal_id: int, body: GoalIn, email: str = Depends(get_current_user)):
+    if not body.nombre.strip():
+        raise HTTPException(status_code=422, detail="Escribe un nombre")
+    if body.objetivo <= 0:
+        raise HTTPException(status_code=422, detail="El objetivo debe ser mayor que 0")
+    return await update_goal(goal_id, email, body.nombre.strip(), body.objetivo, body.emoji, body.fecha)
+
+
+@app.delete("/api/goals/{goal_id}")
+async def delete_goal_endpoint(goal_id: int, email: str = Depends(get_current_user)):
+    await delete_goal(goal_id, email)
+    return {"status": "ok"}
+
+
+@app.post("/api/goals/{goal_id}/contribute")
+async def contribute_endpoint(goal_id: int, body: ContributeIn, email: str = Depends(get_current_user)):
+    return await contribute(goal_id, email, body.importe)
+
+
+@app.post("/api/goals/{goal_id}/share")
+async def share_goal_endpoint(goal_id: int, body: ShareIn, email: str = Depends(get_current_user)):
+    return await share_goal(goal_id, email, body.email)
 
 
 # ── Inversiones ───────────────────────────────────────────────────────────────

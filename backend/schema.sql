@@ -32,3 +32,30 @@ CREATE TABLE IF NOT EXISTS pending_transactions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_pending_user ON pending_transactions(user_email);
+
+-- Metas de ahorro, compartibles entre usuarios. El total ahorrado es la suma
+-- de las contribuciones de todos los miembros, no un campo fijo.
+CREATE TABLE IF NOT EXISTS savings_goals (
+    id         SERIAL PRIMARY KEY,
+    nombre     TEXT NOT NULL,
+    objetivo   NUMERIC(12,2) NOT NULL,
+    emoji      TEXT NOT NULL DEFAULT '🎯',
+    fecha      DATE,
+    created_by TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS savings_goal_members (
+    goal_id    INTEGER NOT NULL REFERENCES savings_goals(id) ON DELETE CASCADE,
+    user_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    joined_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (goal_id, user_email)
+);
+
+CREATE TABLE IF NOT EXISTS savings_goal_contributions (
+    id         SERIAL PRIMARY KEY,
+    goal_id    INTEGER NOT NULL REFERENCES savings_goals(id) ON DELETE CASCADE,
+    user_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    importe    NUMERIC(12,2) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

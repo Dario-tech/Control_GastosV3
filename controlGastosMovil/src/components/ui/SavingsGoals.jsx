@@ -1,30 +1,33 @@
 import { useState } from 'react'
 import { useSavingsGoals } from '../../hooks/useSavingsGoals'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
+import { useAuth } from '../../context/AuthContext'
 import { fmt } from '../../utils'
 
 const GOAL_EMOJIS = ['🎯', '🏖️', '🚗', '🏠', '💍', '🎓', '✈️', '💻', '🛟', '🎁']
 
-function GoalModal({ goal, onSave, onClose, onDelete }) {
+function GoalFormModal({ goal, onSave, onClose }) {
   useLockBodyScroll()
   const [nombre, setNombre]     = useState(goal?.nombre ?? '')
   const [objetivo, setObjetivo] = useState(goal?.objetivo != null ? String(goal.objetivo) : '')
-  const [ahorrado, setAhorrado] = useState(goal?.ahorrado != null ? String(goal.ahorrado) : '')
   const [fecha, setFecha]       = useState(goal?.fecha ?? '')
   const [emoji, setEmoji]       = useState(goal?.emoji ?? '🎯')
+  const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState('')
 
   const objetivoNum = parseFloat(String(objetivo).replace(',', '.'))
-  const canSave = nombre.trim() && objetivoNum > 0
+  const canSave = nombre.trim() && objetivoNum > 0 && !saving
 
-  function submit() {
+  async function submit() {
     if (!canSave) return
-    onSave({
-      nombre:   nombre.trim(),
-      objetivo: objetivoNum,
-      ahorrado: parseFloat(String(ahorrado).replace(',', '.')) || 0,
-      fecha:    fecha || null,
-      emoji,
-    })
+    setSaving(true)
+    setError('')
+    try {
+      await onSave({ nombre: nombre.trim(), objetivo: objetivoNum, fecha: fecha || null, emoji })
+    } catch (e) {
+      setError(e.message || 'No se pudo guardar')
+      setSaving(false)
+    }
   }
 
   return (
@@ -47,28 +50,148 @@ function GoalModal({ goal, onSave, onClose, onDelete }) {
         <input className="setup-input" value={nombre} onChange={e => setNombre(e.target.value)}
           placeholder="Vacaciones, coche nuevo…" maxLength={40} />
 
-        <div className="goal-field-row">
-          <div style={{ flex: 1 }}>
-            <label className="goal-field-label">Objetivo (€)</label>
-            <input className="setup-input" inputMode="decimal" value={objetivo}
-              onChange={e => setObjetivo(e.target.value)} placeholder="5000" />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label className="goal-field-label">Ahorrado (€)</label>
-            <input className="setup-input" inputMode="decimal" value={ahorrado}
-              onChange={e => setAhorrado(e.target.value)} placeholder="0" />
-          </div>
-        </div>
+        <label className="goal-field-label">Objetivo (€)</label>
+        <input className="setup-input" inputMode="decimal" value={objetivo}
+          onChange={e => setObjetivo(e.target.value)} placeholder="5000" />
 
         <label className="goal-field-label">Fecha objetivo (opcional)</label>
         <input className="setup-input" type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
 
+        {error && <p className="cat-err" style={{ marginTop: 8 }}>{error}</p>}
+
         <button className="setup-btn" style={{ marginTop: 16, opacity: canSave ? 1 : 0.5 }}
           onClick={submit} disabled={!canSave}>
-          {goal ? 'Guardar' : 'Crear meta'}
+          {saving ? 'Guardando…' : (goal ? 'Guardar' : 'Crear meta')}
         </button>
-        {goal && onDelete && (
-          <button className="goal-delete-btn" onClick={onDelete}>Eliminar meta</button>
+      </div>
+    </div>
+  )
+}
+
+function AddMoneyRow({ onAdd }) {
+  const [value, setValue] = useState('')
+  const [busy, setBusy]   = useState(false)
+  const amt = parseFloat(String(value).replace(',', '.'))
+  const canAdd = amt > 0 && !busy
+
+  async function submit() {
+    if (!canAdd) return
+    setBusy(true)
+    try {
+      await onAdd(amt)
+      setValue('')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="goal-addmoney-row">
+      <span className="goal-addmoney-prefix">+€</span>
+      <input
+        className="goal-addmoney-input"
+        inputMode="decimal"
+        placeholder="Añadir dinero…"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && submit()}
+      />
+      <button className="goal-addmoney-btn" onClick={submit} disabled={!canAdd}>
+        {busy ? '…' : 'Añadir'}
+      </button>
+    </div>
+  )
+}
+
+function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, onDelete }) {
+  useLockBodyScroll()
+  const [shareEmail, setShareEmail] = useState('')
+  const [sharing, setSharing]       = useState(false)
+  const [shareErr, setShareErr]     = useState('')
+  const [showShare, setShowShare]   = useState(false)
+
+  const isCreator = goal.created_by === myEmail
+  const others    = goal.members.filter(m => m !== myEmail).length
+  const pct       = goal.objetivo > 0 ? Math.min(100, (goal.ahorrado / goal.objetivo) * 100) : 0
+  const done      = goal.ahorrado >= goal.objetivo
+
+  async function submitShare() {
+    const email = shareEmail.trim()
+    if (!email) return
+    setSharing(true)
+    setShareErr('')
+    try {
+      await onShare(email)
+      setShareEmail('')
+      setShowShare(false)
+    } catch (e) {
+      setShareErr(e.message || 'No se pudo compartir')
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal-sheet goal-detail-sheet" onClick={e => e.stopPropagation()}>
+        <div className="modal-drag-handle" />
+
+        <div className="goal-detail-header">
+          <span className="goal-detail-emoji">{goal.emoji}</span>
+          <div className="goal-detail-headtext">
+            <div className="goal-detail-name">{goal.nombre}</div>
+            {goal.fecha && <div className="goal-detail-date">para {goal.fecha}</div>}
+          </div>
+          <button className="modal-close-btn" onClick={onClose} aria-label="Cerrar">✕</button>
+        </div>
+
+        <div className="goal-detail-amount">
+          <span className={`goal-detail-ahorrado${done ? ' done' : ''}`}>{fmt(goal.ahorrado)}</span>
+          <span className="goal-detail-objetivo"> / {fmt(goal.objetivo)}</span>
+        </div>
+        <div className="goal-bar-bg">
+          <div className="goal-bar-fill" style={{
+            width: `${pct}%`,
+            background: done ? 'var(--green, #2dd4a0)' : 'var(--accent)',
+          }} />
+        </div>
+        <div className="goal-item-foot" style={{ marginBottom: 14 }}>
+          <span className="goal-pct">{done ? '¡Completada! 🎉' : `${Math.round(pct)}%`}</span>
+        </div>
+
+        <AddMoneyRow onAdd={onAddMoney} />
+
+        <div className="goal-members">
+          <span className="goal-members-label">
+            {others > 0 ? `Compartida con ${others} persona${others !== 1 ? 's' : ''}` : 'Meta personal'}
+          </span>
+          {!showShare && (
+            <button className="goal-share-btn" onClick={() => setShowShare(true)}>+ Compartir</button>
+          )}
+        </div>
+
+        {showShare && (
+          <div className="goal-share-row">
+            <input
+              className="setup-input"
+              placeholder="email de la otra persona"
+              value={shareEmail}
+              onChange={e => setShareEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && submitShare()}
+              autoFocus
+            />
+            <button className="goal-share-confirm" onClick={submitShare} disabled={sharing}>
+              {sharing ? '…' : 'Invitar'}
+            </button>
+          </div>
+        )}
+        {shareErr && <p className="cat-err">{shareErr}</p>}
+
+        {isCreator && (
+          <div className="goal-detail-actions">
+            <button className="catmodal-back" onClick={onEdit}>Editar meta</button>
+            <button className="goal-delete-btn" onClick={onDelete}>Eliminar</button>
+          </div>
         )}
       </div>
     </div>
@@ -76,66 +199,78 @@ function GoalModal({ goal, onSave, onClose, onDelete }) {
 }
 
 export default function SavingsGoals() {
-  const { goals, addGoal, updateGoal, removeGoal } = useSavingsGoals()
-  const [showModal, setShowModal] = useState(false)
-  const [editGoal, setEditGoal]   = useState(null)
+  const { goals, status, addGoal, editGoal, removeGoal, addMoney, share } = useSavingsGoals()
+  const { user } = useAuth()
+  const [showForm, setShowForm]     = useState(false)
+  const [formGoal, setFormGoal]     = useState(null)
+  const [detailGoal, setDetailGoal] = useState(null)
 
-  function openAdd()      { setEditGoal(null); setShowModal(true) }
-  function openEdit(g)    { setEditGoal(g);    setShowModal(true) }
-  function close()        { setShowModal(false); setEditGoal(null) }
+  function openCreate()          { setFormGoal(null); setShowForm(true) }
+  function openEditForm(g)       { setFormGoal(g); setShowForm(true); setDetailGoal(null) }
+  function closeForm()           { setShowForm(false); setFormGoal(null) }
 
-  function handleSave(data) {
-    if (editGoal) updateGoal(editGoal.id, data)
-    else          addGoal(data)
-    close()
+  async function handleSaveForm(data) {
+    if (formGoal) await editGoal(formGoal.id, data)
+    else          await addGoal(data)
+    closeForm()
   }
-  function handleDelete() {
-    if (editGoal) removeGoal(editGoal.id)
-    close()
+
+  async function handleDelete() {
+    if (!detailGoal) return
+    await removeGoal(detailGoal.id)
+    setDetailGoal(null)
   }
+
+  // Mantiene el modal de detalle sincronizado tras refrescar (nuevas contribuciones, etc.)
+  const liveDetail = detailGoal ? (goals.find(g => g.id === detailGoal.id) ?? detailGoal) : null
 
   return (
     <div className="goals-section">
       <div className="goals-header">
         <span className="goals-title">🎯 Metas de ahorro</span>
-        <button className="goals-add-btn" onClick={openAdd}>+ Añadir</button>
       </div>
 
-      {goals.length === 0 ? (
-        <p className="goals-empty">Crea una meta y sigue tu progreso hacia ella.</p>
-      ) : (
-        <div className="goals-list">
-          {goals.map(g => {
-            const pct = g.objetivo > 0 ? Math.min(100, (g.ahorrado / g.objetivo) * 100) : 0
-            const done = g.ahorrado >= g.objetivo
-            return (
-              <div key={g.id} className="goal-item" onClick={() => openEdit(g)}>
-                <div className="goal-item-top">
-                  <span className="goal-item-name">{g.emoji} {g.nombre}</span>
-                  <span className="goal-item-amount">{fmt(g.ahorrado)} / {fmt(g.objetivo)}</span>
-                </div>
-                <div className="goal-bar-bg">
-                  <div className="goal-bar-fill" style={{
-                    width: `${pct}%`,
-                    background: done ? 'var(--green, #2dd4a0)' : 'var(--accent)',
-                  }} />
-                </div>
-                <div className="goal-item-foot">
-                  <span className="goal-pct">{done ? '¡Completada! 🎉' : `${Math.round(pct)}%`}</span>
-                  {g.fecha && <span className="goal-date">para {g.fecha}</span>}
-                </div>
+      {status === 'error' && <p className="goals-empty">No se pudieron cargar las metas.</p>}
+
+      <div className="goals-grid">
+        {goals.map(g => {
+          const pct    = g.objetivo > 0 ? Math.min(100, (g.ahorrado / g.objetivo) * 100) : 0
+          const done   = g.ahorrado >= g.objetivo
+          const shared = g.members.length > 1
+          return (
+            <button key={g.id} className="goal-square" onClick={() => setDetailGoal(g)}>
+              {shared && <span className="goal-square-shared">👥</span>}
+              <span className="goal-square-emoji">{g.emoji}</span>
+              <span className="goal-square-name">{g.nombre}</span>
+              <div className="goal-square-bar-bg">
+                <div className="goal-square-bar-fill" style={{
+                  width: `${pct}%`,
+                  background: done ? 'var(--green, #2dd4a0)' : 'var(--accent)',
+                }} />
               </div>
-            )
-          })}
-        </div>
+              <span className="goal-square-pct">{Math.round(pct)}%</span>
+            </button>
+          )
+        })}
+        <button className="goal-square goal-square-new" onClick={openCreate}>
+          <span className="goal-square-emoji">＋</span>
+          <span className="goal-square-name">Nueva</span>
+        </button>
+      </div>
+
+      {showForm && (
+        <GoalFormModal goal={formGoal} onSave={handleSaveForm} onClose={closeForm} />
       )}
 
-      {showModal && (
-        <GoalModal
-          goal={editGoal}
-          onSave={handleSave}
-          onClose={close}
-          onDelete={editGoal ? handleDelete : null}
+      {liveDetail && (
+        <GoalDetailModal
+          goal={liveDetail}
+          myEmail={user?.email}
+          onClose={() => setDetailGoal(null)}
+          onAddMoney={amt => addMoney(liveDetail.id, amt)}
+          onShare={email => share(liveDetail.id, email)}
+          onEdit={() => openEditForm(liveDetail)}
+          onDelete={handleDelete}
         />
       )}
     </div>

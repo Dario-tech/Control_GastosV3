@@ -92,3 +92,65 @@ export async function deleteTransaction(rowIndex) {
   if (!res.ok) throw new Error(`Delete ${res.status}`)
   return res.json()
 }
+
+// ── Metas de ahorro (compartibles entre usuarios) ──────────────────────────
+
+async function goalsJson(res) {
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(body.detail || `API ${res.status}`)
+  return body
+}
+
+export async function fetchGoals() {
+  const res = await fetch(`${BASE}/api/goals`, { headers: authHeaders(), signal: AbortSignal.timeout(15000) })
+  return goalsJson(res)
+}
+
+export async function createGoal(nombre, objetivo, emoji, fecha) {
+  const res = await fetch(`${BASE}/api/goals`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify({ nombre, objetivo, emoji, fecha }),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return goalsJson(res)
+}
+
+export async function updateGoal(id, nombre, objetivo, emoji, fecha) {
+  const res = await fetch(`${BASE}/api/goals/${id}`, {
+    method:  'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify({ nombre, objetivo, emoji, fecha }),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return goalsJson(res)
+}
+
+export async function deleteGoal(id) {
+  const res = await fetch(`${BASE}/api/goals/${id}`, {
+    method:  'DELETE',
+    headers: authHeaders(),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return goalsJson(res)
+}
+
+export async function contributeToGoal(id, importe) {
+  const res = await fetch(`${BASE}/api/goals/${id}/contribute`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify({ importe }),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return goalsJson(res)
+}
+
+export async function shareGoal(id, email) {
+  const res = await fetch(`${BASE}/api/goals/${id}/share`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify({ email }),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return goalsJson(res)
+}
