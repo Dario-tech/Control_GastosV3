@@ -5,7 +5,7 @@ import DonutChart from '../charts/DonutChart'
 import TransactionLogModal from '../ui/TransactionLogModal'
 import DayHeatmap from '../ui/DayHeatmap'
 import { useApp } from '../../context/AppContext'
-import { getMonthStats, getActiveMonths, getMonthlyReport, fmt } from '../../utils'
+import { getMonthStats, getActiveMonths, getMonthlyReport, getBalanceForecast, fmt } from '../../utils'
 import { MONTH_NAMES } from '../../data/mockData'
 import { useFinanceData } from '../../context/FinanceDataContext'
 
@@ -27,6 +27,7 @@ export default function MonthTab() {
   const currentIdx = active.findIndex(m => m.index === selectedMonth)
   const stats = getMonthStats(data, selectedMonth)
   const report = getMonthlyReport(data, selectedMonth)
+  const forecast = getBalanceForecast(data, selectedMonth)
 
   function prev() {
     if (currentIdx > 0) setSelectedMonth(active[currentIdx - 1].index)
@@ -70,6 +71,40 @@ export default function MonthTab() {
           </div>
         </div>
       </div>
+
+      {/* Previsión de saldo a fin de mes */}
+      {forecast && (
+        <Card title="Previsión a fin de mes" noPad>
+          <div className="forecast-body">
+            <div className="forecast-main">
+              <span className="forecast-label">
+                Saldo estimado el {forecast.daysInMonth}
+                {forecast.confidence === 'low' && <span className="forecast-conf"> · estimación temprana</span>}
+              </span>
+              <span className={`forecast-value ${forecast.projectedBalance >= 0 ? 'pos' : 'neg'}`}>
+                {fmt(forecast.projectedBalance)}
+              </span>
+              <span className="forecast-sub">
+                Ahora mismo: {fmt(forecast.currentBalance)} · día {forecast.daysElapsed} de {forecast.daysInMonth}
+              </span>
+            </div>
+            <div className="forecast-stats">
+              <div className="forecast-stat">
+                <span className="forecast-stat-label">Ingresos est.</span>
+                <span className="forecast-stat-value green">{fmt(forecast.projectedIncome)}</span>
+              </div>
+              <div className="forecast-stat">
+                <span className="forecast-stat-label">Fijos est.</span>
+                <span className="forecast-stat-value accent">{fmt(forecast.projectedFixed)}</span>
+              </div>
+              <div className="forecast-stat">
+                <span className="forecast-stat-label">Variables est.</span>
+                <span className="forecast-stat-value red">{fmt(forecast.projectedVariable)}</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Informe de cierre vs mes anterior */}
       {report && (report.expPct !== null || report.movers.length > 0) && (

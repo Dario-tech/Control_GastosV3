@@ -90,6 +90,48 @@ export function getMonthlyReport(data, m) {
   return { prevMonth, month: m, cur, prev, expDelta, expPct, savingsDelta, movers }
 }
 
+export function getBalanceForecast(data, m, now = new Date()) {
+  const year = data.year || now.getFullYear()
+  const isCurrentMonth = now.getFullYear() === year && now.getMonth() === m
+  if (!isCurrentMonth) return null
+
+  const daysInMonth  = new Date(now.getFullYear(), m + 1, 0).getDate()
+  const daysElapsed  = now.getDate()
+  if (daysElapsed < 2) return null  // sin datos suficientes el día 1
+
+  const stats = getMonthStats(data, m)
+
+  // Gasto variable: extrapola el ritmo diario observado al mes completo
+  const dailyVariableRate  = stats.variable / daysElapsed
+  const projectedVariable  = dailyVariableRate * daysInMonth
+
+  // Fijos e ingresos: usa la media de hasta 3 meses anteriores con datos,
+  // y nunca proyecta menos de lo que ya consta este mes (algo ya ha pasado).
+  const activeIdxs  = getActiveMonths(data).map(x => x.index)
+  const pos          = activeIdxs.indexOf(m)
+  const prevMonths   = activeIdxs.slice(Math.max(0, pos - 3), pos < 0 ? activeIdxs.length : pos)
+
+  const avgFixed  = prevMonths.length
+    ? prevMonths.reduce((s, mi) => s + sumMonth(data.fixedExpenses, mi), 0) / prevMonths.length
+    : stats.fixed
+  const avgIncome = prevMonths.length
+    ? prevMonths.reduce((s, mi) => s + sumMonth(data.income, mi), 0) / prevMonths.length
+    : stats.income
+
+  const projectedFixed   = Math.max(stats.fixed, avgFixed)
+  const projectedIncome  = stats.income > 0 ? stats.income : avgIncome
+  const projectedExpenses = projectedFixed + projectedVariable
+  const projectedBalance  = projectedIncome - projectedExpenses
+
+  return {
+    daysElapsed, daysInMonth,
+    currentBalance:   stats.balance,
+    projectedIncome, projectedFixed, projectedVariable, projectedExpenses,
+    projectedBalance,
+    confidence: daysElapsed >= 10 ? 'high' : daysElapsed >= 5 ? 'medium' : 'low',
+  }
+}
+
 export function getTopExpenses(data, limit = 6) {
   return [...data.fixedExpenses, ...data.variableExpenses]
     .map(i => ({ name: i.concept, emoji: i.emoji, total: sumConceptAll(i) }))
