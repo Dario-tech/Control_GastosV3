@@ -10,9 +10,11 @@ const DOW_NAMES = ['domingo','lunes','martes','miércoles','jueves','viernes','s
 export default function DaySummaryModal({ day, monthIndex, year, transactions, onClose }) {
   useLockBodyScroll()
 
-  const total = transactions.reduce((s, t) => s + t.importe, 0)
-  const date  = new Date(year, monthIndex, day)
-  const dow   = DOW_NAMES[date.getDay()]
+  const income  = transactions.filter(t => t.bucket === 'income').reduce((s, t) => s + t.importe, 0)
+  const expense = transactions.filter(t => t.bucket !== 'income').reduce((s, t) => s + t.importe, 0)
+  const net     = income - expense
+  const date    = new Date(year, monthIndex, day)
+  const dow     = DOW_NAMES[date.getDay()]
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -35,19 +37,26 @@ export default function DaySummaryModal({ day, monthIndex, year, transactions, o
         </div>
 
         <div className="txlog-list">
-          {transactions.map((t, i) => (
-            <div key={t.rowIndex ?? i} className="txlog-row">
-              <div className="txlog-row-info">
-                <span className="txlog-concepto">{t.concepto}</span>
+          {transactions.map((t, i) => {
+            const isIncome = t.bucket === 'income'
+            return (
+              <div key={t.rowIndex ?? i} className="txlog-row">
+                <div className="txlog-row-info">
+                  <span className="txlog-concepto">{t.concepto}</span>
+                </div>
+                <span className="txlog-importe" style={isIncome ? { color: 'var(--green)' } : undefined}>
+                  {isIncome ? '+' : '-'}{fmt(t.importe)}
+                </span>
               </div>
-              <span className="txlog-importe">-{fmt(t.importe)}</span>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="txlog-footer">
           <span className="txlog-footer-label">Total del día</span>
-          <span className="txlog-footer-total">-{fmt(total)}</span>
+          <span className="txlog-footer-total" style={net >= 0 ? { color: 'var(--green)' } : undefined}>
+            {net >= 0 ? '+' : '-'}{fmt(Math.abs(net))}
+          </span>
         </div>
 
       </div>

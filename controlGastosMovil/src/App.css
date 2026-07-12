@@ -2772,6 +2772,10 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
   border-radius: 4px;
 }
 
+.cal-legend-dual { gap: 18px; }
+.cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.68rem; color: var(--text2); font-weight: 600; }
+.cal-legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
 /* Light mode */
 html.light .cal-day { background: #ededf5; }
 
