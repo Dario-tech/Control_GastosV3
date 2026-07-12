@@ -18,7 +18,7 @@ const TABS = [
     icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>,
   },
   {
-    id: 'budget', label: 'Budget',
+    id: 'budget', label: 'Presupuesto',
     icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg>,
   },
 ]
@@ -42,6 +42,7 @@ export default function BottomNav({ onTabChange }) {
           aria-label={tab.label}
         >
           <div className="nav-icon-bg">{tab.icon}</div>
+          <span className="nav-label">{tab.label}</span>
         </button>
       ))}
     </nav>

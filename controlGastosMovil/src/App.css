@@ -3150,10 +3150,19 @@ html.light .cal-day { background: #ededf5; }
   text-decoration: none;
 }
 
-/* Nav adjustments for 6 tabs — icons only */
-.nav-btn { font-size: 0; padding: 4px 2px; }
-.nav-btn svg { width: 22px; height: 22px; }
-.nav-icon-bg { width: 44px; height: 38px; border-radius: 14px; }
+/* Nav: icono + nombre debajo */
+.nav-btn { padding: 4px 2px 6px; }
+.nav-btn svg { width: 21px; height: 21px; }
+.nav-icon-bg { width: 40px; height: 30px; border-radius: 14px; }
+.nav-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
 
 /* ===== RESPONSIVE ===== */
 @media (min-width: 430px) {
