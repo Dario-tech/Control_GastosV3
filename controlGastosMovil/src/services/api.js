@@ -9,6 +9,12 @@ export function wakeBackend() {
   fetch(`${BASE}/api/health`, { signal: AbortSignal.timeout(60000) }).catch(() => {})
 }
 
+// Render (plan gratuito) puede dormir el backend tras inactividad y tardar
+// 30-60s en despertar. 15s era insuficiente para la carga inicial de datos
+// (el keep-alive no siempre evita que se duerma) y provocaba que el perfil
+// mostrara "Backend no disponible" con el backend en realidad sano.
+const READ_TIMEOUT_MS = 45000
+
 function authHeaders() {
   try {
     const stored = JSON.parse(localStorage.getItem(LS_KEY))
@@ -28,7 +34,7 @@ export async function fetchPrices() {
 export async function fetchFinanceData() {
   const res = await fetch(`${BASE}/api/finance`, {
     headers: authHeaders(),
-    signal:  AbortSignal.timeout(15000),
+    signal:  AbortSignal.timeout(READ_TIMEOUT_MS),
   })
   if (!res.ok) throw new Error(`API ${res.status}`)
   return res.json()
