@@ -1,7 +1,7 @@
 import Card from '../ui/Card'
 import SavingsChart from '../charts/SavingsChart'
 import BalanceAreaChart from '../charts/BalanceAreaChart'
-import { getTopExpenses, getYearStats, sumAll, fmt } from '../../utils'
+import { getTopExpenses, getYearStats, getAntExpenses, sumAll, fmt } from '../../utils'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useRecurring } from '../../hooks/useRecurring'
 
@@ -16,6 +16,7 @@ export default function StatsTab() {
   const { data } = useFinanceData()
   const { items: recurring, status: recurStatus } = useRecurring()
   const top = getTopExpenses(data, 6)
+  const ants = getAntExpenses(data)
   const maxTop = top[0]?.total || 1
   const { income, expenses } = getYearStats(data)
 
@@ -76,6 +77,29 @@ export default function StatsTab() {
                 <span className="recur-amount">{fmt(r.importe)}</span>
               </div>
             ))}
+          </div>
+        </Card>
+      )}
+
+      {ants && (
+        <Card title="🐜 Gastos hormiga" noPad>
+          <div className="ants-body">
+            <div className="ants-summary">
+              <span className="ants-total">{fmt(ants.total)}</span>
+              <span className="ants-sub">
+                en {ants.count} compra{ants.count !== 1 ? 's' : ''} menores de {fmt(ants.threshold)}
+                {ants.pctOfVariable > 0 && <> · {ants.pctOfVariable}% de tu gasto variable</>}
+              </span>
+            </div>
+            <div className="ants-list">
+              {ants.topConcepts.map(c => (
+                <div key={c.concepto} className="ants-item">
+                  <span className="ants-item-name">{c.emoji} {c.concepto}</span>
+                  <span className="ants-item-meta">{c.count}×</span>
+                  <span className="ants-item-amount">{fmt(c.total)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </Card>
       )}

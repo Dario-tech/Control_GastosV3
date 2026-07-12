@@ -132,6 +132,29 @@ export function getBalanceForecast(data, m, now = new Date()) {
   }
 }
 
+export function getAntExpenses(data, threshold = 15) {
+  const txs = (data.transactions || []).filter(t =>
+    t.bucket === 'variableExpenses' && t.importe < threshold
+  )
+  if (txs.length === 0) return null
+
+  const total         = txs.reduce((s, t) => s + t.importe, 0)
+  const variableTotal = sumAll(data.variableExpenses)
+  const pctOfVariable = variableTotal > 0 ? Math.round((total / variableTotal) * 100) : 0
+
+  const emojiFor = concepto => data.variableExpenses.find(i => i.concept === concepto)?.emoji || '💶'
+
+  const byConcept = {}
+  txs.forEach(t => {
+    const g = byConcept[t.concepto] ??= { concepto: t.concepto, emoji: emojiFor(t.concepto), count: 0, total: 0 }
+    g.count += 1
+    g.total += t.importe
+  })
+  const topConcepts = Object.values(byConcept).sort((a, b) => b.total - a.total).slice(0, 4)
+
+  return { threshold, count: txs.length, total, pctOfVariable, topConcepts }
+}
+
 export function getTopExpenses(data, limit = 6) {
   return [...data.fixedExpenses, ...data.variableExpenses]
     .map(i => ({ name: i.concept, emoji: i.emoji, total: sumConceptAll(i) }))
