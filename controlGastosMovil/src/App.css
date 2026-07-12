@@ -611,6 +611,11 @@ html, body, #root {
 .goals-empty { font-size: 0.82rem; color: var(--text2); text-align: center; padding: 16px; background: var(--surface); border-radius: 14px; }
 
 .goals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+/* Compact: debajo del balance, alineadas a la derecha, ocupando solo la mitad */
+.goals-section--compact { display: flex; flex-direction: column; align-items: flex-end; }
+.goals-section--compact .goals-header { width: 55%; min-width: 190px; justify-content: flex-end; }
+.goals-grid--compact { width: 55%; min-width: 190px; grid-template-columns: repeat(2, 1fr); margin-left: auto; }
 .goal-square {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
   background: var(--surface); border: 1px solid var(--border, transparent);

@@ -16,9 +16,6 @@ export default function YearTab() {
   return (
     <div className="tab-panel">
 
-      {/* Metas de ahorro: lo primero que se ve al entrar en la app */}
-      <SavingsGoals />
-
       {/* Year hero */}
       <div className="year-hero">
         <div className="year-hero-title">Balance acumulado {data.year}</div>
@@ -42,6 +39,9 @@ export default function YearTab() {
           </div>
         </div>
       </div>
+
+      {/* Metas de ahorro: debajo del balance, alineadas a la derecha */}
+      <SavingsGoals compact />
 
       <Card title="Ingresos vs Gastos" noPad>
         <div style={{ padding: '14px 4px 8px' }}>

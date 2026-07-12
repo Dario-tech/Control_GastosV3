@@ -269,7 +269,7 @@ function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, 
   )
 }
 
-export default function SavingsGoals() {
+export default function SavingsGoals({ compact = false }) {
   const { goals, status, addGoal, editGoal, removeGoal, addMoney, share, removeContribution } = useSavingsGoals()
   const { user } = useAuth()
   const [showForm, setShowForm]     = useState(false)
@@ -296,14 +296,14 @@ export default function SavingsGoals() {
   const liveDetail = detailGoal ? (goals.find(g => g.id === detailGoal.id) ?? detailGoal) : null
 
   return (
-    <div className="goals-section">
+    <div className={`goals-section${compact ? ' goals-section--compact' : ''}`}>
       <div className="goals-header">
         <span className="goals-title">🎯 Metas de ahorro</span>
       </div>
 
       {status === 'error' && <p className="goals-empty">No se pudieron cargar las metas.</p>}
 
-      <div className="goals-grid">
+      <div className={`goals-grid${compact ? ' goals-grid--compact' : ''}`}>
         {goals.map(g => {
           const pct    = g.objetivo > 0 ? Math.min(100, (g.ahorrado / g.objetivo) * 100) : 0
           const done   = g.ahorrado >= g.objetivo
