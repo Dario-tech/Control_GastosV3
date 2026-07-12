@@ -57,7 +57,6 @@ function ThemeCard({ theme, selected, onSelect }) {
 import { useBudget } from '../../hooks/useBudget'
 import { useApp } from '../../context/AppContext'
 import { sendMonthlyReport } from '../../services/api'
-import RevolutConnection from '../ui/RevolutConnection'
 
 const SUPPORT_EMAIL_DISPLAY = 'soporte@mieconomia.app'
 const SUPPORT_EMAIL_REAL    = 'marioomc00@gmail.com'
@@ -219,11 +218,6 @@ export default function SettingsTab() {
           />
         </Row>
       </Section>
-
-      <div className="settings-section">
-        <div className="settings-section-title">Cuentas conectadas</div>
-        <RevolutConnection />
-      </div>
 
       <Section title="Datos">
         <Row icon="📤" label="Exportar datos">

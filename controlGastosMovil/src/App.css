@@ -2647,39 +2647,6 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
 }
 .s-action-btn.danger:active { background: var(--red); color: white; }
 
-/* ===== REVOLUT / CUENTAS CONECTADAS ===== */
-.revolut-card {
-  display: flex; align-items: center; gap: 12px;
-  background: var(--settings-card, var(--surface));
-  border-radius: 16px;
-  padding: 14px 16px;
-}
-.revolut-card--locked { cursor: pointer; }
-.revolut-card--locked:active { opacity: 0.85; }
-.revolut-card-icon { font-size: 1.5rem; flex-shrink: 0; }
-.revolut-card-text { flex: 1; min-width: 0; }
-.revolut-card-title { font-size: 0.9rem; font-weight: 700; color: var(--text); }
-.revolut-card-sub { font-size: 0.76rem; color: var(--text2); margin-top: 2px; }
-.revolut-card-actions { display: flex; gap: 8px; flex-shrink: 0; }
-.revolut-lock-badge {
-  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.02em;
-  color: #fff; background: linear-gradient(135deg, var(--accent), var(--purple, #a855f7));
-  padding: 5px 9px; border-radius: 20px; flex-shrink: 0; white-space: nowrap;
-}
-
-/* Paywall */
-.paywall-sheet { display: flex; flex-direction: column; align-items: center; text-align: center; }
-.paywall-badge {
-  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.03em;
-  color: #fff; background: linear-gradient(135deg, var(--accent), var(--purple, #a855f7));
-  padding: 6px 14px; border-radius: 20px; margin-bottom: 14px;
-}
-.paywall-title { font-size: 1.15rem; font-weight: 800; color: var(--text); text-wrap: balance; margin-bottom: 18px; }
-.paywall-benefits { list-style: none; display: flex; flex-direction: column; gap: 12px; width: 100%; margin-bottom: 20px; text-align: left; }
-.paywall-benefit { display: flex; align-items: center; gap: 12px; font-size: 0.86rem; color: var(--text); }
-.paywall-benefit-emoji { font-size: 1.2rem; flex-shrink: 0; }
-.paywall-note { font-size: 0.74rem; color: var(--text3, var(--text2)); line-height: 1.5; margin-top: 10px; }
-
 /* ===== NOTIFICATION PERMISSION BANNER ===== */
 .notif-banner {
   display: flex;
