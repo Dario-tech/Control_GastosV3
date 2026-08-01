@@ -25,6 +25,10 @@ def ensure_annual_expenses_table():
             )
         """)
         cur.execute("CREATE INDEX IF NOT EXISTS idx_annual_exp_user ON annual_fixed_expenses(user_email)")
+        # Meses concretos (1-12) en los que se reparte el gasto — permite elegir
+        # exactamente qué meses, no solo cuántos. Sustituye a dividir_meses (que
+        # se mantiene solo por compatibilidad y se deriva de esta lista).
+        cur.execute("ALTER TABLE annual_fixed_expenses ADD COLUMN IF NOT EXISTS meses_reparto INTEGER[]")
 
 
 def _next_due_date(mes: int, dia: int, today: date) -> date:
@@ -46,13 +50,15 @@ def _enrich(row: dict, today: date | None = None) -> dict:
     today = today or date.today()
     proxima = _next_due_date(row["mes"], row["dia"], today)
     dias_restantes = (proxima - today).days
-    reparto_mensual = round(float(row["importe"]) / row["dividir_meses"], 2) if row.get("dividir_meses") else None
+    meses_reparto = sorted(row.get("meses_reparto") or [])
+    reparto_mensual = round(float(row["importe"]) / len(meses_reparto), 2) if meses_reparto else None
     return {
         **row,
         "importe": float(row["importe"]),
         "proximo_vencimiento": proxima.isoformat(),
         "dias_restantes": dias_restantes,
         "aviso_activo": bool(row["avisar"] and dias_restantes <= row["dias_aviso"]),
+        "meses_reparto": meses_reparto,
         "reparto_mensual": reparto_mensual,
     }
 
@@ -61,7 +67,7 @@ async def list_for_user(email: str) -> list[dict]:
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                """SELECT id, nombre, importe, mes, dia, dividir_meses, avisar, dias_aviso
+                """SELECT id, nombre, importe, mes, dia, meses_reparto, avisar, dias_aviso
                    FROM annual_fixed_expenses WHERE user_email = %s ORDER BY mes, dia""",
                 (email,),
             )
@@ -73,14 +79,14 @@ async def list_for_user(email: str) -> list[dict]:
 
 
 async def create(email: str, nombre: str, importe: float, mes: int, dia: int,
-                  dividir_meses: int | None, avisar: bool, dias_aviso: int) -> dict:
+                  meses_reparto: list[int] | None, avisar: bool, dias_aviso: int) -> dict:
     def _q():
         with db_cursor() as cur:
             cur.execute(
                 """INSERT INTO annual_fixed_expenses
-                   (user_email, nombre, importe, mes, dia, dividir_meses, avisar, dias_aviso)
+                   (user_email, nombre, importe, mes, dia, meses_reparto, avisar, dias_aviso)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
-                (email, nombre, importe, mes, dia, dividir_meses, avisar, dias_aviso),
+                (email, nombre, importe, mes, dia, meses_reparto or None, avisar, dias_aviso),
             )
             return cur.fetchone()["id"]
     new_id = await run_in_thread(_q)
@@ -100,16 +106,16 @@ async def _require_owner(expense_id: int, email: str):
 
 
 async def update(email: str, expense_id: int, nombre: str, importe: float, mes: int, dia: int,
-                  dividir_meses: int | None, avisar: bool, dias_aviso: int) -> dict:
+                  meses_reparto: list[int] | None, avisar: bool, dias_aviso: int) -> dict:
     await _require_owner(expense_id, email)
 
     def _q():
         with db_cursor() as cur:
             cur.execute(
                 """UPDATE annual_fixed_expenses
-                   SET nombre=%s, importe=%s, mes=%s, dia=%s, dividir_meses=%s, avisar=%s, dias_aviso=%s
+                   SET nombre=%s, importe=%s, mes=%s, dia=%s, meses_reparto=%s, avisar=%s, dias_aviso=%s
                    WHERE id=%s AND user_email=%s""",
-                (nombre, importe, mes, dia, dividir_meses, avisar, dias_aviso, expense_id, email),
+                (nombre, importe, mes, dia, meses_reparto or None, avisar, dias_aviso, expense_id, email),
             )
     await run_in_thread(_q)
     for item in await list_for_user(email):

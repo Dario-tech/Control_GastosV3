@@ -1,9 +1,11 @@
 import Card from '../ui/Card'
 import SavingsChart from '../charts/SavingsChart'
 import BalanceAreaChart from '../charts/BalanceAreaChart'
-import { getTopExpenses, getYearStats, sumAll, fmt } from '../../utils'
+import { getTopExpenses, getYearStats, sumAll, fmt, getBalanceForecast, getMonthlyReport } from '../../utils'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useRecurring } from '../../hooks/useRecurring'
+import { useApp } from '../../context/AppContext'
+import { MONTH_NAMES } from '../../data/mockData'
 
 const BREAKDOWN_COLORS = ['#5b7cff','#2dd4a0','#ff9f43','#ff5f7e','#ffd93d','#6bcfff','#a78bff']
 
@@ -14,10 +16,13 @@ function fmtRecurDate(dateStr) {
 
 export default function StatsTab() {
   const { data } = useFinanceData()
+  const { selectedMonth } = useApp()
   const { items: recurring, status: recurStatus } = useRecurring()
   const top = getTopExpenses(data, 6)
   const maxTop = top[0]?.total || 1
   const { income, expenses } = getYearStats(data)
+  const forecast = getBalanceForecast(data, selectedMonth)
+  const report = getMonthlyReport(data, selectedMonth)
 
   const breakdown = [
     { name: '🏠 Alquiler',      val: sumAll(data.fixedExpenses.filter(i => i.concept === 'Alquiler')) },
@@ -33,6 +38,74 @@ export default function StatsTab() {
 
   return (
     <div className="tab-panel">
+
+      {/* Previsión de saldo a fin de mes */}
+      {forecast && (
+        <div className="stats-forecast-card">
+          <span className="stats-forecast-label">
+            Previsión a fin de {MONTH_NAMES[selectedMonth]}
+            {forecast.confidence === 'low' && <span className="forecast-conf"> · estimación temprana</span>}
+          </span>
+          <span className={`stats-forecast-value ${forecast.projectedBalance >= 0 ? 'pos' : 'neg'}`}>
+            {fmt(forecast.projectedBalance)}
+          </span>
+          <span className="stats-forecast-sub">
+            Ahora mismo: {fmt(forecast.currentBalance)} · día {forecast.daysElapsed} de {forecast.daysInMonth}
+          </span>
+          <div className="forecast-stats">
+            <div className="forecast-stat">
+              <span className="forecast-stat-label">Ingresos est.</span>
+              <span className="forecast-stat-value green">{fmt(forecast.projectedIncome)}</span>
+            </div>
+            <div className="forecast-stat">
+              <span className="forecast-stat-label">Fijos est.</span>
+              <span className="forecast-stat-value accent">{fmt(forecast.projectedFixed)}</span>
+            </div>
+            <div className="forecast-stat">
+              <span className="forecast-stat-label">Variables est.</span>
+              <span className="forecast-stat-value red">{fmt(forecast.projectedVariable)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Informe de cierre vs mes anterior */}
+      {report && (report.expPct !== null || report.movers.length > 0) && (
+        <Card title="Resumen del mes" noPad>
+          <div className="report-body">
+            <p className="report-headline">
+              {report.expPct !== null && (
+                <>Gastaste un <strong className={report.expDelta > 0 ? 'neg' : 'pos'}>
+                  {Math.abs(report.expPct)}% {report.expDelta > 0 ? 'más' : 'menos'}
+                </strong> que en {MONTH_NAMES[report.prevMonth]}
+                {report.movers.length > 0 ? ', ' : '.'}</>
+              )}
+              {report.movers.length > 0 && (
+                <>{report.expPct !== null ? 'sobre todo en ' : 'Este mes destaca '}
+                  {report.movers.map((mv, i) => (
+                    <span key={mv.name}>
+                      {i > 0 ? ' y ' : ''}<strong>{mv.emoji} {mv.name}</strong>
+                    </span>
+                  ))}.</>
+              )}
+            </p>
+            <div className="report-stats">
+              <div className="report-stat">
+                <span className="report-stat-label">Gasto vs {MONTH_NAMES[report.prevMonth].slice(0, 3)}.</span>
+                <span className={`report-stat-value ${report.expDelta > 0 ? 'neg' : 'pos'}`}>
+                  {report.expDelta > 0 ? '+' : ''}{fmt(report.expDelta)}
+                </span>
+              </div>
+              <div className="report-stat">
+                <span className="report-stat-label">Ahorro vs {MONTH_NAMES[report.prevMonth].slice(0, 3)}.</span>
+                <span className={`report-stat-value ${report.savingsDelta >= 0 ? 'pos' : 'neg'}`}>
+                  {report.savingsDelta >= 0 ? '+' : ''}{fmt(report.savingsDelta)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Resumen financiero compacto */}
       <div className="stats-summary">

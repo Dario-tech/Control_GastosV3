@@ -483,7 +483,7 @@ class AnnualExpenseIn(BaseModel):
     importe:       float
     mes:           int
     dia:           int = 1
-    dividir_meses: int | None = None
+    meses_reparto: list[int] | None = None
     avisar:        bool = True
     dias_aviso:    int = 15
 
@@ -497,8 +497,13 @@ def _validate_annual_expense(body: "AnnualExpenseIn"):
         raise HTTPException(status_code=422, detail="El mes debe estar entre 1 y 12")
     if not (1 <= body.dia <= 31):
         raise HTTPException(status_code=422, detail="El día debe estar entre 1 y 31")
-    if body.dividir_meses is not None and not (1 <= body.dividir_meses <= 12):
-        raise HTTPException(status_code=422, detail="El reparto debe ser entre 1 y 12 meses")
+    if body.meses_reparto is not None:
+        if not (1 <= len(body.meses_reparto) <= 12):
+            raise HTTPException(status_code=422, detail="Elige entre 1 y 12 meses para el reparto")
+        if any(not (1 <= m <= 12) for m in body.meses_reparto):
+            raise HTTPException(status_code=422, detail="Los meses del reparto deben estar entre 1 y 12")
+        if len(set(body.meses_reparto)) != len(body.meses_reparto):
+            raise HTTPException(status_code=422, detail="No repitas el mismo mes en el reparto")
 
 
 @app.get("/api/annual-expenses")
@@ -511,7 +516,7 @@ async def create_annual_expense_endpoint(body: AnnualExpenseIn, email: str = Dep
     _validate_annual_expense(body)
     return await create_annual_expense(
         email, body.nombre.strip(), body.importe, body.mes, body.dia,
-        body.dividir_meses, body.avisar, body.dias_aviso,
+        body.meses_reparto, body.avisar, body.dias_aviso,
     )
 
 
@@ -520,7 +525,7 @@ async def update_annual_expense_endpoint(expense_id: int, body: AnnualExpenseIn,
     _validate_annual_expense(body)
     return await update_annual_expense(
         email, expense_id, body.nombre.strip(), body.importe, body.mes, body.dia,
-        body.dividir_meses, body.avisar, body.dias_aviso,
+        body.meses_reparto, body.avisar, body.dias_aviso,
     )
 
 

@@ -674,6 +674,34 @@ html, body, #root {
 .ss-value.positive { color: var(--green); }
 .ss-value.negative { color: var(--red); }
 
+/* Previsión a fin de mes — tarjeta destacada al inicio de Stats */
+.stats-forecast-card {
+  display: flex; flex-direction: column; gap: 4px;
+  background: linear-gradient(155deg, var(--surface) 0%, var(--surface2) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 18px 16px 16px;
+  margin-bottom: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.stats-forecast-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--green, #2dd4a0));
+}
+.stats-forecast-label {
+  font-size: 0.72rem; color: var(--text2); text-transform: uppercase;
+  letter-spacing: 0.06em; font-weight: 700;
+}
+.stats-forecast-value {
+  font-size: 2.1rem; font-weight: 800; letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums; margin: 2px 0 1px;
+}
+.stats-forecast-value.pos { color: var(--green, #2dd4a0); }
+.stats-forecast-value.neg { color: var(--red, #ff5f7e); }
+.stats-forecast-sub { font-size: 0.78rem; color: var(--text2); margin-bottom: 12px; }
+
 /* Savings bars */
 .savings-bars { display: flex; flex-direction: column; gap: 10px; }
 .saving-row { display: flex; align-items: center; gap: 10px; }
@@ -745,6 +773,15 @@ html, body, #root {
   font-size: 0.82rem; color: var(--text); margin: 12px 0 8px; cursor: pointer;
 }
 .annual-check-row input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--accent); }
+
+.annual-months-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.annual-month-chip {
+  background: var(--surface2); border: 1px solid var(--border, transparent);
+  border-radius: 8px; padding: 8px 0; font-size: 0.76rem; font-weight: 600;
+  color: var(--text2); cursor: pointer; text-transform: capitalize;
+}
+.annual-month-chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+.annual-months-hint { font-size: 0.74rem; color: var(--text2); margin-top: 8px; }
 
 .annual-list { display: flex; flex-direction: column; gap: 10px; }
 .annual-item {

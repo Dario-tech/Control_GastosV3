@@ -66,8 +66,10 @@ CREATE TABLE IF NOT EXISTS savings_goal_contributions (
     foto       TEXT  -- opcional: data-URL JPEG comprimida en cliente ("álbum de recuerdos")
 );
 
--- Gastos fijos anuales (IBI, seguro del coche…). dividir_meses: si se rellena,
--- el importe / dividir_meses es lo que se sugiere apartar cada mes.
+-- Gastos fijos anuales (IBI, seguro del coche…). meses_reparto: meses concretos
+-- (1-12) en los que se reparte el importe; importe / len(meses_reparto) es lo
+-- que se sugiere apartar cada uno de esos meses, y aparece como gasto fijo
+-- estimado en la pestaña Mes.
 CREATE TABLE IF NOT EXISTS annual_fixed_expenses (
     id            SERIAL PRIMARY KEY,
     user_email    TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
@@ -75,7 +77,7 @@ CREATE TABLE IF NOT EXISTS annual_fixed_expenses (
     importe       NUMERIC(12,2) NOT NULL,
     mes           INTEGER NOT NULL CHECK (mes BETWEEN 1 AND 12),
     dia           INTEGER NOT NULL DEFAULT 1 CHECK (dia BETWEEN 1 AND 31),
-    dividir_meses INTEGER,
+    meses_reparto INTEGER[],
     avisar        BOOLEAN NOT NULL DEFAULT true,
     dias_aviso    INTEGER NOT NULL DEFAULT 15,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()

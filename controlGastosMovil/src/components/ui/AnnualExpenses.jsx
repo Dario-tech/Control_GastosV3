@@ -62,18 +62,32 @@ function ExpenseFormModal({ expense, onSave, onClose }) {
   const [importe, setImporte]   = useState(expense?.importe != null ? String(expense.importe) : '')
   const [mes, setMes]           = useState(expense?.mes ?? new Date().getMonth() + 1)
   const [dia, setDia]           = useState(expense?.dia ?? 1)
-  const [dividir, setDividir]   = useState(Boolean(expense?.dividir_meses))
-  const [meses, setMeses]       = useState(expense?.dividir_meses ? String(expense.dividir_meses) : '12')
+  const [dividir, setDividir]   = useState(Boolean(expense?.meses_reparto?.length))
+  const [mesesSel, setMesesSel] = useState(() => new Set(expense?.meses_reparto?.length ? expense.meses_reparto : []))
+
+  // Al activar "repartir" por primera vez (sin selección todavía), preselecciona
+  // el mes de vencimiento actual como punto de partida cómodo.
+  function handleToggleDividir(checked) {
+    setDividir(checked)
+    if (checked && mesesSel.size === 0) setMesesSel(new Set([Number(mes)]))
+  }
   const [avisar, setAvisar]     = useState(expense?.avisar ?? true)
   const [diasAviso, setDiasAviso] = useState(expense?.dias_aviso != null ? String(expense.dias_aviso) : '15')
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState('')
 
   const importeNum = parseFloat(String(importe).replace(',', '.'))
-  const mesesNum   = parseInt(meses, 10)
   const diasNum    = parseInt(diasAviso, 10)
   const canSave = nombre.trim() && importeNum > 0 && !saving
-    && (!dividir || (mesesNum >= 1 && mesesNum <= 12))
+    && (!dividir || mesesSel.size >= 1)
+
+  function toggleMes(m) {
+    setMesesSel(prev => {
+      const next = new Set(prev)
+      if (next.has(m)) next.delete(m); else next.add(m)
+      return next
+    })
+  }
 
   async function submit() {
     if (!canSave) return
@@ -82,7 +96,7 @@ function ExpenseFormModal({ expense, onSave, onClose }) {
     try {
       await onSave({
         nombre: nombre.trim(), importe: importeNum, mes: Number(mes), dia: Number(dia),
-        dividir_meses: dividir ? mesesNum : null,
+        meses_reparto: dividir ? [...mesesSel].sort((a, b) => a - b) : null,
         avisar, dias_aviso: diasNum || 15,
       })
     } catch (e) {
@@ -120,12 +134,33 @@ function ExpenseFormModal({ expense, onSave, onClose }) {
         </div>
 
         <label className="annual-check-row">
-          <input type="checkbox" checked={dividir} onChange={e => setDividir(e.target.checked)} />
+          <input type="checkbox" checked={dividir} onChange={e => handleToggleDividir(e.target.checked)} />
           <span>Repartir el gasto en varios meses (te digo cuánto apartar al mes)</span>
         </label>
         {dividir && (
-          <input className="setup-input" type="number" min="1" max="12" value={meses}
-            onChange={e => setMeses(e.target.value)} placeholder="Nº de meses" style={{ marginBottom: 10 }} />
+          <div style={{ marginBottom: 10 }}>
+            <div className="annual-months-grid">
+              {MONTH_NAMES.map((m, i) => {
+                const num = i + 1
+                const active = mesesSel.has(num)
+                return (
+                  <button
+                    key={num}
+                    type="button"
+                    className={`annual-month-chip${active ? ' active' : ''}`}
+                    onClick={() => toggleMes(num)}
+                  >
+                    {m.slice(0, 3)}
+                  </button>
+                )
+              })}
+            </div>
+            {importeNum > 0 && mesesSel.size > 0 && (
+              <p className="annual-months-hint">
+                Apartarás {fmt(importeNum / mesesSel.size)}/mes en {mesesSel.size} mes{mesesSel.size !== 1 ? 'es' : ''}
+              </p>
+            )}
+          </div>
         )}
 
         <label className="annual-check-row">
@@ -246,7 +281,9 @@ export default function AnnualExpenses() {
                   {' · '}{exp.dia} de {MONTH_NAMES[exp.mes - 1]}
                 </span>
                 {exp.reparto_mensual != null && (
-                  <span className="annual-item-split">Aparta {fmt(exp.reparto_mensual)}/mes</span>
+                  <span className="annual-item-split">
+                    Aparta {fmt(exp.reparto_mensual)}/mes en {exp.meses_reparto.map(m => MONTH_NAMES[m - 1].slice(0, 3)).join(', ')}
+                  </span>
                 )}
               </div>
               <span className="annual-item-amount">{fmt(exp.importe)}</span>
