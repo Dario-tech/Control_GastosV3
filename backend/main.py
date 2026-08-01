@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from services.prices import get_all_prices
 from services.sheets import (
     get_finance_data, get_raw_transactions, delete_transaction, post_transaction,
-    ensure_comentario_column, update_transaction_comment,
+    ensure_comentario_column, update_transaction_comment, ensure_encrypted_columns,
 )
 from services.auth import (
     verify_google_token, create_jwt, get_current_user,
@@ -36,6 +36,7 @@ async def lifespan(app: FastAPI):
     ensure_password_column()  # migración aditiva idempotente (columna password_hash)
     ensure_goals_tables()     # migración aditiva idempotente (metas de ahorro compartidas)
     ensure_comentario_column()  # migración aditiva idempotente (comentario libre en transacciones)
+    ensure_encrypted_columns()  # migración aditiva idempotente (concepto/importe cifrados)
     yield
 
 

@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 from .db import db_cursor, run_in_thread
+from .crypto import decrypt_str, decrypt_float
 
 # (mín días, máx días, etiqueta, período canónico) para clasificar el hueco entre cargos
 _FREQUENCIES = [
@@ -89,9 +90,13 @@ async def get_recurring(email: str) -> list[dict]:
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                "SELECT concepto, importe, fecha::text FROM transactions WHERE user_email = %s",
+                "SELECT concepto_enc, importe_enc, fecha::text FROM transactions WHERE user_email = %s",
                 (email,),
             )
             return cur.fetchall()
     rows = await run_in_thread(_q)
-    return detect_recurring([dict(r) for r in rows])
+    history = [
+        {"concepto": decrypt_str(bytes(r["concepto_enc"])), "importe": decrypt_float(bytes(r["importe_enc"])), "fecha": r["fecha"]}
+        for r in rows
+    ]
+    return detect_recurring(history)

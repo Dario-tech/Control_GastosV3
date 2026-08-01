@@ -12,15 +12,18 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash  TEXT
 );
 
--- Transacciones confirmadas.
+-- Transacciones confirmadas. concepto e importe van cifrados en reposo
+-- (AES-256-GCM, ver backend/services/crypto.py) — solo el backend, con la
+-- clave DB_ENCRYPTION_KEY, puede leerlos. tipo y fecha quedan en claro
+-- (tipo solo tiene 3 valores; fecha hace falta para filtrar por rango).
 CREATE TABLE IF NOT EXISTS transactions (
-    id         SERIAL PRIMARY KEY,
-    user_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
-    fecha      DATE NOT NULL DEFAULT CURRENT_DATE,
-    tipo       TEXT NOT NULL DEFAULT '',
-    concepto   TEXT NOT NULL DEFAULT '',
-    importe    NUMERIC(12,2) NOT NULL DEFAULT 0,
-    comentario TEXT  -- nota libre opcional, se puede añadir al crear o después
+    id           SERIAL PRIMARY KEY,
+    user_email   TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    fecha        DATE NOT NULL DEFAULT CURRENT_DATE,
+    tipo         TEXT NOT NULL DEFAULT '',
+    concepto_enc BYTEA NOT NULL,
+    importe_enc  BYTEA NOT NULL,
+    comentario   TEXT  -- nota libre opcional, se puede añadir al crear o después (sin cifrar)
 );
 CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_email);
 

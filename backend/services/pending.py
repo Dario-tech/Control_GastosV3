@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 from .db import db_cursor, run_in_thread
 from .suggest import suggest_category
+from .crypto import encrypt_str, decrypt_str, encrypt_float, decrypt_float
 
 
 async def create_pending(email: str, importe: float, fecha: str | None = None) -> dict:
@@ -30,14 +31,17 @@ async def get_pending(email: str) -> list:
             pending = cur.fetchall()
             # Historial del usuario para sugerir categoría (una sola query)
             cur.execute(
-                "SELECT tipo, concepto, importe FROM transactions WHERE user_email = %s",
+                "SELECT tipo, concepto_enc, importe_enc FROM transactions WHERE user_email = %s",
                 (email,),
             )
             history = cur.fetchall()
             return pending, history
 
     pending, history = await run_in_thread(_q)
-    history = [dict(h) for h in history]
+    history = [
+        {"tipo": h["tipo"], "concepto": decrypt_str(bytes(h["concepto_enc"])), "importe": decrypt_float(bytes(h["importe_enc"]))}
+        for h in history
+    ]
 
     result = []
     for r in pending:
@@ -52,6 +56,8 @@ async def get_pending(email: str) -> list:
 
 async def categorize_pending(pending_id: int, email: str, tipo: str, concepto: str) -> dict:
     """Mueve una transacción pendiente a la tabla transactions con su fecha original."""
+    concepto_enc = encrypt_str(concepto)
+
     def _q():
         with db_cursor() as cur:
             cur.execute(
@@ -61,9 +67,10 @@ async def categorize_pending(pending_id: int, email: str, tipo: str, concepto: s
             row = cur.fetchone()
             if not row:
                 return None
+            importe_enc = encrypt_float(float(row["importe"]))
             cur.execute(
-                "INSERT INTO transactions (user_email, fecha, tipo, concepto, importe) VALUES (%s, %s, %s, %s, %s) RETURNING id, fecha::text",
-                (email, row["fecha"], tipo, concepto, row["importe"]),
+                "INSERT INTO transactions (user_email, fecha, tipo, concepto_enc, importe_enc) VALUES (%s, %s, %s, %s, %s) RETURNING id, fecha::text",
+                (email, row["fecha"], tipo, concepto_enc, importe_enc),
             )
             tx = cur.fetchone()
             cur.execute("DELETE FROM pending_transactions WHERE id = %s", (pending_id,))

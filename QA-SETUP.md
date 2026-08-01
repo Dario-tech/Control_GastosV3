@@ -28,10 +28,17 @@ Vercel (rama qa)  ──►  Render (backend QA, rama qa)  ──►  Supabase (
 ## 1. Base de datos QA (Supabase)
 
 1. En [supabase.com](https://supabase.com) → **New project** (nómbralo `control-gastos-qa`). Guarda la contraseña de la BD que te pida.
-2. Cuando esté listo: **Project Settings → Database → Connection string → URI**. Cópiala (formato `postgresql://postgres:...@...supabase.co:5432/postgres`). Será el `DATABASE_URL` del backend QA.
-3. Ve a **SQL Editor** y ejecuta, en este orden:
-   - El contenido de `backend/schema.sql` → crea las tablas.
-   - El contenido de `backend/seed_qa.sql` → crea el usuario de test y datos de muestra.
+2. Cuando esté listo: **Project Settings → Database → Connection string**, elige la pestaña del **Session pooler** (no la conexión directa: los proyectos nuevos de Supabase solo exponen esa por IPv6, y Render no tiene salida IPv6). Formato `postgresql://postgres.XXXXX:...@aws-0-<región>.pooler.supabase.com:5432/postgres`. Será el `DATABASE_URL` del backend QA.
+3. Ve a **SQL Editor** y ejecuta el contenido de `backend/schema.sql` → crea las tablas.
+4. Genera la clave de cifrado (`DB_ENCRYPTION_KEY`, ver services/crypto.py — concepto e importe de las transacciones se guardan cifrados):
+   ```bash
+   python -c "import os, base64; print(base64.b64encode(os.urandom(32)).decode())"
+   ```
+5. Aplica el usuario de test y los datos de muestra con el script (ya no es SQL puro, porque cifra al insertar):
+   ```bash
+   cd backend
+   DATABASE_URL="..." DB_ENCRYPTION_KEY="..." python seed_qa.py
+   ```
 
 > Con esto la BD de QA queda lista y con datos. Producción no se toca en ningún momento.
 
@@ -50,8 +57,9 @@ Vercel (rama qa)  ──►  Render (backend QA, rama qa)  ──►  Supabase (
 
    | Clave | Valor |
    |-------|-------|
-   | `DATABASE_URL` | *(la URI de Supabase QA del paso 1.2)* |
+   | `DATABASE_URL` | *(la URI del pooler de Supabase QA del paso 1.2)* |
    | `JWT_SECRET` | *(genera uno propio — ver abajo. NO se commitea al repo)* |
+   | `DB_ENCRYPTION_KEY` | *(la clave del paso 1.4 — misma que usaste al ejecutar seed_qa.py)* |
    | `CORS_ORIGINS` | *(la URL del frontend QA — la rellenas tras el paso 3; de momento pon `*` temporalmente)* |
 
    Genera el `JWT_SECRET` con:

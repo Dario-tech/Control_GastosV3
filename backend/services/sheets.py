@@ -1,12 +1,21 @@
 from datetime import date as date_type
 from fastapi import HTTPException
 from .db import db_cursor, run_in_thread
+from .crypto import encrypt_str, decrypt_str, encrypt_float, decrypt_float
 
 
 def ensure_comentario_column():
     """Migración aditiva e idempotente: comentario libre en cada transacción."""
     with db_cursor() as cur:
         cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS comentario TEXT")
+
+
+def ensure_encrypted_columns():
+    """Migración aditiva e idempotente: concepto e importe cifrados en reposo
+    (ver services/crypto.py). tipo, fecha y comentario quedan en claro."""
+    with db_cursor() as cur:
+        cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS concepto_enc BYTEA")
+        cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS importe_enc BYTEA")
 
 
 # ── Helpers (lógica pura, sin I/O) ────────────────────────────────────────────
@@ -144,7 +153,7 @@ async def get_finance_data(email: str) -> dict:
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                "SELECT id, fecha::text, tipo, concepto, importe, comentario FROM transactions WHERE user_email = %s ORDER BY fecha, id",
+                "SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario FROM transactions WHERE user_email = %s ORDER BY fecha, id",
                 (email,),
             )
             return cur.fetchall()
@@ -163,9 +172,11 @@ async def get_finance_data(email: str) -> dict:
             "transactions":     [],
         }
 
+    # Descifrado en Python — el backend es el único que tiene la clave.
     data_rows = [
         {"_rowIndex": r["id"], "fecha": r["fecha"], "tipo": r["tipo"],
-         "concepto": r["concepto"], "importe": float(r["importe"]), "comentario": r["comentario"]}
+         "concepto": decrypt_str(bytes(r["concepto_enc"])), "importe": decrypt_float(bytes(r["importe_enc"])),
+         "comentario": r["comentario"]}
         for r in rows
     ]
     return _build_finance(data_rows)
@@ -190,19 +201,22 @@ async def post_transaction(
     importe: float, tipo: str, concepto: str, email: str = "", source: str = "shortcut",
     fecha: str | None = None, comentario: str | None = None,
 ) -> dict:
+    concepto_enc = encrypt_str(concepto)
+    importe_enc  = encrypt_float(importe)
+
     def _q():
         with db_cursor() as cur:
             if fecha:
                 cur.execute(
-                    """INSERT INTO transactions (user_email, tipo, concepto, importe, fecha, comentario)
+                    """INSERT INTO transactions (user_email, tipo, concepto_enc, importe_enc, fecha, comentario)
                        VALUES (%s, %s, %s, %s, %s::date, %s) RETURNING id, fecha::text""",
-                    (email, tipo, concepto, importe, fecha, comentario),
+                    (email, tipo, concepto_enc, importe_enc, fecha, comentario),
                 )
             else:
                 cur.execute(
-                    """INSERT INTO transactions (user_email, tipo, concepto, importe, comentario)
+                    """INSERT INTO transactions (user_email, tipo, concepto_enc, importe_enc, comentario)
                        VALUES (%s, %s, %s, %s, %s) RETURNING id, fecha::text""",
-                    (email, tipo, concepto, importe, comentario),
+                    (email, tipo, concepto_enc, importe_enc, comentario),
                 )
             return cur.fetchone()
 
@@ -230,10 +244,14 @@ async def get_raw_transactions(email: str = "") -> dict:
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                "SELECT id, fecha::text, tipo, concepto, importe, comentario FROM transactions WHERE user_email = %s ORDER BY fecha DESC, id DESC LIMIT 100",
+                "SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario FROM transactions WHERE user_email = %s ORDER BY fecha DESC, id DESC LIMIT 100",
                 (email,),
             )
             return cur.fetchall()
 
     rows = await run_in_thread(_q)
-    return {"data": [dict(r) for r in rows]}
+    return {"data": [
+        {"id": r["id"], "fecha": r["fecha"], "tipo": r["tipo"], "comentario": r["comentario"],
+         "concepto": decrypt_str(bytes(r["concepto_enc"])), "importe": decrypt_float(bytes(r["importe_enc"]))}
+        for r in rows
+    ]}
