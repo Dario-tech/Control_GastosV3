@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { SESSION_EXPIRED_EVENT } from '../services/api'
 
 const BASE   = import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com'
 const LS_KEY = 'mi-economia-auth-v1'
@@ -17,6 +18,11 @@ export function usePendingTransaction() {
   const fetchQueue = useCallback(async () => {
     try {
       const res = await fetch(`${BASE}/api/pending`, { headers: authHeaders() })
+      if (res.status === 401) {
+        try { localStorage.removeItem(LS_KEY) } catch { /* no-op */ }
+        window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
+        return
+      }
       if (!res.ok) return
       setQueue(await res.json())
     } catch { /* no-op */ }
@@ -55,6 +61,11 @@ export function usePendingTransaction() {
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body:    JSON.stringify({ tipo, concepto }),
     })
+    if (res.status === 401) {
+      try { localStorage.removeItem(LS_KEY) } catch { /* no-op */ }
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
+      throw new Error('Tu sesión ha caducado. Vuelve a iniciar sesión.')
+    }
     if (!res.ok) throw new Error('Error al categorizar')
     setQueue(q => q.filter(t => t.id !== id))
   }

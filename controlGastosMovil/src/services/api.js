@@ -1,6 +1,12 @@
 export const BASE = import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com'
 const LS_KEY = 'mi-economia-auth-v1'
 
+// Emitido cuando cualquier llamada a la API recibe un 401: el token guardado
+// ya no vale (caducado, o el backend cambió de JWT_SECRET). AuthContext
+// escucha esto para cerrar la sesión y avisar, en vez de dejar al usuario
+// viendo un "Error al guardar" genérico sin saber que tiene que reentrar.
+export const SESSION_EXPIRED_EVENT = 'session-expired'
+
 // Render (plan gratuito) duerme el backend tras inactividad. Llamar a esto en
 // cuanto arranca la app "despierta" el servidor en segundo plano, para que
 // cuando el usuario llegue a guardar algo el backend ya no esté frío.
@@ -24,10 +30,23 @@ function authHeaders() {
   return {}
 }
 
+// Único punto por el que pasan todas las respuestas autenticadas: si el
+// backend dice 401, la sesión ya no vale — se limpia y se avisa al resto de
+// la app en vez de dejar que cada llamada falle con un error genérico.
+async function apiJson(res) {
+  if (res.status === 401) {
+    try { localStorage.removeItem(LS_KEY) } catch { /* no-op */ }
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
+    throw new Error('Tu sesión ha caducado. Vuelve a iniciar sesión.')
+  }
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(body.detail || `API ${res.status}`)
+  return body
+}
+
 export async function fetchPrices() {
   const res = await fetch(`${BASE}/api/investments/prices`, { signal: AbortSignal.timeout(15000) })
-  if (!res.ok) throw new Error(`API ${res.status}`)
-  return res.json()
+  return apiJson(res)
 }
 
 export async function suggestEmoji(nombre) {
@@ -37,8 +56,7 @@ export async function suggestEmoji(nombre) {
     body:    JSON.stringify({ nombre }),
     signal:  AbortSignal.timeout(10000),
   })
-  if (!res.ok) throw new Error(`API ${res.status}`)
-  return res.json()
+  return apiJson(res)
 }
 
 export async function sendMonthlyReport() {
@@ -47,9 +65,7 @@ export async function sendMonthlyReport() {
     headers: authHeaders(),
     signal:  AbortSignal.timeout(20000),
   })
-  const body = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(body.detail || `API ${res.status}`)
-  return body
+  return apiJson(res)
 }
 
 export async function fetchRecurring() {
@@ -57,8 +73,7 @@ export async function fetchRecurring() {
     headers: authHeaders(),
     signal:  AbortSignal.timeout(15000),
   })
-  if (!res.ok) throw new Error(`API ${res.status}`)
-  return res.json()
+  return apiJson(res)
 }
 
 export async function fetchFinanceData() {
@@ -66,8 +81,7 @@ export async function fetchFinanceData() {
     headers: authHeaders(),
     signal:  AbortSignal.timeout(15000),
   })
-  if (!res.ok) throw new Error(`API ${res.status}`)
-  return res.json()
+  return apiJson(res)
 }
 
 export async function postTransaction(importe, tipo, concepto, fecha = null, comentario = null) {
@@ -80,8 +94,7 @@ export async function postTransaction(importe, tipo, concepto, fecha = null, com
     body:    JSON.stringify(body),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
-  if (!res.ok) throw new Error(`API ${res.status}`)
-  return res.json()
+  return apiJson(res)
 }
 
 export async function deleteTransaction(rowIndex) {
@@ -90,8 +103,7 @@ export async function deleteTransaction(rowIndex) {
     headers: authHeaders(),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
-  if (!res.ok) throw new Error(`Delete ${res.status}`)
-  return res.json()
+  return apiJson(res)
 }
 
 export async function updateTransactionComment(rowIndex, comentario) {
@@ -101,21 +113,14 @@ export async function updateTransactionComment(rowIndex, comentario) {
     body:    JSON.stringify({ comentario }),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
-  if (!res.ok) throw new Error(`API ${res.status}`)
-  return res.json()
+  return apiJson(res)
 }
 
 // ── Metas de ahorro (compartibles entre usuarios) ──────────────────────────
 
-async function goalsJson(res) {
-  const body = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(body.detail || `API ${res.status}`)
-  return body
-}
-
 export async function fetchGoals() {
   const res = await fetch(`${BASE}/api/goals`, { headers: authHeaders(), signal: AbortSignal.timeout(15000) })
-  return goalsJson(res)
+  return apiJson(res)
 }
 
 export async function createGoal(nombre, objetivo, emoji, fecha, imagen_url) {
@@ -125,7 +130,7 @@ export async function createGoal(nombre, objetivo, emoji, fecha, imagen_url) {
     body:    JSON.stringify({ nombre, objetivo, emoji, fecha, imagen_url }),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
-  return goalsJson(res)
+  return apiJson(res)
 }
 
 export async function updateGoal(id, nombre, objetivo, emoji, fecha, imagen_url) {
@@ -135,7 +140,7 @@ export async function updateGoal(id, nombre, objetivo, emoji, fecha, imagen_url)
     body:    JSON.stringify({ nombre, objetivo, emoji, fecha, imagen_url }),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
-  return goalsJson(res)
+  return apiJson(res)
 }
 
 export async function deleteGoal(id) {
@@ -144,7 +149,7 @@ export async function deleteGoal(id) {
     headers: authHeaders(),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
-  return goalsJson(res)
+  return apiJson(res)
 }
 
 export async function contributeToGoal(id, importe, foto = null) {
@@ -154,7 +159,7 @@ export async function contributeToGoal(id, importe, foto = null) {
     body:    JSON.stringify({ importe, foto }),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
-  return goalsJson(res)
+  return apiJson(res)
 }
 
 export async function deleteContribution(goalId, contributionId) {
@@ -163,7 +168,7 @@ export async function deleteContribution(goalId, contributionId) {
     headers: authHeaders(),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
-  return goalsJson(res)
+  return apiJson(res)
 }
 
 export async function shareGoal(id, email) {
@@ -173,14 +178,14 @@ export async function shareGoal(id, email) {
     body:    JSON.stringify({ email }),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
-  return goalsJson(res)
+  return apiJson(res)
 }
 
 // ── Gastos fijos anuales ────────────────────────────────────────────────────
 
 export async function fetchAnnualExpenses() {
   const res = await fetch(`${BASE}/api/annual-expenses`, { headers: authHeaders(), signal: AbortSignal.timeout(15000) })
-  return goalsJson(res)
+  return apiJson(res)
 }
 
 export async function createAnnualExpense(payload) {
@@ -190,7 +195,7 @@ export async function createAnnualExpense(payload) {
     body:    JSON.stringify(payload),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
-  return goalsJson(res)
+  return apiJson(res)
 }
 
 export async function updateAnnualExpense(id, payload) {
@@ -200,7 +205,7 @@ export async function updateAnnualExpense(id, payload) {
     body:    JSON.stringify(payload),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
-  return goalsJson(res)
+  return apiJson(res)
 }
 
 export async function deleteAnnualExpense(id) {
@@ -209,5 +214,5 @@ export async function deleteAnnualExpense(id) {
     headers: authHeaders(),
     signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
-  return goalsJson(res)
+  return apiJson(res)
 }

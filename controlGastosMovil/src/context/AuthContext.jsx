@@ -1,4 +1,5 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
+import { SESSION_EXPIRED_EVENT } from '../services/api'
 
 const BASE   = import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com'
 const LS_KEY = 'mi-economia-auth-v1'
@@ -23,6 +24,20 @@ const AuthCtx = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(loadStored)
+  const [sessionExpiredMsg, setSessionExpiredMsg] = useState('')
+
+  // Cualquier llamada a la API puede avisar de que el token ya no vale
+  // (caducado, o el backend cambió de secreto) — en ese caso cerramos
+  // sesión aquí mismo y dejamos un mensaje claro para la pantalla de login,
+  // en vez de que cada sitio de la app muestre su propio error genérico.
+  useEffect(() => {
+    function handleExpired() {
+      setUser(null)
+      setSessionExpiredMsg('Tu sesión ha caducado. Vuelve a iniciar sesión.')
+    }
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleExpired)
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleExpired)
+  }, [])
 
   async function loginWithGoogle(googleToken) {
     let res
@@ -82,8 +97,15 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  function clearSessionExpiredMsg() {
+    setSessionExpiredMsg('')
+  }
+
   return (
-    <AuthCtx.Provider value={{ user, loginWithGoogle, registerWithEmail, loginWithEmail, logout }}>
+    <AuthCtx.Provider value={{
+      user, loginWithGoogle, registerWithEmail, loginWithEmail, logout,
+      sessionExpiredMsg, clearSessionExpiredMsg,
+    }}>
       {children}
     </AuthCtx.Provider>
   )

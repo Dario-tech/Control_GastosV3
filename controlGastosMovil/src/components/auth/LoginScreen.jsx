@@ -4,9 +4,18 @@ import { useAuth } from '../../context/AuthContext'
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 export default function LoginScreen() {
-  const { loginWithGoogle, registerWithEmail, loginWithEmail } = useAuth()
-  const [error, setError]     = useState('')
+  const { loginWithGoogle, registerWithEmail, loginWithEmail, sessionExpiredMsg, clearSessionExpiredMsg } = useAuth()
+  const [error, setError]     = useState(sessionExpiredMsg || '')
   const [loading, setLoading] = useState(false)
+
+  // Si nos han traído aquí por una sesión caducada, mostramos ese aviso una
+  // vez y limpiamos el flag para que no reaparezca en el siguiente login.
+  useEffect(() => {
+    if (sessionExpiredMsg) {
+      setError(sessionExpiredMsg)
+      clearSessionExpiredMsg()
+    }
+  }, [sessionExpiredMsg, clearSessionExpiredMsg])
 
   // Formulario email/contraseña
   const [mode, setMode]         = useState('login') // 'login' | 'register'
