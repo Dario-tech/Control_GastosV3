@@ -26,6 +26,14 @@
 .login-loading  { color: var(--text2); font-size: 0.9rem; padding: 12px 0; }
 .login-error    { color: var(--red); font-size: 0.8rem; text-align: center; margin: 4px 0 0; }
 
+/* Identificador de versión desplegada — para diagnosticar sin depender del
+   dashboard de Vercel/Render (qué commit corre realmente en cada entorno). */
+.build-marker {
+  position: fixed; bottom: calc(10px + env(safe-area-inset-bottom)); left: 0; right: 0;
+  text-align: center; font-size: 0.62rem; color: var(--text3, var(--text2));
+  opacity: 0.5; font-variant-numeric: tabular-nums; pointer-events: none;
+}
+
 .login-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
 .login-input {
   background: var(--surface2, var(--bg2)); border: 1px solid var(--border);

@@ -2,7 +2,17 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Vercel expone esto como variable de entorno SOLO durante el build (no en
+// runtime), así que hay que "hornearlo" en el bundle con `define`. Sirve
+// para comprobar desde la propia app qué commit está desplegado de verdad,
+// sin depender de leer bien el dashboard de Vercel.
+const commitSha = process.env.VERCEL_GIT_COMMIT_SHA || process.env.npm_package_gitHead || 'local'
+
 export default defineConfig({
+  define: {
+    __BUILD_SHA__: JSON.stringify(commitSha.slice(0, 7)),
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     react(),
     VitePWA({

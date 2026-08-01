@@ -142,6 +142,7 @@ export default function LoginScreen() {
 
         {error && <p className="login-error">{error}</p>}
       </div>
+      <p className="build-marker">build {__BUILD_SHA__}</p>
     </div>
   )
 }
