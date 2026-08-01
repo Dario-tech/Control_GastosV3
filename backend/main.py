@@ -28,6 +28,11 @@ from services.goals import (
     ensure_goals_tables, get_goals_for_user, create_goal, update_goal,
     delete_goal, contribute, delete_contribution, share_goal,
 )
+from services.annual_expenses import (
+    ensure_annual_expenses_table, list_for_user as list_annual_expenses,
+    create as create_annual_expense, update as update_annual_expense,
+    delete as delete_annual_expense,
+)
 
 
 @asynccontextmanager
@@ -37,6 +42,7 @@ async def lifespan(app: FastAPI):
     ensure_goals_tables()     # migración aditiva idempotente (metas de ahorro compartidas)
     ensure_comentario_column()  # migración aditiva idempotente (comentario libre en transacciones)
     ensure_encrypted_columns()  # migración aditiva idempotente (concepto/importe cifrados)
+    ensure_annual_expenses_table()  # migración aditiva idempotente (gastos fijos anuales)
     yield
 
 
@@ -468,6 +474,60 @@ async def delete_contribution_endpoint(goal_id: int, contribution_id: int, email
 @app.post("/api/goals/{goal_id}/share")
 async def share_goal_endpoint(goal_id: int, body: ShareIn, email: str = Depends(get_current_user)):
     return await share_goal(goal_id, email, body.email)
+
+
+# ── Gastos fijos anuales (IBI, seguro del coche…) ────────────────────────────
+
+class AnnualExpenseIn(BaseModel):
+    nombre:        str
+    importe:       float
+    mes:           int
+    dia:           int = 1
+    dividir_meses: int | None = None
+    avisar:        bool = True
+    dias_aviso:    int = 15
+
+
+def _validate_annual_expense(body: "AnnualExpenseIn"):
+    if not body.nombre.strip():
+        raise HTTPException(status_code=422, detail="Escribe un nombre")
+    if body.importe <= 0:
+        raise HTTPException(status_code=422, detail="El importe debe ser mayor que 0")
+    if not (1 <= body.mes <= 12):
+        raise HTTPException(status_code=422, detail="El mes debe estar entre 1 y 12")
+    if not (1 <= body.dia <= 31):
+        raise HTTPException(status_code=422, detail="El día debe estar entre 1 y 31")
+    if body.dividir_meses is not None and not (1 <= body.dividir_meses <= 12):
+        raise HTTPException(status_code=422, detail="El reparto debe ser entre 1 y 12 meses")
+
+
+@app.get("/api/annual-expenses")
+async def list_annual_expenses_endpoint(email: str = Depends(get_current_user)):
+    return await list_annual_expenses(email)
+
+
+@app.post("/api/annual-expenses")
+async def create_annual_expense_endpoint(body: AnnualExpenseIn, email: str = Depends(get_current_user)):
+    _validate_annual_expense(body)
+    return await create_annual_expense(
+        email, body.nombre.strip(), body.importe, body.mes, body.dia,
+        body.dividir_meses, body.avisar, body.dias_aviso,
+    )
+
+
+@app.patch("/api/annual-expenses/{expense_id}")
+async def update_annual_expense_endpoint(expense_id: int, body: AnnualExpenseIn, email: str = Depends(get_current_user)):
+    _validate_annual_expense(body)
+    return await update_annual_expense(
+        email, expense_id, body.nombre.strip(), body.importe, body.mes, body.dia,
+        body.dividir_meses, body.avisar, body.dias_aviso,
+    )
+
+
+@app.delete("/api/annual-expenses/{expense_id}")
+async def delete_annual_expense_endpoint(expense_id: int, email: str = Depends(get_current_user)):
+    await delete_annual_expense(email, expense_id)
+    return {"status": "ok"}
 
 
 # ── Inversiones ───────────────────────────────────────────────────────────────

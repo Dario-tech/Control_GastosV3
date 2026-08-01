@@ -6,6 +6,7 @@ import { useSettings } from '../../context/SettingsContext'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import BudgetModal from '../ui/BudgetModal'
 import SavingsGoals from '../ui/SavingsGoals'
+import AnnualExpenses from '../ui/AnnualExpenses'
 import { fmt } from '../../utils'
 
 const NOTIF_LS_KEY = 'mi-economia-notif-v1'
@@ -291,6 +292,9 @@ export default function BudgetTab() {
           </button>
         </>
       )}
+
+      {/* Gastos fijos anuales: IBI, seguro del coche… */}
+      <AnnualExpenses />
 
       {/* Metas de ahorro: aquí vive la gestión completa (crear, editar, compartir…) */}
       <SavingsGoals alignRight />

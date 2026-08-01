@@ -175,3 +175,39 @@ export async function shareGoal(id, email) {
   })
   return goalsJson(res)
 }
+
+// ── Gastos fijos anuales ────────────────────────────────────────────────────
+
+export async function fetchAnnualExpenses() {
+  const res = await fetch(`${BASE}/api/annual-expenses`, { headers: authHeaders(), signal: AbortSignal.timeout(15000) })
+  return goalsJson(res)
+}
+
+export async function createAnnualExpense(payload) {
+  const res = await fetch(`${BASE}/api/annual-expenses`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify(payload),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return goalsJson(res)
+}
+
+export async function updateAnnualExpense(id, payload) {
+  const res = await fetch(`${BASE}/api/annual-expenses/${id}`, {
+    method:  'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify(payload),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return goalsJson(res)
+}
+
+export async function deleteAnnualExpense(id) {
+  const res = await fetch(`${BASE}/api/annual-expenses/${id}`, {
+    method:  'DELETE',
+    headers: authHeaders(),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return goalsJson(res)
+}
