@@ -9,7 +9,6 @@ import BottomNav from './components/layout/BottomNav'
 import ProfilePanel from './components/layout/ProfilePanel'
 import CategorizeModal from './components/ui/CategorizeModal'
 import AddTransactionModal from './components/ui/AddTransactionModal'
-import TransactionSearchModal from './components/ui/TransactionSearchModal'
 import Toast from './components/ui/Toast'
 import SpotlightTour, { shouldShowTour } from './components/ui/SpotlightTour'
 import { usePendingTransaction } from './hooks/usePendingTransaction'
@@ -49,7 +48,6 @@ function AppContent() {
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [categorizeOpen, setCategorizeOpen] = useState(false)
   const [addOpen,        setAddOpen]        = useState(false)
-  const [searchOpen,     setSearchOpen]     = useState(false)
   const [guideOpen,      setGuideOpen]      = useState(shouldShowTour)
   const { queue, fetchQueue, categorizePending } = usePendingTransaction()
 
@@ -63,7 +61,6 @@ function AppContent() {
         pendingCount={queue.length}
         onPendingClick={async () => { await fetchQueue(); setCategorizeOpen(true) }}
         onAddClick={() => setAddOpen(true)}
-        onSearchClick={() => setSearchOpen(true)}
       />
       <main className="main">
         <ErrorBoundary>
@@ -84,7 +81,7 @@ function AppContent() {
       {guideOpen && (
         <SpotlightTour
           onFinish={() => setGuideOpen(false)}
-          modalOpen={addOpen || searchOpen || categorizeOpen}
+          modalOpen={addOpen || categorizeOpen}
         />
       )}
       {categorizeOpen && current && (
@@ -96,7 +93,6 @@ function AppContent() {
         />
       )}
       {addOpen && <AddTransactionModal onClose={() => setAddOpen(false)} />}
-      {searchOpen && <TransactionSearchModal onClose={() => setSearchOpen(false)} />}
     </div>
   )
 }
