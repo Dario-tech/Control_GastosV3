@@ -44,9 +44,9 @@ const STEPS = [
   },
   {
     target: '[data-tour="tab-budget"]',
-    text: 'Toca Presupuesto: ahí pones límites de gasto por categoría y la app te avisa si te acercas.',
+    text: 'Toca Planificación: ahí van los límites de gasto por categoría, los gastos fijos anuales como el IBI o el seguro, y tus metas de ahorro.',
     advance: 'click',
-    thenExplore: 'Pon límites por categoría, y más abajo tienes tus metas de ahorro compartidas.',
+    thenExplore: 'Tres bloques separados: presupuestos por categoría, gastos fijos anuales, y metas de ahorro compartidas — cada uno con su propio apartado.',
   },
   {
     target: '[data-tour="goals"]',

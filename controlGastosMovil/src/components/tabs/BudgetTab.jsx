@@ -243,9 +243,11 @@ export default function BudgetTab() {
   return (
     <div className="tab-panel budget-tab">
 
-      {/* Sub-header con selector de mes */}
+      {/* Sub-header con selector de mes — solo afecta a esta sección de
+          presupuestos por categoría, no a los gastos fijos ni a las metas de
+          más abajo (cada bloque es independiente). */}
       <div className="bgt-subheader">
-        <span className="bgt-subheader-title">Presupuesto</span>
+        <span className="bgt-subheader-title">Presupuestos por categoría</span>
         <button className="bgt-month-btn" onClick={() => setShowMonthPicker(true)}>
           {MONTH_NAMES[budgetMonth]}
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -293,10 +295,14 @@ export default function BudgetTab() {
         </>
       )}
 
-      {/* Gastos fijos anuales: IBI, seguro del coche… */}
+      {/* Gastos fijos anuales: IBI, seguro del coche… — bloque independiente
+          del presupuesto por categoría de arriba, separado visualmente para
+          que no se lean como una sola cosa continua. */}
+      <div className="planning-section-divider" />
       <AnnualExpenses />
 
       {/* Metas de ahorro: aquí vive la gestión completa (crear, editar, compartir…) */}
+      <div className="planning-section-divider" />
       <SavingsGoals alignRight />
 
       {/* Month picker */}

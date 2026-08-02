@@ -16,7 +16,6 @@ import LoginScreen from './components/auth/LoginScreen'
 import YearTab from './components/tabs/YearTab'
 import MonthTab from './components/tabs/MonthTab'
 import StatsTab from './components/tabs/StatsTab'
-import InvestmentsTab from './components/tabs/InvestmentsTab'
 import BudgetTab from './components/tabs/BudgetTab'
 
 class ErrorBoundary extends Component {
@@ -67,7 +66,6 @@ function AppContent() {
           {activeTab === 'year'        && <YearTab />}
           {activeTab === 'month'       && <MonthTab />}
           {activeTab === 'stats'       && <StatsTab />}
-          {activeTab === 'investments' && <InvestmentsTab />}
           {activeTab === 'budget'      && <BudgetTab />}
         </ErrorBoundary>
       </main>

@@ -52,15 +52,17 @@ export default function BudgetModal({ item, onSave, onClose, onDelete }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
-        <div className="modal-handle" />
+    <div className="fullscreen-form-screen">
+      <div className="fullscreen-form-topbar">
+        <button className="profile-back-btn" onClick={onClose} aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </button>
+        <span className="fullscreen-form-title">{isEdit ? 'Editar categoría' : 'Nueva categoría'}</span>
+      </div>
 
-        <div className="modal-header">
-          <span className="modal-title">{isEdit ? 'Editar categoría' : 'Nueva categoría'}</span>
-          <button className="modal-close-btn" onClick={onClose}>✕</button>
-        </div>
-
+      <div className="fullscreen-form-body">
         {/* Tipo selector */}
         <div className="bgt-tipo-segmented">
           {TIPOS.map(t => (

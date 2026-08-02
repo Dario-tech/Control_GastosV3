@@ -46,6 +46,12 @@ export default function MonthTab() {
   }
 
   const balPos = stats.balance >= 0
+  // Mes real en curso y todavía sin ingresos: el saldo en rojo desde el día 2
+  // no significa "vas mal", significa "aún no ha pasado nada que contar" —
+  // se lo aclaramos en vez de dejar que parezca un cierre de mes real.
+  const now = new Date()
+  const isIncompleteCurrentMonth =
+    data.year === now.getFullYear() && selectedMonth === now.getMonth() && stats.income === 0
 
   function handleSelectConcept(item) {
     if (!item.isAnnualSplit) setSelectedConcept(item)
@@ -67,6 +73,9 @@ export default function MonthTab() {
           <span className={`hero-balance-value ${balPos ? 'pos' : 'neg'}`}>
             {fmt(stats.balance)}
           </span>
+          {isIncompleteCurrentMonth && (
+            <span className="hero-balance-hint">Mes en curso — todavía sin ingresos registrados</span>
+          )}
         </div>
 
         <div className="hero-stats">

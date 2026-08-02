@@ -64,11 +64,17 @@ function GoalFormModal({ goal, onSave, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-sheet goal-sheet" onClick={e => e.stopPropagation()}>
-        <div className="modal-drag-handle" />
-        <div className="goal-modal-title">{goal ? 'Editar meta' : 'Nueva meta de ahorro'}</div>
+    <div className="fullscreen-form-screen">
+      <div className="fullscreen-form-topbar">
+        <button className="profile-back-btn" onClick={onClose} aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </button>
+        <span className="fullscreen-form-title">{goal ? 'Editar meta' : 'Nueva meta de ahorro'}</span>
+      </div>
 
+      <div className="fullscreen-form-body">
         <div className="goal-emoji-row">
           {GOAL_EMOJIS.map(e => (
             <button

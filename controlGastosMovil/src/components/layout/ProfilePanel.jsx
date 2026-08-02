@@ -84,7 +84,7 @@ export default function ProfilePanel({ open, onClose, onShowGuide }) {
             Cerrar sesión
           </button>
         </div>
-        <p className="build-marker">build {__BUILD_SHA__} · {__BUILD_TIME__.slice(0, 16).replace('T', ' ')}</p>
+        <p className="build-marker-inline">build {__BUILD_SHA__} · {__BUILD_TIME__.slice(0, 16).replace('T', ' ')}</p>
       </div>
     </div>
   )

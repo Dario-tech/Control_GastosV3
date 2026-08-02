@@ -112,11 +112,22 @@ function Segmented({ options, value, onChange }) {
 }
 
 
+const TIPO_LABEL = { 'Gasto Variable': 'Variable', 'Gasto Fijo': 'Fijo' }
+
 export default function SettingsTab() {
-  const { settings, update } = useSettings()
+  const { settings, update, customCategories, removeCategory } = useSettings()
   const { allItems: budgetItems, removeItem } = useBudget()
   const { showToast } = useApp()
   const [sendingReport, setSendingReport] = useState(false)
+
+  const customList = ['Gasto Variable', 'Gasto Fijo']
+    .flatMap(tipo => (customCategories[tipo] || []).map(c => ({ ...c, tipo })))
+
+  function handleRemoveCategory(tipo, concepto) {
+    if (window.confirm(`¿Eliminar la categoría "${concepto}"? Las transacciones ya guardadas con ella no cambian, pero dejará de aparecer para elegirla en nuevos movimientos.`)) {
+      removeCategory(tipo, concepto)
+    }
+  }
 
   async function handleSendReport() {
     setSendingReport(true)
@@ -217,6 +228,31 @@ export default function SettingsTab() {
             disabled={!settings.budgetAlerts}
           />
         </Row>
+      </Section>
+
+      <Section title="Categorías personalizadas">
+        {customList.length === 0 ? (
+          <Row icon="🏷️" label="Aún no has creado ninguna" last>
+            <span className="s-value-text" style={{ fontSize: '0.72rem' }}>Se crean desde "+ Nueva" al añadir un gasto</span>
+          </Row>
+        ) : (
+          customList.map((c, i) => (
+            <Row
+              key={`${c.tipo}-${c.concepto}`}
+              icon={c.emoji}
+              label={c.concepto}
+              last={i === customList.length - 1}
+            >
+              <span className="s-value-text" style={{ fontSize: '0.7rem', marginRight: 6 }}>{TIPO_LABEL[c.tipo]}</span>
+              <button
+                className="s-action-btn danger"
+                onClick={() => handleRemoveCategory(c.tipo, c.concepto)}
+              >
+                Eliminar
+              </button>
+            </Row>
+          ))
+        )}
       </Section>
 
       <Section title="Datos">

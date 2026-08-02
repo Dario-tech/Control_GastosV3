@@ -11,7 +11,7 @@ export const DEFAULT_CATEGORIES = {
     { concepto: 'Ropa',                 emoji: '👗' },
     { concepto: 'Vuelos',               emoji: '✈️' },
     { concepto: 'Gimnasio',             emoji: '💪' },
-    { concepto: 'Netflix&Dazn&Regalos', emoji: '📺' },
+    { concepto: 'Suscripciones',        emoji: '📺' },
     { concepto: 'Variado',              emoji: '💶' },
   ],
   'Gasto Fijo': [
