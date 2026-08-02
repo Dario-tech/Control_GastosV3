@@ -106,11 +106,17 @@ function ExpenseFormModal({ expense, onSave, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-sheet goal-sheet" onClick={e => e.stopPropagation()}>
-        <div className="modal-drag-handle" />
-        <div className="goal-modal-title">{expense ? 'Editar gasto fijo' : 'Nuevo gasto fijo anual'}</div>
+    <div className="annual-form-screen">
+      <div className="annual-form-topbar">
+        <button className="profile-back-btn" onClick={onClose} aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </button>
+        <span className="annual-form-title">{expense ? 'Editar gasto fijo' : 'Nuevo gasto fijo anual'}</span>
+      </div>
 
+      <div className="annual-form-body">
         <label className="goal-field-label">Nombre</label>
         <input className="setup-input" value={nombre} onChange={e => setNombre(e.target.value)}
           placeholder="IBI, seguro del coche…" maxLength={40} />
