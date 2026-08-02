@@ -5,25 +5,28 @@ import DonutChart from '../charts/DonutChart'
 import TransactionLogModal from '../ui/TransactionLogModal'
 import DayHeatmap from '../ui/DayHeatmap'
 import { useApp } from '../../context/AppContext'
-import { getMonthStats, getActiveMonths, fmt } from '../../utils'
+import { getMonthStats, getActiveMonths, mergeAnnualSplits, fmt } from '../../utils'
 import { MONTH_NAMES } from '../../data/mockData'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
 
 export default function MonthTab() {
   const { selectedMonth, setSelectedMonth } = useApp()
-  const { data } = useFinanceData()
+  const { data: rawData } = useFinanceData()
   const { expenses: annualExpenses } = useAnnualExpenses()
+  // Los repartos de gastos fijos anuales cuentan como gasto fijo del mes que
+  // les toca — se fusionan aquí una vez y de ahí para abajo todo (saldo,
+  // donut, listado) los trata igual que cualquier otro gasto fijo.
+  const data = mergeAnnualSplits(rawData, annualExpenses)
   const [selectedConcept, setSelectedConcept] = useState(null)
   const [heatmapOpen, setHeatmapOpen] = useState(() => {
     try { return JSON.parse(localStorage.getItem('mi-economia-cal-open') ?? 'false') }
     catch { return false }
   })
-  // Meses navegables: los que tienen transacciones reales + los que tienen
-  // algún reparto de gasto fijo anual (para poder revisar el mes por adelantado
-  // aunque todavía no haya ninguna transacción registrada en él).
+  // Meses navegables: los que tienen transacciones reales o algún reparto de
+  // gasto fijo anual (mergeAnnualSplits ya marca esos meses como activos),
+  // más el mes seleccionado por si acaba de dejar de tener reparto.
   const activeIndexSet = new Set(getActiveMonths(data).map(m => m.index))
-  annualExpenses.forEach(e => e.meses_reparto?.forEach(m => activeIndexSet.add(m - 1)))
   activeIndexSet.add(selectedMonth)
   const active = [...activeIndexSet].sort((a, b) => a - b).map(index => ({ active: true, index }))
 
@@ -43,17 +46,6 @@ export default function MonthTab() {
   }
 
   const balPos = stats.balance >= 0
-
-  // Gastos fijos anuales repartidos que caen en el mes seleccionado (estimación,
-  // no una transacción real todavía) — se muestran junto a los gastos fijos.
-  const annualSplitsThisMonth = annualExpenses
-    .filter(e => e.meses_reparto?.includes(selectedMonth + 1))
-    .map(e => {
-      const amounts = Array(12).fill(0)
-      amounts[selectedMonth] = e.reparto_mensual
-      return { concept: `${e.nombre} · reparto`, emoji: '📅', amounts, isAnnualSplit: true }
-    })
-  const fixedWithAnnual = [...data.fixedExpenses, ...annualSplitsThisMonth]
 
   function handleSelectConcept(item) {
     if (!item.isAnnualSplit) setSelectedConcept(item)
@@ -114,7 +106,7 @@ export default function MonthTab() {
         <ConceptList items={data.income} monthIndex={selectedMonth} colorClass="income-amt" onSelect={setSelectedConcept} />
       </Card>
       <Card title="🏠 Gastos Fijos" noPad>
-        <ConceptList items={fixedWithAnnual} monthIndex={selectedMonth} colorClass="expense-amt" onSelect={handleSelectConcept} />
+        <ConceptList items={data.fixedExpenses} monthIndex={selectedMonth} colorClass="expense-amt" onSelect={handleSelectConcept} />
       </Card>
       <Card title="💳 Gastos Variables" noPad>
         <ConceptList items={data.variableExpenses} monthIndex={selectedMonth} colorClass="expense-amt" onSelect={setSelectedConcept} />

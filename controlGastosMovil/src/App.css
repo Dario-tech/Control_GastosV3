@@ -823,6 +823,7 @@ html, body, #root {
 .annual-item-name { font-size: 0.9rem; font-weight: 700; color: var(--text); }
 .annual-item-due { font-size: 0.74rem; color: var(--text2); }
 .annual-item-split { font-size: 0.72rem; color: var(--accent); font-weight: 600; }
+.annual-item-progress { font-size: 0.7rem; color: var(--green, #2dd4a0); }
 .annual-item-amount { font-size: 0.95rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .annual-item-actions {
   display: flex; gap: 8px; padding: 0 14px 12px;

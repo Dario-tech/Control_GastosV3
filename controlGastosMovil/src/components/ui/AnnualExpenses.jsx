@@ -46,6 +46,17 @@ function buildIcs(expense) {
   return lines.join('\r\n')
 }
 
+// Cuánto del reparto ya ha caído en un mes pasado (o el actual) — para que se
+// vea que la anualidad se va "pagando" a medida que pasan esos meses, igual
+// que ya se descuenta del saldo de cada mes en Mes/Stats/Año.
+function annualProgress(expense) {
+  if (!expense.meses_reparto?.length) return null
+  const mesActual = new Date().getMonth() + 1
+  const pasados = expense.meses_reparto.filter(m => m <= mesActual).length
+  const pagado = Math.round(pasados * expense.reparto_mensual * 100) / 100
+  return { pasados, total: expense.meses_reparto.length, pagado, pendiente: Math.round((expense.importe - pagado) * 100) / 100 }
+}
+
 function downloadIcs(expense) {
   const blob = new Blob([buildIcs(expense)], { type: 'text/calendar' })
   const url = URL.createObjectURL(blob)
@@ -277,7 +288,9 @@ export default function AnnualExpenses() {
       )}
 
       <div className="annual-list">
-        {expenses.map(exp => (
+        {expenses.map(exp => {
+          const progress = annualProgress(exp)
+          return (
           <div key={exp.id} className={`annual-item${exp.aviso_activo ? ' annual-item--soon' : ''}`}>
             <div className="annual-item-top" onClick={() => openEdit(exp)}>
               <div className="annual-item-left">
@@ -291,6 +304,12 @@ export default function AnnualExpenses() {
                     Aparta {fmt(exp.reparto_mensual)}/mes en {exp.meses_reparto.map(m => MONTH_NAMES[m - 1].slice(0, 3)).join(', ')}
                   </span>
                 )}
+                {progress && progress.pasados > 0 && (
+                  <span className="annual-item-progress">
+                    Ya contabilizado {fmt(progress.pagado)} de {fmt(exp.importe)}
+                    {progress.pendiente > 0 && ` · quedan ${fmt(progress.pendiente)}`}
+                  </span>
+                )}
               </div>
               <span className="annual-item-amount">{fmt(exp.importe)}</span>
             </div>
@@ -299,7 +318,8 @@ export default function AnnualExpenses() {
               <button className="annual-item-btn danger" onClick={() => handleDelete(exp)}>Eliminar</button>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {showForm && <ExpenseFormModal expense={formExpense} onSave={handleSave} onClose={closeForm} />}

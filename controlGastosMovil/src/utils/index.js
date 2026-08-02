@@ -19,6 +19,29 @@ export function sumConceptAll(item) {
   return item.amounts.reduce((s, v) => s + v, 0)
 }
 
+// Mete los repartos de gastos fijos anuales (IBI, seguro del coche…) dentro
+// de fixedExpenses como una categoría más, con sus importes en los meses del
+// reparto — así cuentan igual que un gasto fijo normal en TODOS los cálculos
+// derivados (saldo del mes, balance del año, previsión, top gastos…) sin
+// tener que tocar cada uno por separado.
+export function mergeAnnualSplits(data, annualExpenses) {
+  if (!annualExpenses?.length) return data
+  const synthetic = annualExpenses
+    .filter(e => e.meses_reparto?.length)
+    .map(e => {
+      const amounts = Array(12).fill(0)
+      e.meses_reparto.forEach(m => { amounts[m - 1] = e.reparto_mensual })
+      return { concept: `${e.nombre} · reparto`, emoji: '📅', amounts, isAnnualSplit: true }
+    })
+  if (!synthetic.length) return data
+  // También cuentan como mes "activo" — si no, el mes con solo un reparto (sin
+  // transacciones reales todavía) desaparecería de tablas/gráficos que iteran
+  // activeMonths, aunque su importe sí sume en los totales.
+  const activeMonths = [...data.activeMonths]
+  synthetic.forEach(s => s.amounts.forEach((v, i) => { if (v) activeMonths[i] = true }))
+  return { ...data, activeMonths, fixedExpenses: [...data.fixedExpenses, ...synthetic] }
+}
+
 export function getActiveMonths(data) {
   return data.activeMonths
     .map((active, i) => ({ active, index: i }))

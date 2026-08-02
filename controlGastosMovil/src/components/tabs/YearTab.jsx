@@ -2,14 +2,17 @@ import KpiCard from '../ui/KpiCard'
 import Card from '../ui/Card'
 import IncomeExpenseChart from '../charts/IncomeExpenseChart'
 import SavingsGoals from '../ui/SavingsGoals'
-import { getYearStats, getActiveMonths, getMonthStats, fmt } from '../../utils'
+import { getYearStats, getActiveMonths, getMonthStats, mergeAnnualSplits, fmt } from '../../utils'
 import { MONTH_NAMES } from '../../data/mockData'
 import { useApp } from '../../context/AppContext'
 import { useFinanceData } from '../../context/FinanceDataContext'
+import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
 
 export default function YearTab() {
   const { goToMonth } = useApp()
-  const { data } = useFinanceData()
+  const { data: rawData } = useFinanceData()
+  const { expenses: annualExpenses } = useAnnualExpenses()
+  const data = mergeAnnualSplits(rawData, annualExpenses)
   const { income, expenses, balance, savingsRate, avgIncome, avgExpenses } = getYearStats(data)
   const activeMonths = getActiveMonths(data)
 

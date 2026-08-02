@@ -1,10 +1,11 @@
 import Card from '../ui/Card'
 import SavingsChart from '../charts/SavingsChart'
 import BalanceAreaChart from '../charts/BalanceAreaChart'
-import { getTopExpenses, getYearStats, sumAll, fmt, getBalanceForecast, getMonthlyReport } from '../../utils'
+import { getTopExpenses, getYearStats, sumAll, fmt, getBalanceForecast, getMonthlyReport, mergeAnnualSplits } from '../../utils'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useRecurring } from '../../hooks/useRecurring'
 import { useApp } from '../../context/AppContext'
+import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
 import { MONTH_NAMES } from '../../data/mockData'
 
 const BREAKDOWN_COLORS = ['#5b7cff','#2dd4a0','#ff9f43','#ff5f7e','#ffd93d','#6bcfff','#a78bff']
@@ -15,7 +16,9 @@ function fmtRecurDate(dateStr) {
 }
 
 export default function StatsTab() {
-  const { data } = useFinanceData()
+  const { data: rawData } = useFinanceData()
+  const { expenses: annualExpenses } = useAnnualExpenses()
+  const data = mergeAnnualSplits(rawData, annualExpenses)
   const { selectedMonth } = useApp()
   const { items: recurring, status: recurStatus } = useRecurring()
   const top = getTopExpenses(data, 6)
