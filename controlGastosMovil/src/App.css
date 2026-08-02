@@ -1592,6 +1592,12 @@ html.light .api-key-ok { border-color: var(--border); color: #16a34a; }
 .search-importe.pos { color: var(--green, #2dd4a0); }
 .search-importe.neg { color: var(--red, #ff5f7e); }
 .search-empty { text-align: center; color: var(--text2); padding: 32px; font-size: 0.85rem; }
+.search-load-more {
+  background: var(--surface2); border: none; border-radius: 10px;
+  padding: 10px 0; margin: 10px 2px 2px; font-size: 0.8rem; font-weight: 600;
+  color: var(--accent); cursor: pointer; flex-shrink: 0;
+}
+.search-load-more:disabled { opacity: 0.6; cursor: default; }
 .search-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--border, rgba(255,255,255,0.08)); }
 .search-footer-label { font-size: 0.78rem; color: var(--text2); }
 .search-footer-total { font-size: 0.95rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }

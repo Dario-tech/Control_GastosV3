@@ -10,6 +10,7 @@ from services.prices import get_all_prices
 from services.sheets import (
     get_finance_data, get_raw_transactions, delete_transaction, post_transaction,
     ensure_comentario_column, update_transaction_comment, ensure_encrypted_columns,
+    ensure_search_index, search_transactions,
 )
 from services.auth import (
     verify_google_token, create_jwt, get_current_user,
@@ -43,6 +44,7 @@ async def lifespan(app: FastAPI):
     ensure_comentario_column()  # migración aditiva idempotente (comentario libre en transacciones)
     ensure_encrypted_columns()  # migración aditiva idempotente (concepto/importe cifrados)
     ensure_annual_expenses_table()  # migración aditiva idempotente (gastos fijos anuales)
+    ensure_search_index()  # migración aditiva idempotente (índice para paginar la búsqueda)
     yield
 
 
@@ -204,6 +206,19 @@ async def notify_update():
 async def finance_data(email: str = Depends(get_current_user)):
     try:
         return await get_finance_data(email)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/transactions/search")
+async def search_transactions_endpoint(
+    q: str = "", tipo: str = "all", cursor: str | None = None, limit: int = 30,
+    email: str = Depends(get_current_user),
+):
+    try:
+        return await search_transactions(email, q=q, tipo=tipo, cursor=cursor, limit=limit)
     except HTTPException:
         raise
     except Exception as e:

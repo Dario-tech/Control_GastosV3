@@ -97,6 +97,16 @@ export async function postTransaction(importe, tipo, concepto, fecha = null, com
   return apiJson(res)
 }
 
+export async function searchTransactions({ q = '', tipo = 'all', cursor = null, limit = 30 } = {}) {
+  const params = new URLSearchParams({ q, tipo, limit: String(limit) })
+  if (cursor) params.set('cursor', cursor)
+  const res = await fetch(`${BASE}/api/transactions/search?${params}`, {
+    headers: authHeaders(),
+    signal:  AbortSignal.timeout(15000),
+  })
+  return apiJson(res)
+}
+
 export async function deleteTransaction(rowIndex) {
   const res = await fetch(`${BASE}/api/transactions/${rowIndex}`, {
     method:  'DELETE',

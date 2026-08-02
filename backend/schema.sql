@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     comentario   TEXT  -- nota libre opcional, se puede añadir al crear o después (sin cifrar)
 );
 CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_email);
+-- Paginación de la búsqueda por (usuario, fecha, id) sin escanear toda la tabla.
+CREATE INDEX IF NOT EXISTS idx_transactions_search ON transactions(user_email, fecha DESC, id DESC);
 
 -- Pagos pendientes de categorizar (llegan del Atajo iOS con importe + fecha).
 CREATE TABLE IF NOT EXISTS pending_transactions (

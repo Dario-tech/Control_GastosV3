@@ -18,6 +18,16 @@ def ensure_encrypted_columns():
         cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS importe_enc BYTEA")
 
 
+def ensure_search_index():
+    """Índice para paginar por (usuario, fecha, id) sin escanear toda la tabla
+    en cada página de búsqueda — ver search_transactions más abajo."""
+    with db_cursor() as cur:
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_transactions_search "
+            "ON transactions(user_email, fecha DESC, id DESC)"
+        )
+
+
 # ── Helpers (lógica pura, sin I/O) ────────────────────────────────────────────
 
 def _month_index(date_str: str) -> int | None:
@@ -180,6 +190,111 @@ async def get_finance_data(email: str) -> dict:
         for r in rows
     ]
     return _build_finance(data_rows)
+
+
+# Filtro SQL aproximado por tipo — barato porque `tipo` no está cifrado, así
+# reducimos cuántas filas hace falta descifrar antes de mirar si el concepto
+# encaja con la búsqueda. "all" no filtra nada.
+BUCKET_SQL_PATTERN = {
+    "income":           "%INGRESO%",
+    "fixedExpenses":    "%FIJO%",
+    "variableExpenses": "%VARIABLE%",
+}
+
+SEARCH_BATCH_SIZE = 200   # filas que se piden a la vez a la base de datos
+SEARCH_MAX_SCAN   = 1000  # tope de filas a descifrar por petición (~5 tandas)
+
+
+def _parse_cursor(cursor: str | None) -> tuple[str, int] | None:
+    if not cursor:
+        return None
+    try:
+        fecha, id_str = cursor.rsplit("_", 1)
+        return fecha, int(id_str)
+    except (ValueError, TypeError):
+        return None
+
+
+async def search_transactions(
+    email: str, q: str = "", tipo: str = "all", cursor: str | None = None, limit: int = 30,
+) -> dict:
+    """Búsqueda paginada de transacciones.
+
+    concepto/importe están cifrados con nonce aleatorio, así que no se puede
+    filtrar por texto en SQL — hay que descifrar fila a fila. Para que esto
+    escale con el historial en vez de descifrar la tabla entera en cada
+    búsqueda, se pagina con un cursor (fecha, id) yendo hacia atrás en el
+    tiempo en tandas de SEARCH_BATCH_SIZE, descifrando y filtrando por texto
+    sobre la marcha, hasta reunir `limit` resultados o agotar el tope de
+    escaneo por petición (SEARCH_MAX_SCAN) — lo que llegue antes. Si hace
+    falta seguir buscando más atrás, el cliente pide la siguiente página con
+    el `next_cursor` devuelto ("cargar más").
+    """
+    limit = max(1, min(limit, 100))
+    q_norm = q.strip().lower()
+    tipo_pattern = BUCKET_SQL_PATTERN.get(tipo)
+    after = _parse_cursor(cursor)
+
+    def _fetch_batch(after_fecha: str | None, after_id: int | None):
+        with db_cursor() as cur:
+            clauses = ["user_email = %s"]
+            params: list = [email]
+            if tipo_pattern:
+                clauses.append("tipo ILIKE %s")
+                params.append(tipo_pattern)
+            if after_fecha is not None:
+                clauses.append("(fecha, id) < (%s::date, %s)")
+                params.extend([after_fecha, after_id])
+            params.append(SEARCH_BATCH_SIZE)
+            cur.execute(
+                f"""SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario
+                    FROM transactions WHERE {' AND '.join(clauses)}
+                    ORDER BY fecha DESC, id DESC LIMIT %s""",
+                params,
+            )
+            return cur.fetchall()
+
+    results: list[dict] = []
+    scanned = 0
+    last_fecha = after[0] if after else None
+    last_id    = after[1] if after else None
+    exhausted  = False
+
+    while len(results) < limit and scanned < SEARCH_MAX_SCAN:
+        batch = await run_in_thread(lambda: _fetch_batch(last_fecha, last_id))
+        if not batch:
+            exhausted = True
+            break
+        batch_fully_consumed = True
+        for row in batch:
+            scanned += 1
+            # El cursor avanza fila a fila según lo escaneado, no según el
+            # final de la tanda — si cortamos a mitad de tanda porque ya
+            # tenemos `limit` resultados, el resto de esa tanda no se pierde:
+            # queda pendiente para la siguiente página.
+            last_fecha, last_id = row["fecha"], row["id"]
+            concepto = decrypt_str(bytes(row["concepto_enc"]))
+            if q_norm and q_norm not in concepto.lower():
+                continue
+            results.append({
+                "rowIndex":   row["id"],
+                "fecha":      row["fecha"][:10],
+                "concepto":   concepto,
+                "importe":    abs(decrypt_float(bytes(row["importe_enc"]))),
+                "bucket":     _normalize_tipo(row["tipo"], concepto),
+                "comentario": row["comentario"] or "",
+            })
+            if len(results) >= limit:
+                batch_fully_consumed = False
+                break
+        if batch_fully_consumed and len(batch) < SEARCH_BATCH_SIZE:
+            exhausted = True
+
+    next_cursor = None
+    if not exhausted and (len(results) >= limit or scanned >= SEARCH_MAX_SCAN):
+        next_cursor = f"{last_fecha}_{last_id}"
+
+    return {"results": results, "next_cursor": next_cursor}
 
 
 async def delete_transaction(row_index: int, email: str = "") -> dict:
