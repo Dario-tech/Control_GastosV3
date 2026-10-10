@@ -1,0 +1,55 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+Control_GastosV3 ("Mi Economía") is a personal/family expense-tracking app. The repo has three parts, only two of which are deployed:
+
+- `controlGastosMovil/` — the **active** frontend: React 18 + Vite PWA. This is the one you edit for any UI/frontend work.
+- `backend/` — FastAPI + Postgres API that the frontend talks to.
+- `controlGastos/` — a legacy static HTML/CSS/JS version. Not referenced by `vercel.json` or `render.yaml`, not deployed anywhere. Don't extend it; treat as historical reference only.
+
+## Running everything locally
+
+If the user asks to run the app locally (frontend + backend + database together), **use `LOCAL_SETUP.md`**, not the per-component commands below — it's a self-contained Docker Compose setup (`docker-compose.local.yml`) that gives a working `http://localhost:5173` with a seeded test login, validated end-to-end. The commands below are for working on one component at a time against a database you already have running some other way.
+
+## Commands
+
+### Frontend (`controlGastosMovil/`)
+```
+npm install
+npm run dev       # Vite dev server
+npm run build     # production build (also runs vite-plugin-pwa)
+npm run preview   # preview a production build
+```
+No linter or unit test runner is configured. `test-logic.mjs` and `check.mjs` exist in this directory from earlier development but are currently stale: `test-logic.mjs` imports a `DATA` export from `src/data/mockData.js` that is commented out, and `check.mjs` (a Playwright smoke script) targets `[data-tab="..."]` selectors that no longer exist in the markup (components now use `data-tour="tab-..."`). Fix them before relying on them, or verify changes with `npm run build` plus a manual check.
+
+### Backend (`backend/`)
+```
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+Requires these env vars at minimum to run against a real database: `DATABASE_URL` (Postgres), `JWT_SECRET`, `DB_ENCRYPTION_KEY` (32 bytes, base64 — see `services/crypto.py` for how to generate one). `GOOGLE_CLIENT_ID` is only needed to test Google login; email/password login works without it. See `backend/.env.example` and `QA-SETUP.md` for the full list and how to stand up an isolated QA environment (separate Render + Vercel + Supabase instances, driven by the `qa` branch).
+
+## Architecture
+
+### Backend
+`main.py` registers every route directly (no router modules/blueprints) and delegates logic to `services/*.py`. Notable points that aren't obvious from file names alone:
+
+- **`services/sheets.py` is the transactions module, not a Google Sheets integration** — the name is historical (the project read/wrote a Google Sheet in an earlier version). Transaction data lives entirely in Postgres today, accessed through `services/db.py`'s connection pool. `APPS_SCRIPT_URL` in `.env.example`/`render.yaml` is a leftover from that era and isn't read anywhere in the current Python code.
+- **`concepto` and `importe` are encrypted at rest** (AES-GCM, `services/crypto.py`, key from `DB_ENCRYPTION_KEY`) so a DB leak doesn't expose amounts/categories; `tipo`, `fecha` and `comentario` stay in plaintext. Aggregation (sums, top categories) happens in Python after decrypting, not in SQL.
+- **Two independent login paths** into the same JWT session: Google ID token verification (`verify_google_token`) and email+bcrypt (`hash_password`/`verify_password`), both in `services/auth.py`.
+- **A third, separate auth path** exists for the iOS Shortcuts integration: `/api/shortcut/pending` takes a permanent per-user `shortcut_token` instead of a JWT, so a Shortcut can log a pending expense without opening the app.
+- **Live updates are SSE, not polling-only**: `/api/events` holds open connections in a module-level `_sse_clients` set; any mutating endpoint calls `_broadcast()`, which pushes to *every* connected client (not scoped per-user), and the frontend refetches `/api/finance` on receipt.
+
+### Frontend
+`controlGastosMovil/src/App.jsx` nests four context providers — `AuthProvider` → `SettingsProvider` → `AppProvider` → `FinanceDataProvider` — and most screens read from more than one. Specifics worth knowing before changing data flow:
+
+- `FinanceDataContext` is cache-first: it loads last-known data from `localStorage` synchronously on mount, then refreshes over SSE (see above) with a 5-minute poll as a backup, and re-fetches on tab-visibility change. `status` (`idle`/`loading`/`live`/`offline`) reflects this.
+- Domain logic lives in `hooks/` (budgets, savings goals, recurring/subscription detection, annual fixed expenses that can be split across months) and `services/*Api.js` (thin fetch wrappers), kept separate from `components/`.
+- `components/` is organized by role: `auth/`, `layout/` (header, bottom nav, profile panel), `tabs/` (the four screens — Year, Month, Stats, Budget/Planning), `charts/` (recharts wrappers), `ui/` (modals and standalone widgets).
+- **The Investments tab is present in code but not reachable in the UI** — `App.jsx` only mounts `year`/`month`/`stats`/`budget`, and `BottomNav` has no entry for it. `InvestmentsTab.jsx` itself just renders a placeholder. The supporting components/hooks/services (`InvestmentCard`, `useInvestments`, `investmentApi.js`, etc.) and the `/api/investments/prices` backend endpoint are dead code paths, not a hidden feature — don't assume they're exercised by anything.
+- Styling is one file, `src/App.css` (~3300 lines), using CSS custom properties for theming rather than a CSS-in-JS or utility framework. `:root` is the dark theme (default); `html.light` and `html.pastel` override the same variable set for the other two themes. New components should read colors/spacing from these variables, not hardcode values, so all three themes stay in sync.
+- The app shell is fixed-width, mobile-only (`max-width: 430px`, see `.app` in `App.css`) — there's no responsive/desktop layout to preserve.
+- `vite-plugin-pwa` handles the PWA manifest/service worker (config in `vite.config.js`); there's no native app wrapper (Capacitor etc.) in the codebase yet, though it's been discussed as a possible direction.

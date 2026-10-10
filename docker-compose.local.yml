@@ -1,0 +1,70 @@
+# Entorno de desarrollo LOCAL — NO usar en producción.
+#
+# Levanta los tres componentes (base de datos, backend, frontend) en un solo
+# comando, con datos de ejemplo ya cargados. Las claves de abajo son fijas y
+# solo valen para este entorno local aislado (nunca accesible desde fuera de
+# tu máquina) — no son las de QA ni las de producción.
+#
+# Uso:
+#   docker compose -f docker-compose.local.yml up
+# Primera vez (o para resetear los datos de ejemplo), en otra terminal:
+#   docker compose -f docker-compose.local.yml exec backend python seed_qa.py
+#
+# Login de prueba: qa@mieconomia.test / QaTest1234!
+#
+# URLs:
+#   Frontend → http://localhost:5173
+#   Backend  → http://localhost:8000  (http://localhost:8000/api/health)
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gastos
+      POSTGRES_PASSWORD: gastos
+      POSTGRES_DB: gastos
+    volumes:
+      - gastos-local-db:/var/lib/postgresql/data
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gastos -d gastos"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    command: sh -c "pip install --no-cache-dir -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+    environment:
+      DATABASE_URL: postgresql://gastos:gastos@db:5432/gastos
+      JWT_SECRET: bshLzY-c_KNPQgx6LTUrgN1l88VJFExvcwuVzVbwGKA
+      DB_ENCRYPTION_KEY: v79LpsHQ0XT0I2aCfPlhoyVV2Nw6iZrQAdLv80N2IF4=
+      CORS_ORIGINS: http://localhost:5173
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: node:22-slim
+    working_dir: /app
+    volumes:
+      - ./controlGastosMovil:/app
+      - gastos-local-node-modules:/app/node_modules
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  gastos-local-db:
+  gastos-local-node-modules:
