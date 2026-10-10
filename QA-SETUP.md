@@ -119,3 +119,16 @@ O crea tu propia cuenta con **"Crear cuenta"** para probar el registro de cero.
 - El **plan gratis** de Render duerme el servicio tras inactividad: la primera petición tras un rato tarda ~30 s en despertar. Normal en QA.
 - Flujo para futuros cambios: mergea tu `feature/*` a **`qa`** → Render y Vercel redespliegan solos y pruebas ahí → cuando esté validado, mergea `qa` a **`main`** (producción, con su propio `JWT_SECRET` ya verificado).
 - La rama `qa` **no se borra**. Las ramas de feature sí se pueden borrar tras mergearlas.
+
+---
+
+## Desarrollo local contra la BD de QA
+
+Base de datos QA (Supabase): host `db.qmqseibceutmczfggelx.supabase.co`, puerto `5432`.
+
+1. `cp backend/.env.example backend/.env` y rellena `DATABASE_URL`
+   (`postgresql://postgres:[YOUR-PASSWORD]@db.qmqseibceutmczfggelx.supabase.co:5432/postgres`)
+   y `DB_ENCRYPTION_KEY`. Los ficheros `.env` están en `.gitignore`: la contraseña nunca va al repo ni a los `.md`.
+2. Si tu red no tiene IPv6 y la conexión directa falla, usa la URI del **Session pooler** (ver paso 1.2).
+3. Backend: `cd backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt && uvicorn main:app --port 8000`
+4. Frontend: `cd controlGastosMovil && echo "VITE_API_URL=http://127.0.0.1:8000" > .env.local && npm run dev`

@@ -3,7 +3,13 @@ backend/venv/
 backend/__pycache__/
 backend/**/__pycache__/
 backend/*.pyc
+# backend/.env contiene las credenciales de la BD de QA (Supabase). NUNCA subir a git.
 backend/.env
+backend/.env.*
+!backend/.env.example
+controlGastosMovil/.env
+controlGastosMovil/.env.*
+!controlGastosMovil/.env.example
 
 # Node
 controlGastosMovil/node_modules/

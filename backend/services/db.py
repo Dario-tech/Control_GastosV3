@@ -1,6 +1,5 @@
 import os
 import asyncio
-import psycopg2
 from psycopg2.pool import ThreadedConnectionPool
 from psycopg2.extras import RealDictCursor
 
