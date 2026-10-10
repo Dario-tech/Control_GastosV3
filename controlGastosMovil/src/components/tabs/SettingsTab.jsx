@@ -2,55 +2,28 @@ import { useState } from 'react'
 import { useSettings, ACCENTS } from '../../context/SettingsContext'
 
 const THEMES = [
-  {
-    id: 'dark',
-    name: 'Oscuro',
-    emoji: '🌙',
-    bg: '#07070f', surface: '#111120', accent: '#6366f1', bar: '#22c55e',
-  },
-  {
-    id: 'light',
-    name: 'Claro',
-    emoji: '☀️',
-    bg: '#f0f0f8', surface: '#ffffff', accent: '#6366f1', bar: '#22c55e',
-  },
-  {
-    id: 'pastel',
-    name: 'Pastel',
-    emoji: '🌸',
-    bg: '#fff0f7', surface: '#ffffff', accent: '#ec4899', bar: '#f9a8d4',
-  },
-  {
-    id: 'auto',
-    name: 'Auto',
-    emoji: '⚙️',
-    bg: '#888', surface: '#aaa', accent: '#6366f1', bar: '#22c55e',
-  },
+  { id: 'dark',     name: 'Oscuro' },
+  { id: 'light',    name: 'Claro' },
+  { id: 'pastel',   name: 'Pastel' },
+  { id: 'ocean',    name: 'Océano' },
+  { id: 'sunset',   name: 'Atardecer' },
+  { id: 'forest',   name: 'Bosque' },
+  { id: 'midnight', name: 'Medianoche' },
+  { id: 'auto',     name: 'Auto' },
 ]
 
 function ThemeCard({ theme, selected, onSelect }) {
-  const isAuto = theme.id === 'auto'
   return (
     <button
       className={`theme-card${selected ? ' active' : ''}`}
       onClick={() => onSelect(theme.id)}
+      aria-pressed={selected}
+      aria-label={`Tema ${theme.name}`}
     >
-      <div className="theme-card-preview" style={{ background: isAuto ? 'linear-gradient(135deg, #111120 50%, #f0f0f8 50%)' : theme.bg }}>
-        <div className="theme-card-preview-surface" style={{ background: isAuto ? 'transparent' : theme.surface }}>
-          <div className="theme-card-preview-bar" style={{ background: isAuto ? '#6366f1' : theme.accent, width: '65%' }} />
-          <div className="theme-card-preview-bar" style={{ background: isAuto ? '#22c55e' : theme.bar, width: '40%', opacity: 0.7 }} />
-          <div className="theme-card-preview-bar" style={{ background: isAuto ? '#6366f1' : theme.accent, width: '80%', opacity: 0.4 }} />
-        </div>
-      </div>
-      <div className="theme-card-label">
-        <span className="theme-card-emoji">{theme.emoji}</span>
+      <span className={`theme-dot theme-dot-${theme.id}`} />
+      <span className="theme-card-label">
         <span className="theme-card-name">{theme.name}</span>
-        {selected && (
-          <svg className="theme-card-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M3 8l3.5 3.5L13 5"/>
-          </svg>
-        )}
-      </div>
+      </span>
     </button>
   )
 }
@@ -233,7 +206,7 @@ export default function SettingsTab() {
       <Section title="Categorías personalizadas">
         {customList.length === 0 ? (
           <Row icon="🏷️" label="Aún no has creado ninguna" last>
-            <span className="s-value-text" style={{ fontSize: '0.72rem' }}>Se crean desde "+ Nueva" al añadir un gasto</span>
+            <span className="s-value-text" style={{ fontSize: "var(--fs-xs)" }}>Se crean desde "+ Nueva" al añadir un gasto</span>
           </Row>
         ) : (
           customList.map((c, i) => (
@@ -243,7 +216,7 @@ export default function SettingsTab() {
               label={c.concepto}
               last={i === customList.length - 1}
             >
-              <span className="s-value-text" style={{ fontSize: '0.7rem', marginRight: 6 }}>{TIPO_LABEL[c.tipo]}</span>
+              <span className="s-value-text" style={{ fontSize: "var(--fs-xs)", marginRight: 6 }}>{TIPO_LABEL[c.tipo]}</span>
               <button
                 className="s-action-btn danger"
                 onClick={() => handleRemoveCategory(c.tipo, c.concepto)}
@@ -271,7 +244,7 @@ export default function SettingsTab() {
 
       <Section title="Ayuda">
         <Row icon="❓" label="¿Tienes dudas o algo no funciona?">
-          <span className="s-value-text" style={{ fontSize: '0.75rem' }}>Escríbenos</span>
+          <span className="s-value-text" style={{ fontSize: "var(--fs-xs)" }}>Escríbenos</span>
         </Row>
         <Row icon="✉️" label="Contacto" last>
           <a

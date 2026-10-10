@@ -18,6 +18,13 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
+      workbox: {
+        runtimeCaching: [{
+          urlPattern: /\.woff2$/,
+          handler: 'CacheFirst',
+          options: { cacheName: 'fonts', expiration: { maxEntries: 8, maxAgeSeconds: 31536000 } },
+        }],
+      },
       manifest: {
         name: 'Control de Gastos 2025',
         short_name: 'Gastos',

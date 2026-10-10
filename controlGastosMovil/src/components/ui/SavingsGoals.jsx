@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useId } from 'react'
 import { useSavingsGoals } from '../../hooks/useSavingsGoals'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import { useAuth } from '../../context/AuthContext'
@@ -37,6 +37,49 @@ async function compressImage(file, maxDim = 800, quality = 0.72) {
 function GoalIcon({ goal, className }) {
   if (goal.imagen_url) return <img className={className} src={goal.imagen_url} alt={goal.nombre} />
   return <span className={className}>{goal.emoji}</span>
+}
+
+// Anillo de progreso (SVG). pathLength=100 -> el desplazamiento es directamente el % restante.
+function GoalRing({ pct, done, size = 'md', children }) {
+  const gid = useId()
+  return (
+    <div className={`goal-ring goal-ring--${size}${done ? ' done' : ''}`} style={{ '--off': 100 - pct }}>
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   className="goal-ring-stop-a" />
+            <stop offset="100%" className="goal-ring-stop-b" />
+          </linearGradient>
+        </defs>
+        <circle className="goal-ring-track" cx="50" cy="50" r="42" pathLength="100" />
+        {pct > 0 && (
+          <circle className="goal-ring-fg" cx="50" cy="50" r="42" pathLength="100" stroke={`url(#${gid})`} />
+        )}
+      </svg>
+      <div className="goal-ring-center">{children}</div>
+    </div>
+  )
+}
+
+// Texto de apoyo: cuánto falta y, si hay fecha futura, cuánto aportar al mes.
+function goalRemaining(goal) {
+  const falta = Math.max(0, goal.objetivo - goal.ahorrado)
+  let mes = null
+  if (falta > 0 && goal.fecha) {
+    const d = new Date(goal.fecha)
+    if (!isNaN(d)) {
+      const now = new Date()
+      const months = (d.getFullYear() - now.getFullYear()) * 12 + (d.getMonth() - now.getMonth())
+      if (months > 0) mes = falta / months
+    }
+  }
+  return { falta, mes }
+}
+
+function formatGoalDate(iso) {
+  try {
+    return new Date(iso).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })
+  } catch { return iso }
 }
 
 function GoalFormModal({ goal, onSave, onClose }) {
@@ -194,6 +237,7 @@ function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, 
   const pct       = goal.objetivo > 0 ? Math.min(100, (goal.ahorrado / goal.objetivo) * 100) : 0
   const done      = goal.ahorrado >= goal.objetivo
   const memories  = (goal.contributions || []).filter(c => c.foto)
+  const remaining = goalRemaining(goal)
 
   async function handleDeleteContribution(c) {
     if (!window.confirm(`¿Eliminar esta aportación de ${fmt(c.importe)}?`)) return
@@ -237,14 +281,18 @@ function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, 
           <span className={`goal-detail-ahorrado${done ? ' done' : ''}`}>{fmt(goal.ahorrado)}</span>
           <span className="goal-detail-objetivo"> / {fmt(goal.objetivo)}</span>
         </div>
-        <div className="goal-bar-bg">
-          <div className="goal-bar-fill" style={{
-            width: `${pct}%`,
-            background: done ? 'var(--green, #2dd4a0)' : 'var(--accent)',
-          }} />
-        </div>
-        <div className="goal-item-foot" style={{ marginBottom: 14 }}>
-          <span className="goal-pct">{done ? '¡Completada! 🎉' : `${Math.round(pct)}%`}</span>
+        <div className="goal-detail-ringwrap">
+          <GoalRing pct={pct} done={done} size="lg">
+            <span className="goal-ring-pct">{Math.round(pct)}<small>%</small></span>
+          </GoalRing>
+          <div className="goal-detail-status">
+            {done ? '¡Completada! 🎉' : (
+              <>
+                <span>Faltan <b>{fmt(remaining.falta)}</b></span>
+                {remaining.mes != null && <span className="goal-detail-hint">≈ {fmt(remaining.mes)}/mes hasta {formatGoalDate(goal.fecha)}</span>}
+              </>
+            )}
+          </div>
         </div>
 
         <AddMoneyRow onAdd={onAddMoney} />
@@ -351,7 +399,7 @@ function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, 
 // sin afectar a si se puede crear/gestionar. `compact` ya implica alineado
 // a la derecha.
 export default function SavingsGoals({ compact = false, alignRight = false }) {
-  const rightAligned = compact || alignRight
+  const rightAligned = compact  // alignRight ya no estrecha el bloque: las tarjetas con anillo necesitan ancho completo
   const { goals, status, addGoal, editGoal, removeGoal, addMoney, share, removeContribution } = useSavingsGoals()
   const { user } = useAuth()
   const [showForm, setShowForm]     = useState(false)
@@ -391,30 +439,60 @@ export default function SavingsGoals({ compact = false, alignRight = false }) {
 
       {status === 'error' && <p className="goals-empty">No se pudieron cargar las metas.</p>}
 
+      {!compact && status !== 'error' && goals.length === 0 && (
+        <div className="goals-empty-state">
+          <GoalRing pct={0} size="lg">
+            <span className="goals-empty-emoji">🎯</span>
+          </GoalRing>
+          <div className="goals-empty-title">Tu primera meta de ahorro</div>
+          <p className="goals-empty-text">Ponle nombre y objetivo a eso que quieres lograr y ve crecer tu progreso.</p>
+          <button className="goals-empty-cta" onClick={openCreate}>Crear meta</button>
+        </div>
+      )}
+
       <div className={`goals-grid${rightAligned ? ' goals-grid--compact' : ''}`}>
         {goals.map(g => {
           const pct    = g.objetivo > 0 ? Math.min(100, (g.ahorrado / g.objetivo) * 100) : 0
           const done   = g.ahorrado >= g.objetivo
           const shared = g.members.length > 1
+          const remaining = goalRemaining(g)
           return (
-            <button key={g.id} className="goal-square" onClick={() => setDetailGoal(g)}>
+            <button key={g.id} className={`goal-square${done ? ' done' : ''}`} onClick={() => setDetailGoal(g)}>
               {shared && <span className="goal-square-shared">👥</span>}
-              <GoalIcon goal={g} className="goal-square-emoji" />
-              <span className="goal-square-name">{g.nombre}</span>
-              <div className="goal-square-bar-bg">
-                <div className="goal-square-bar-fill" style={{
-                  width: `${pct}%`,
-                  background: done ? 'var(--green, #2dd4a0)' : 'var(--accent)',
-                }} />
-              </div>
-              <span className="goal-square-pct">{Math.round(pct)}%</span>
+              <GoalRing pct={pct} done={done} size={compact ? 'sm' : 'md'}>
+                <span className="goal-ring-pct">{Math.round(pct)}<small>%</small></span>
+              </GoalRing>
+              <span className="goal-square-title">
+                <GoalIcon goal={g} className="goal-square-emoji" />
+                <span className="goal-square-name">{g.nombre}</span>
+              </span>
+              {compact && (
+                <span className="goal-square-amounts">
+                  <b>{fmt(g.ahorrado)}</b> / {fmt(g.objetivo)}
+                </span>
+              )}
+              {!compact && (
+                <>
+                  <span className="goal-square-amounts">
+                    <b>{fmt(g.ahorrado)}</b> / {fmt(g.objetivo)}
+                  </span>
+                  <span className="goal-square-foot">
+                    {done ? '¡Lograda! 🎉' : `Faltan ${fmt(remaining.falta)}`}
+                  </span>
+                  {!done && g.fecha && (
+                    <span className="goal-square-date">
+                      {formatGoalDate(g.fecha)}{remaining.mes != null && ` · ${fmt(remaining.mes)}/mes`}
+                    </span>
+                  )}
+                </>
+              )}
             </button>
           )
         })}
-        {!compact && (
+        {!compact && goals.length > 0 && (
           <button className="goal-square goal-square-new" onClick={openCreate}>
-            <span className="goal-square-emoji">＋</span>
-            <span className="goal-square-name">Nueva</span>
+            <span className="goal-new-plus">＋</span>
+            <span className="goal-square-name">Nueva meta</span>
           </button>
         )}
       </div>

@@ -28,19 +28,19 @@ export default function BalanceAreaChart({ data: financeData }) {
       <AreaChart data={data} margin={{ top: 4, right: 4, left: -18, bottom: 0 }}>
         <defs>
           <linearGradient id="balanceGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%"  stopColor="#a78bfa" stopOpacity={0.35} />
-            <stop offset="95%" stopColor="#a78bfa" stopOpacity={0.02} />
+            <stop offset="5%"  stopColor="#a78bfa" stopOpacity={0.45} />
+            <stop offset="95%" stopColor="#a78bfa" stopOpacity={0.03} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
         <XAxis
           dataKey="monthLabel"
-          tick={{ fill: tick, fontSize: 11 }}
+          tick={{ fill: tick, fontSize: 12 }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
-          tick={{ fill: tick, fontSize: 10 }}
+          tick={{ fill: tick, fontSize: 11 }}
           axisLine={false}
           tickLine={false}
           tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}
@@ -53,6 +53,7 @@ export default function BalanceAreaChart({ data: financeData }) {
           stroke="#a78bfa"
           strokeWidth={2.5}
           fill="url(#balanceGrad)"
+          style={{ filter: 'drop-shadow(0 0 6px #a78bfa)' }}
           dot={{ fill: '#a78bfa', r: 3, strokeWidth: 0 }}
           activeDot={{ r: 5, fill: '#a78bfa' }}
         />

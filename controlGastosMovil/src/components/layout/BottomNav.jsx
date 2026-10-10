@@ -28,7 +28,13 @@ export default function BottomNav({ onTabChange }) {
   }
 
   return (
-    <nav className="bottom-nav">
+    <nav
+      className="bottom-nav"
+      style={{ '--i': Math.max(0, TABS.findIndex(t => t.id === activeTab)), '--tabs': TABS.length }}
+    >
+      <span className="nav-drop" aria-hidden="true">
+        <span key={activeTab} className="nav-drop-blob" />
+      </span>
       {TABS.map(tab => (
         <button
           key={tab.id}

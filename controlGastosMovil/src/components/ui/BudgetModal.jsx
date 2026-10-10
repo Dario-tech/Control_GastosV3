@@ -4,6 +4,7 @@ import { BUDGET_COLORS } from '../../hooks/useBudget'
 import { DEFAULT_CATEGORIES } from '../../data/categories'
 import { useCategories } from '../../hooks/useCategories'
 import { useSettings } from '../../context/SettingsContext'
+import { fmt } from '../../utils'
 
 const TIPOS = [
   { id: 'Gasto Variable', label: 'Variable' },
@@ -62,7 +63,22 @@ export default function BudgetModal({ item, onSave, onClose, onDelete }) {
         <span className="fullscreen-form-title">{isEdit ? 'Editar categoría' : 'Nueva categoría'}</span>
       </div>
 
-      <div className="fullscreen-form-body">
+      <div className="fullscreen-form-body bgm-body">
+        {/* Vista previa en vivo */}
+        <div className="bgm-preview" aria-label="Vista previa del presupuesto">
+          <span className="bgm-preview-tag">Vista previa</span>
+          <div className="bgt-item-top">
+            <div className="bgt-item-left">
+              <span className="bgt-item-emoji">{selectedCat?.emoji || '🎯'}</span>
+              <span className="bgt-item-name">{selectedCat?.concepto || 'Elige una categoría'}</span>
+            </div>
+            <span className="bgt-item-amount">{fmt(parseFloat(limit) || 0)}</span>
+          </div>
+          <div className="bgt-bar-bg">
+            <div className="bgt-bar-fill" style={{ width: '60%', background: color, boxShadow: `0 0 8px ${color}55` }} />
+          </div>
+        </div>
+
         {/* Tipo selector */}
         <div className="bgt-tipo-segmented">
           {TIPOS.map(t => (
@@ -96,7 +112,7 @@ export default function BudgetModal({ item, onSave, onClose, onDelete }) {
         <form onSubmit={handleSubmit} className="modal-form" style={{ marginTop: 16 }}>
           <div className="modal-field">
             <label className="modal-label">Límite mensual</label>
-            <div className="modal-input-wrap">
+            <div className="modal-input-wrap modal-input-wrap--hero">
               <span className="modal-input-prefix">€</span>
               <input
                 className="modal-input"
@@ -108,6 +124,11 @@ export default function BudgetModal({ item, onSave, onClose, onDelete }) {
                 value={limit}
                 onChange={e => setLimit(e.target.value)}
               />
+            </div>
+            <div className="bgm-quick">
+              {[50, 100, 200, 500].map(v => (
+                <button key={v} type="button" className="bgm-quick-chip" onClick={() => setLimit(String(v))}>{fmt(v)}</button>
+              ))}
             </div>
             <span className="modal-field-hint">
               El gasto real se obtiene automáticamente de tus transacciones
@@ -126,9 +147,6 @@ export default function BudgetModal({ item, onSave, onClose, onDelete }) {
                   onClick={() => setColor(c)}
                 />
               ))}
-            </div>
-            <div className="modal-bar-preview">
-              <div className="modal-bar-preview-fill" style={{ background: color, width: '60%' }} />
             </div>
           </div>
 

@@ -39,6 +39,14 @@ export default function DonutChart({ fixed, variable }) {
       <div className="donut-chart-wrap">
         <ResponsiveContainer width="100%" height={190}>
           <PieChart>
+            <defs>
+              {COLORS.map((c, i) => (
+                <linearGradient key={i} id={`donutGrad${i}`} x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%"   stopColor={c} stopOpacity={0.95} />
+                  <stop offset="100%" stopColor={c} stopOpacity={0.55} />
+                </linearGradient>
+              ))}
+            </defs>
             <Pie
               data={data}
               cx="50%"
@@ -51,7 +59,7 @@ export default function DonutChart({ fixed, variable }) {
               label={renderCustomLabel}
             >
               {data.map((_, i) => (
-                <Cell key={i} fill={COLORS[i]} strokeWidth={0} />
+                <Cell key={i} fill={`url(#donutGrad${i})`} stroke={COLORS[i]} strokeOpacity={0.5} strokeWidth={1} style={{ filter: `drop-shadow(0 0 6px ${COLORS[i]})` }} />
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip />} />

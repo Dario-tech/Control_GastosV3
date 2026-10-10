@@ -81,76 +81,95 @@ function EmptyState({ onAdd }) {
   )
 }
 
+/* ── Estados visuales: color + icono + texto ── */
+const STATUS = {
+  ok:   { icon: '✓', label: 'En orden' },
+  warn: { icon: '!', label: 'Cerca del límite' },
+  over: { icon: '✕', label: 'Superado' },
+}
+function statusOf(spent, limit, threshold) {
+  if (limit > 0 && spent > limit) return 'over'
+  if (limit > 0 && (spent / limit) * 100 >= threshold) return 'warn'
+  return 'ok'
+}
+
 /* ── Hero total mensual ── */
-function TotalHero({ totalLimit, totalSpent, daysLeft }) {
-  const pct       = totalLimit > 0 ? Math.min(100, (totalSpent / totalLimit) * 100) : 0
+function TotalHero({ totalLimit, totalSpent, daysLeft, threshold }) {
+  const rawPct    = totalLimit > 0 ? (totalSpent / totalLimit) * 100 : 0
+  const pct       = Math.min(100, rawPct)
   const remaining = totalLimit - totalSpent
   const over      = remaining < 0
+  const st        = statusOf(totalSpent, totalLimit, threshold)
+  const pace      = !over && daysLeft > 0 ? remaining / daysLeft : null
 
   return (
-    <div className="bgt-hero">
+    <div className={`bgt-hero bgt-st-${st}`}>
       <div className="bgt-hero-top">
         <div className="bgt-hero-left">
-          <span className="bgt-hero-title">Total Mensual</span>
+          <span className="bgt-hero-title">Total mensual</span>
+          <span className="bgt-hero-sub tabular">{fmt(totalSpent)} de {fmt(totalLimit)}</span>
         </div>
-        <div className="bgt-hero-right">
-          {daysLeft > 0 && <span className="bgt-days-badge">{daysLeft}d restantes</span>}
-          <span className="bgt-hero-amount">{fmt(totalLimit)}</span>
-        </div>
+        {daysLeft > 0 && <span className="bgt-days-badge">{daysLeft}d restantes</span>}
       </div>
 
-      <div className="bgt-bar-bg">
-        <div
-          className="bgt-bar-fill"
-          style={{ width: `${pct}%`, background: over ? 'var(--red)' : 'var(--text3)' }}
-        />
+      <div className="bgt-hero-main">
+        <span className="bgt-hero-remaining tabular">{fmt(Math.abs(remaining))}</span>
+        <span className="bgt-hero-remaining-label">{over ? 'excedido' : 'restantes'}</span>
+      </div>
+
+      <div className="bgt-bar-bg bgt-bar-bg--lg" role="progressbar" aria-valuemin={0} aria-valuemax={100}
+           aria-valuenow={Math.round(rawPct)} aria-label="Gastado del presupuesto total">
+        <div className="bgt-bar-fill" style={{ width: `${pct}%` }} />
       </div>
 
       <div className="bgt-bar-footer">
-        <span className="bgt-pct-label">Gastado {Math.round(pct)}%</span>
-        <span className={`bgt-rem-label ${over ? 'over' : ''}`}>
-          {over ? `${fmt(-remaining)} excedido` : `${fmt(remaining)} restantes este mes`}
-        </span>
+        <span className="bgt-pct-label">Gastado {Math.round(rawPct)}%</span>
+        <span className="bgt-status-chip"><span aria-hidden="true">{STATUS[st].icon}</span>{STATUS[st].label}</span>
       </div>
+      {pace != null && (
+        <div className="bgt-pace tabular">Ritmo sugerido: {fmt(pace)} al día</div>
+      )}
     </div>
   )
 }
 
 /* ── Ítem de categoría ── */
-function BudgetItem({ item, spent, daysLeft, onEdit }) {
-  const pct       = item.limit > 0 ? Math.min(100, (spent / item.limit) * 100) : 0
+function BudgetItem({ item, spent, threshold, onEdit }) {
+  const rawPct    = item.limit > 0 ? (spent / item.limit) * 100 : 0
+  const pct       = Math.min(100, rawPct)
   const remaining = item.limit - spent
   const over      = remaining < 0
+  const st        = statusOf(spent, item.limit, threshold)
   const color     = item.color || 'var(--accent)'
 
   return (
-    <div className="bgt-item" onClick={onEdit}>
+    <div className={`bgt-item bgt-st-${st}`} onClick={onEdit}>
       <div className="bgt-item-top">
         <div className="bgt-item-left">
           <span className="bgt-item-emoji">{item.emoji}</span>
-          <span className="bgt-item-name">{item.name}</span>
+          <div className="bgt-item-titles">
+            <span className="bgt-item-name">{item.name}</span>
+            <span className="bgt-item-sub tabular">{fmt(spent)} / {fmt(item.limit)}</span>
+          </div>
         </div>
-        <div className="bgt-item-right">
-          {daysLeft > 0 && <span className="bgt-days-badge">{daysLeft}d restantes</span>}
-          <span className="bgt-item-amount">{fmt(item.limit)}</span>
-        </div>
+        <span className="bgt-item-pct tabular">{Math.round(rawPct)}%</span>
       </div>
 
-      <div className="bgt-bar-bg">
+      <div className="bgt-bar-bg" role="progressbar" aria-valuemin={0} aria-valuemax={100}
+           aria-valuenow={Math.round(rawPct)} aria-label={`Gastado en ${item.name}`}>
         <div
           className="bgt-bar-fill"
           style={{
             width: `${pct}%`,
-            background: over ? 'var(--red)' : color,
-            boxShadow: over ? 'none' : `0 0 8px ${color}55`,
+            '--bar-color': over ? 'var(--red)' : color,
           }}
         />
       </div>
 
       <div className="bgt-bar-footer">
-        <span className="bgt-pct-label">Gastado {Math.round(pct)}%</span>
-        <span className={`bgt-rem-label ${over ? 'over' : ''}`}>
-          {over ? `${fmt(-remaining)} excedido` : `${fmt(remaining)} restantes este mes`}
+        <span className="bgt-status-chip"><span aria-hidden="true">{STATUS[st].icon}</span>{STATUS[st].label}</span>
+        <span className="bgt-rem-label tabular">
+          {over ? `Excedido ${fmt(-remaining)}` : `Quedan ${fmt(remaining)}`}
         </span>
       </div>
     </div>
@@ -223,6 +242,9 @@ export default function BudgetTab() {
   }, [data, items, budgetMonth, settings.budgetAlerts, settings.alertThreshold, notifPermission])
 
   const itemsWithSpent = items.map(item => ({ ...item, realSpent: getRealSpent(item.name) }))
+  // Más consumido primero (los superados quedan arriba)
+  const sortedItems    = [...itemsWithSpent].sort((a, b) =>
+    (b.limit > 0 ? b.realSpent / b.limit : 0) - (a.limit > 0 ? a.realSpent / a.limit : 0))
   const totalLimit     = items.reduce((s, i) => s + (i.limit || 0), 0)
   const totalSpent     = itemsWithSpent.reduce((s, i) => s + i.realSpent, 0)
 
@@ -275,15 +297,15 @@ export default function BudgetTab() {
         <EmptyState onAdd={openAdd} />
       ) : (
         <>
-          <TotalHero totalLimit={totalLimit} totalSpent={totalSpent} daysLeft={days} />
+          <TotalHero totalLimit={totalLimit} totalSpent={totalSpent} daysLeft={days} threshold={settings.alertThreshold} />
 
           <div className="bgt-list">
-            {itemsWithSpent.map(item => (
+            {sortedItems.map(item => (
               <BudgetItem
                 key={item.id}
                 item={item}
                 spent={item.realSpent}
-                daysLeft={days}
+                threshold={settings.alertThreshold}
                 onEdit={() => openEdit(item)}
               />
             ))}

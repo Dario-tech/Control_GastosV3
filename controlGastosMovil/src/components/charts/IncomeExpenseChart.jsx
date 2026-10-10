@@ -28,26 +28,36 @@ export default function IncomeExpenseChart({ data: financeData }) {
   return (
     <ResponsiveContainer width="100%" height={210}>
       <BarChart data={data} margin={{ top: 4, right: 4, left: -18, bottom: 0 }} barGap={3}>
+        <defs>
+          <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor={incomeColor} stopOpacity={0.95} />
+            <stop offset="100%" stopColor={incomeColor} stopOpacity={0.35} />
+          </linearGradient>
+          <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor={expenseColor} stopOpacity={0.95} />
+            <stop offset="100%" stopColor={expenseColor} stopOpacity={0.35} />
+          </linearGradient>
+        </defs>
         <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
         <XAxis
           dataKey="monthLabel"
-          tick={{ fill: tick, fontSize: 11 }}
+          tick={{ fill: tick, fontSize: 12 }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
-          tick={{ fill: tick, fontSize: 10 }}
+          tick={{ fill: tick, fontSize: 11 }}
           axisLine={false}
           tickLine={false}
           tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}
         />
         <Tooltip content={<CustomTooltip />} cursor={{ fill: cursor }} />
         <Legend
-          wrapperStyle={{ fontSize: 11, color: tick, paddingTop: 8 }}
+          wrapperStyle={{ fontSize: 12, color: tick, paddingTop: 8 }}
           formatter={(value) => value === 'income' ? 'Ingresos' : 'Gastos'}
         />
-        <Bar dataKey="income"   name="income"   fill={incomeColor}  radius={[4,4,0,0]} maxBarSize={28} />
-        <Bar dataKey="expenses" name="expenses" fill={expenseColor} radius={[4,4,0,0]} maxBarSize={28} />
+        <Bar dataKey="income"   name="income"   fill="url(#incomeGrad)" stroke={incomeColor} strokeOpacity={0.5} radius={[4,4,0,0]} maxBarSize={28} style={{ filter: `drop-shadow(0 0 5px ${incomeColor})` }} />
+        <Bar dataKey="expenses" name="expenses" fill="url(#expenseGrad)" stroke={expenseColor} strokeOpacity={0.5} radius={[4,4,0,0]} maxBarSize={28} style={{ filter: `drop-shadow(0 0 5px ${expenseColor})` }} />
       </BarChart>
     </ResponsiveContainer>
   )

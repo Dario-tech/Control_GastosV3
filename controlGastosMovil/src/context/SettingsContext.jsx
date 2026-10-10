@@ -12,6 +12,30 @@ export const ACCENTS = [
   { id: 'sky',      color: '#0ea5e9', label: 'Cielo'    },
 ]
 
+// Luminancia relativa WCAG de un color #rrggbb
+function luminance(hex) {
+  const n = parseInt(hex.replace('#', '').slice(0, 6), 16)
+  const lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }
+  return 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255)
+}
+
+const ON_ACCENT_DARK  = '#06121f'
+const ON_ACCENT_LIGHT = '#ffffff'
+
+function contrast(l1, l2) {
+  const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1]
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+// Texto sobre el acento: el candidato (blanco o casi negro) con MAYOR ratio real
+export function onAccentColor(hex) {
+  const L = luminance(hex)
+  return contrast(L, luminance(ON_ACCENT_LIGHT)) >= contrast(L, luminance(ON_ACCENT_DARK))
+    ? ON_ACCENT_LIGHT : ON_ACCENT_DARK
+}
+
+export const EXTRA_THEMES = ['ocean', 'sunset', 'forest', 'midnight']
+
 const DEFAULT = {
   theme:          'dark',
   accent:         '#6366f1',
@@ -84,12 +108,14 @@ export function SettingsProvider({ children }) {
   // Apply theme class on <html>
   useEffect(() => {
     const root = document.documentElement
-    root.classList.remove('light', 'pastel')
+    root.classList.remove('light', 'pastel', ...EXTRA_THEMES)
 
     if (settings.theme === 'light') {
       root.classList.add('light')
     } else if (settings.theme === 'pastel') {
       root.classList.add('pastel')
+    } else if (EXTRA_THEMES.includes(settings.theme)) {
+      root.classList.add(settings.theme)
     } else if (settings.theme === 'auto') {
       const mq = window.matchMedia('(prefers-color-scheme: light)')
       const apply = () => mq.matches ? root.classList.add('light') : root.classList.remove('light')
@@ -99,11 +125,23 @@ export function SettingsProvider({ children }) {
     }
   }, [settings.theme])
 
+  // Sincroniza <meta name="theme-color"> con el fondo del tema activo
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (!meta) return
+    const id = requestAnimationFrame(() => {
+      const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()
+      if (bg) meta.setAttribute('content', bg)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [settings.theme])
+
   // Apply accent color as CSS variable
   useEffect(() => {
     const r = document.documentElement
     r.style.setProperty('--accent', settings.accent)
     r.style.setProperty('--accent-dim', settings.accent + '28')
+    r.style.setProperty('--on-accent', onAccentColor(settings.accent))
   }, [settings.accent])
 
   return (

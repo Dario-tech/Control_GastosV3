@@ -57,6 +57,16 @@ function annualProgress(expense) {
   return { pasados, total: expense.meses_reparto.length, pagado, pendiente: Math.round((expense.importe - pagado) * 100) / 100 }
 }
 
+// Estado según el vencimiento: color + icono + texto
+function dueState(exp) {
+  const d = exp.dias_restantes
+  if (d < 0)  return { key: 'overdue', icon: '✕', label: `Vencido hace ${-d} día${d !== -1 ? 's' : ''}` }
+  if (d === 0) return { key: 'soon',   icon: '!', label: 'Vence hoy' }
+  if (exp.aviso_activo || d <= 30)
+              return { key: 'soon',   icon: '!', label: `En ${d} día${d !== 1 ? 's' : ''}` }
+  return        { key: 'far',    icon: '✓', label: `En ${d} días` }
+}
+
 function downloadIcs(expense) {
   const blob = new Blob([buildIcs(expense)], { type: 'text/calendar' })
   const url = URL.createObjectURL(blob)
@@ -186,10 +196,10 @@ function ExpenseFormModal({ expense, onSave, onClose }) {
         </label>
         {avisar && (
           <div className="goal-field-row" style={{ alignItems: 'center' }}>
-            <span style={{ fontSize: '0.82rem', color: 'var(--text2)' }}>Con antelación de</span>
+            <span style={{ fontSize: "var(--fs-sm)", color: 'var(--text2)' }}>Con antelación de</span>
             <input className="setup-input" type="number" min="1" max="90" value={diasAviso}
               onChange={e => setDiasAviso(e.target.value)} style={{ width: 70 }} />
-            <span style={{ fontSize: '0.82rem', color: 'var(--text2)' }}>días</span>
+            <span style={{ fontSize: "var(--fs-sm)", color: 'var(--text2)' }}>días</span>
           </div>
         )}
 
@@ -255,16 +265,23 @@ export default function AnnualExpenses() {
     if (changed) setNotifCache(cache)
   }, [expenses, notifPermission])
 
+  const sorted     = [...expenses].sort((a, b) => a.dias_restantes - b.dias_restantes)
+  const totalAnual = expenses.reduce((t, e) => t + (e.importe || 0), 0)
+
   if (status !== 'error' && expenses.length === 0 && !showForm) {
     return (
       <div className="goals-section" data-tour="annual-expenses">
         <div className="goals-header">
           <span className="goals-title">📅 Gastos fijos anuales</span>
         </div>
-        <p className="goals-empty">
-          IBI, seguro del coche… configúralos una vez y la app te avisa cuando se acercan.
-        </p>
-        <button className="budget-fab" onClick={openCreate}>Añadir gasto fijo</button>
+        <div className="annual-empty">
+          <div className="annual-empty-icon" aria-hidden="true">📅</div>
+          <h3 className="annual-empty-title">Sin gastos fijos anuales</h3>
+          <p className="annual-empty-desc">
+            IBI, seguro del coche… configúralos una vez y la app te avisa cuando se acercan.
+          </p>
+          <button className="annual-primary-btn" onClick={openCreate}>Añadir gasto fijo</button>
+        </div>
         {showForm && <ExpenseFormModal expense={formExpense} onSave={handleSave} onClose={closeForm} />}
       </div>
     )
@@ -274,7 +291,7 @@ export default function AnnualExpenses() {
     <div className="goals-section" data-tour="annual-expenses">
       <div className="goals-header">
         <span className="goals-title">📅 Gastos fijos anuales</span>
-        <button className="goal-share-btn" onClick={openCreate}>+ Añadir</button>
+        <button className="annual-add-btn" onClick={openCreate}>+ Añadir</button>
       </div>
 
       {status === 'error' && <p className="goals-empty">No se pudieron cargar los gastos fijos.</p>}
@@ -287,32 +304,43 @@ export default function AnnualExpenses() {
         </button>
       )}
 
+      {expenses.length > 0 && (
+        <div className="annual-summary">
+          <span className="annual-summary-label">A reservar al mes</span>
+          <span className="annual-summary-main tabular">{fmt(totalAnual / 12)}</span>
+          <span className="annual-summary-sub tabular">
+            Total anual {fmt(totalAnual)} · {expenses.length} gasto{expenses.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
+
       <div className="annual-list">
-        {expenses.map(exp => {
+        {sorted.map(exp => {
           const progress = annualProgress(exp)
+          const due = dueState(exp)
           return (
-          <div key={exp.id} className={`annual-item${exp.aviso_activo ? ' annual-item--soon' : ''}`}>
+          <div key={exp.id} className={`annual-item annual-st-${due.key}`}>
             <div className="annual-item-top" onClick={() => openEdit(exp)}>
+              <span className="annual-item-icon" aria-hidden="true">🧾</span>
               <div className="annual-item-left">
                 <span className="annual-item-name">{exp.nombre}</span>
-                <span className="annual-item-due">
-                  {exp.dias_restantes === 0 ? 'Vence hoy' : `Vence en ${exp.dias_restantes} días`}
-                  {' · '}{exp.dia} de {MONTH_NAMES[exp.mes - 1]}
-                </span>
-                {exp.reparto_mensual != null && (
-                  <span className="annual-item-split">
-                    Aparta {fmt(exp.reparto_mensual)}/mes en {exp.meses_reparto.map(m => MONTH_NAMES[m - 1].slice(0, 3)).join(', ')}
-                  </span>
-                )}
-                {progress && progress.pasados > 0 && (
-                  <span className="annual-item-progress">
-                    Ya contabilizado {fmt(progress.pagado)} de {fmt(exp.importe)}
-                    {progress.pendiente > 0 && ` · quedan ${fmt(progress.pendiente)}`}
-                  </span>
-                )}
+                <span className="annual-item-due">{exp.dia} de {MONTH_NAMES[exp.mes - 1]}</span>
+                <span className="annual-due-chip"><span aria-hidden="true">{due.icon}</span>{due.label}</span>
               </div>
               <span className="annual-item-amount">{fmt(exp.importe)}</span>
             </div>
+            {exp.reparto_mensual != null && (
+              <div className="annual-quota">
+                <div className="annual-quota-dots" aria-hidden="true">
+                  {exp.meses_reparto.map((m, i) => (
+                    <span key={m} className={`annual-quota-dot${progress && i < progress.pasados ? ' done' : ''}`} />
+                  ))}
+                </div>
+                <span className="annual-quota-text tabular">
+                  {progress ? progress.pasados : 0}/{exp.meses_reparto.length} cuotas · {fmt(exp.reparto_mensual)}/mes
+                </span>
+              </div>
+            )}
             <div className="annual-item-actions">
               <button className="annual-item-btn" onClick={() => downloadIcs(exp)}>📅 Recordatorio</button>
               <button className="annual-item-btn danger" onClick={() => handleDelete(exp)}>Eliminar</button>
