@@ -6,6 +6,11 @@ from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from dotenv import load_dotenv
+# Carga backend/.env si existe (no pisa variables ya definidas, así que en Render/Docker no cambia nada).
+# Debe ejecutarse antes de importar los servicios, que leen el entorno al importarse.
+load_dotenv()
+
 from services.prices import get_all_prices
 from services.sheets import (
     get_finance_data, get_raw_transactions, delete_transaction, post_transaction,

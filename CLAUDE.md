@@ -4,11 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Control_GastosV3 ("Mi Economía") is a personal/family expense-tracking app. The repo has three parts, only two of which are deployed:
+Control_GastosV3 ("Mi Economía") is a personal/family expense-tracking app. The repo has two deployed parts:
 
 - `controlGastosMovil/` — the **active** frontend: React 18 + Vite PWA. This is the one you edit for any UI/frontend work.
 - `backend/` — FastAPI + Postgres API that the frontend talks to.
-- `controlGastos/` — a legacy static HTML/CSS/JS version. Not referenced by `vercel.json` or `render.yaml`, not deployed anywhere. Don't extend it; treat as historical reference only.
 
 ## Running everything locally
 
@@ -23,7 +22,7 @@ npm run dev       # Vite dev server
 npm run build     # production build (also runs vite-plugin-pwa)
 npm run preview   # preview a production build
 ```
-No linter or unit test runner is configured. `test-logic.mjs` and `check.mjs` exist in this directory from earlier development but are currently stale: `test-logic.mjs` imports a `DATA` export from `src/data/mockData.js` that is commented out, and `check.mjs` (a Playwright smoke script) targets `[data-tab="..."]` selectors that no longer exist in the markup (components now use `data-tour="tab-..."`). Fix them before relying on them, or verify changes with `npm run build` plus a manual check.
+No linter or unit test runner is configured. `check.mjs` (a Playwright smoke script) exists in this directory from earlier development but is currently stale: it targets `[data-tab="..."]` selectors that no longer exist in the markup (components now use `data-tour="tab-..."`). Fix it before relying on it, or verify changes with `npm run build` plus a manual check.
 
 ### Backend (`backend/`)
 ```
@@ -50,6 +49,6 @@ Requires these env vars at minimum to run against a real database: `DATABASE_URL
 - Domain logic lives in `hooks/` (budgets, savings goals, recurring/subscription detection, annual fixed expenses that can be split across months) and `services/*Api.js` (thin fetch wrappers), kept separate from `components/`.
 - `components/` is organized by role: `auth/`, `layout/` (header, bottom nav, profile panel), `tabs/` (the four screens — Year, Month, Stats, Budget/Planning), `charts/` (recharts wrappers), `ui/` (modals and standalone widgets).
 - **The Investments tab is present in code but not reachable in the UI** — `App.jsx` only mounts `year`/`month`/`stats`/`budget`, and `BottomNav` has no entry for it. `InvestmentsTab.jsx` itself just renders a placeholder. The supporting components/hooks/services (`InvestmentCard`, `useInvestments`, `investmentApi.js`, etc.) and the `/api/investments/prices` backend endpoint are dead code paths, not a hidden feature — don't assume they're exercised by anything.
-- Styling is one file, `src/App.css` (~3300 lines), using CSS custom properties for theming rather than a CSS-in-JS or utility framework. `:root` is the dark theme (default); `html.light` and `html.pastel` override the same variable set for the other two themes. New components should read colors/spacing from these variables, not hardcode values, so all three themes stay in sync.
+- Styling is one file, `src/App.css` (~2900 lines), using CSS custom properties for theming rather than a CSS-in-JS or utility framework. `:root` is the dark theme (default); `html.light` and `html.pastel` override the same variable set for the other two themes. New components should read colors/spacing from these variables, not hardcode values, so all three themes stay in sync.
 - The app shell is fixed-width, mobile-only (`max-width: 430px`, see `.app` in `App.css`) — there's no responsive/desktop layout to preserve.
 - `vite-plugin-pwa` handles the PWA manifest/service worker (config in `vite.config.js`); there's no native app wrapper (Capacitor etc.) in the codebase yet, though it's been discussed as a possible direction.

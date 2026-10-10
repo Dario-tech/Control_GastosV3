@@ -124,11 +124,13 @@ O crea tu propia cuenta con **"Crear cuenta"** para probar el registro de cero.
 
 ## Desarrollo local contra la BD de QA
 
+> ⚠️ Este flujo escribe en la **BD de QA compartida**. Para probar sin riesgo con datos de usar y tirar, usa el entorno Docker de [`LOCAL_SETUP.md`](LOCAL_SETUP.md) (recomendado por defecto).
+
 Base de datos QA (Supabase): host `db.qmqseibceutmczfggelx.supabase.co`, puerto `5432`.
 
 1. `cp backend/.env.example backend/.env` y rellena `DATABASE_URL`
    (`postgresql://postgres:[YOUR-PASSWORD]@db.qmqseibceutmczfggelx.supabase.co:5432/postgres`)
-   y `DB_ENCRYPTION_KEY`. Los ficheros `.env` están en `.gitignore`: la contraseña nunca va al repo ni a los `.md`.
+   `DB_ENCRYPTION_KEY` (la original de QA, la de Render) y `JWT_SECRET`. El backend carga `backend/.env` solo. Los ficheros `.env` están en `.gitignore`: la contraseña nunca va al repo ni a los `.md`.
 2. Si tu red no tiene IPv6 y la conexión directa falla, usa la URI del **Session pooler** (ver paso 1.2).
 3. Backend: `cd backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt && uvicorn main:app --port 8000`
 4. Frontend: `cd controlGastosMovil && echo "VITE_API_URL=http://127.0.0.1:8000" > .env.local && npm run dev`
