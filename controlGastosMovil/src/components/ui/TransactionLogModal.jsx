@@ -10,7 +10,7 @@ const MONTH_NAMES = [
 ]
 const MONTH_SHORT = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
 
-export default function TransactionLogModal({ concept, emoji, monthIndex, onClose }) {
+export default function TransactionLogModal({ concept, emoji, monthIndex, year, onClose }) {
   useLockBodyScroll()
   const { transactions, refresh } = useFinanceData()
   const [deletedRows, setDeletedRows]   = useState(new Set())
@@ -20,7 +20,7 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, onClos
   const [savingComment, setSavingComment] = useState(false)
 
   const rows = transactions
-    .filter(t => t.concepto === concept && t.month === monthIndex && !deletedRows.has(t.rowIndex))
+    .filter(t => t.concepto === concept && t.month === monthIndex && (!year || String(t.fecha).startsWith(String(year))) && !deletedRows.has(t.rowIndex))
     .sort((a, b) => a.fecha.localeCompare(b.fecha))
 
   async function handleDelete(rowIndex) {

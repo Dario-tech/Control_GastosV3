@@ -62,7 +62,7 @@ export default function YearTab() {
           {activeMonths.map(({ index }) => {
             const s = getMonthStats(data, index)
             return (
-              <div key={index} className="mt-row" onClick={() => goToMonth(index)}>
+              <div key={index} className="mt-row" onClick={() => goToMonth(index, data.year)}>
                 <div className="mt-cell">{MONTH_NAMES[index]}</div>
                 <div className="mt-cell positive">{fmt(s.income)}</div>
                 <div className="mt-cell negative">{fmt(s.expenses)}</div>

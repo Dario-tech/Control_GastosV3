@@ -5,6 +5,7 @@ import { DEFAULT_CATEGORIES } from '../../data/categories'
 import { useCategories } from '../../hooks/useCategories'
 import { useSettings } from '../../context/SettingsContext'
 import { fmt } from '../../utils'
+import { FormScreen, Field, Section, AmountInput, Chips, Segmented, TileGrid, PrimaryButton, DangerButton, ConfirmSheet, Icon } from './FormKit'
 
 const TIPOS = [
   { id: 'Gasto Variable', label: 'Variable' },
@@ -19,6 +20,8 @@ function inferTipo(name) {
   return 'Gasto Variable'
 }
 
+const QUICK_LIMITS = [50, 100, 200, 500].map(v => ({ key: v, label: fmt(v), value: v }))
+
 export default function BudgetModal({ item, onSave, onClose, onDelete }) {
   useLockBodyScroll()
   const isEdit = !!item
@@ -31,137 +34,147 @@ export default function BudgetModal({ item, onSave, onClose, onDelete }) {
   )
   const [limit, setLimit] = useState(item?.limit != null ? item.limit.toString() : '')
   const [color, setColor] = useState(item?.color || BUDGET_COLORS[0])
+  const [touched, setTouched] = useState(false)
+  const [saving, setSaving]   = useState(false)
+  const [error, setError]     = useState('')
+  const [confirmDel, setConfirmDel] = useState(false)
 
   const allCats = [...filteredCategories[tipo], ...(customCategories[tipo] || [])]
-  const canSave = selectedCat && limit && parseFloat(limit) > 0
+  const limitNum = parseFloat(String(limit).replace(',', '.'))
+  const limitOk  = limitNum > 0
+  const canSave = !!selectedCat && limitOk && !saving
+
+  const now = new Date()
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
 
   function handleTipoChange(t) {
     setTipo(t)
     setSelectedCat(null)
   }
 
-  function handleSubmit(e) {
-    e.preventDefault()
+  async function handleSubmit() {
     if (!canSave) return
-    onSave({
-      emoji: selectedCat.emoji,
-      name:  selectedCat.concepto,
-      limit: parseFloat(limit) || 0,
-      color,
-      tipo,
-    })
+    setSaving(true)
+    setError('')
+    try {
+      await onSave({
+        emoji: selectedCat.emoji,
+        name:  selectedCat.concepto,
+        limit: limitNum || 0,
+        color,
+        tipo,
+      })
+    } catch (e) {
+      setError(e?.message || 'No se pudo guardar')
+      setSaving(false)
+    }
   }
 
+  const missing = !selectedCat ? 'Elige una categoría para continuar' : 'Indica un límite mensual mayor que 0'
+
   return (
-    <div className="fullscreen-form-screen">
-      <div className="fullscreen-form-topbar">
-        <button className="profile-back-btn" onClick={onClose} aria-label="Cerrar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <path d="M15 18l-6-6 6-6"/>
-          </svg>
-        </button>
-        <span className="fullscreen-form-title">{isEdit ? 'Editar categoría' : 'Nueva categoría'}</span>
+    <FormScreen
+      title={isEdit ? 'Editar presupuesto' : 'Nuevo presupuesto'}
+      subtitle="Fija cuánto quieres gastar al mes en una categoría."
+      onClose={onClose}
+      error={error}
+      footer={
+        <PrimaryButton loading={saving} disabled={!canSave} hint={missing} onClick={handleSubmit}>
+          {isEdit ? 'Guardar cambios' : 'Crear presupuesto'}
+        </PrimaryButton>
+      }
+    >
+      {/* Vista previa en vivo */}
+      <div className="fm-preview" aria-label="Vista previa del presupuesto">
+        <span className="fm-preview-tag">Vista previa</span>
+        <div className="fm-preview-row">
+          <span className="fm-preview-tile">{selectedCat?.emoji || '🎯'}</span>
+          <div className="fm-preview-main">
+            <span className={`fm-preview-name${selectedCat ? '' : ' muted'}`}>{selectedCat?.concepto || 'Elige una categoría'}</span>
+            <span className="fm-preview-sub">{tipo === 'Gasto Fijo' ? 'Gasto fijo' : 'Gasto variable'} · al mes</span>
+          </div>
+          <span className="fm-preview-amount tabular">{fmt(limitOk ? limitNum : 0)}</span>
+        </div>
+        <div className="fm-preview-bar"><div className="fm-preview-bar-fill" style={{ width: '60%', background: color, boxShadow: `0 0 10px ${color}66` }} /></div>
+        <span className="fm-preview-foot tabular">
+          {limitOk ? `≈ ${fmt(limitNum / daysInMonth)} al día` : 'Verás cuánto puedes gastar al día'}
+        </span>
       </div>
 
-      <div className="fullscreen-form-body bgm-body">
-        {/* Vista previa en vivo */}
-        <div className="bgm-preview" aria-label="Vista previa del presupuesto">
-          <span className="bgm-preview-tag">Vista previa</span>
-          <div className="bgt-item-top">
-            <div className="bgt-item-left">
-              <span className="bgt-item-emoji">{selectedCat?.emoji || '🎯'}</span>
-              <span className="bgt-item-name">{selectedCat?.concepto || 'Elige una categoría'}</span>
-            </div>
-            <span className="bgt-item-amount">{fmt(parseFloat(limit) || 0)}</span>
-          </div>
-          <div className="bgt-bar-bg">
-            <div className="bgt-bar-fill" style={{ width: '60%', background: color, boxShadow: `0 0 8px ${color}55` }} />
-          </div>
-        </div>
+      <Section title="Tipo de gasto">
+        <Segmented
+          label="Tipo de gasto"
+          value={tipo}
+          onChange={handleTipoChange}
+          options={TIPOS}
+        />
+      </Section>
 
-        {/* Tipo selector */}
-        <div className="bgt-tipo-segmented">
-          {TIPOS.map(t => (
+      <Section title="Categoría">
+        {allCats.length === 0 ? (
+          <p className="fm-hint">No hay categorías de este tipo.</p>
+        ) : (
+          <TileGrid
+            label="Categoría"
+            columns={3}
+            items={allCats.map(c => ({ key: c.concepto, icon: c.emoji, label: c.concepto, cat: c }))}
+            isSelected={it => selectedCat?.concepto === it.cat.concepto}
+            onSelect={it => setSelectedCat(it.cat)}
+          />
+        )}
+      </Section>
+
+      <Field
+        label="Límite mensual"
+        hint="El gasto real se obtiene automáticamente de tus transacciones."
+        error={touched && !limitOk ? 'Introduce un importe mayor que 0.' : ''}
+      >
+        {({ id, describedBy, invalid }) => (
+          <>
+            <AmountInput id={id} describedBy={describedBy} invalid={invalid} value={limit}
+              onChange={setLimit} onBlur={() => setTouched(true)} />
+            <Chips
+              label="Importes rápidos"
+              options={QUICK_LIMITS}
+              isActive={o => limitNum === o.value}
+              onPick={o => { setLimit(String(o.value)); setTouched(true) }}
+            />
+          </>
+        )}
+      </Field>
+
+      <Section title="Color de la barra">
+        <div className="fm-swatches" role="radiogroup" aria-label="Color de la barra">
+          {BUDGET_COLORS.map((c, i) => (
             <button
-              key={t.id}
+              key={c}
               type="button"
-              className={`bgt-tipo-btn${tipo === t.id ? ' active' : ''}`}
-              onClick={() => handleTipoChange(t.id)}
+              role="radio"
+              aria-checked={color === c}
+              aria-label={`Color ${i + 1}`}
+              className={`fm-swatch${color === c ? ' selected' : ''}`}
+              onClick={() => setColor(c)}
             >
-              {t.label}
+              <span className="fm-swatch-dot" style={{ background: c }}>
+                {color === c && <Icon name="check" size={16} />}
+              </span>
             </button>
           ))}
         </div>
+      </Section>
 
-        {/* Category grid */}
-        <div className="modal-label" style={{ marginBottom: 10 }}>Categoría</div>
-        <div className="catmodal-grid bgt-cat-grid">
-          {allCats.map(c => (
-            <button
-              key={c.concepto}
-              type="button"
-              className={`catmodal-cat-card${selectedCat?.concepto === c.concepto ? ' selected' : ''}`}
-              onClick={() => setSelectedCat(c)}
-            >
-              <span className="catmodal-cat-emoji">{c.emoji}</span>
-              <span className="catmodal-cat-label">{c.concepto}</span>
-            </button>
-          ))}
-        </div>
+      {onDelete && (
+        <DangerButton onClick={() => setConfirmDel(true)}>Eliminar presupuesto</DangerButton>
+      )}
 
-        <form onSubmit={handleSubmit} className="modal-form" style={{ marginTop: 16 }}>
-          <div className="modal-field">
-            <label className="modal-label">Límite mensual</label>
-            <div className="modal-input-wrap modal-input-wrap--hero">
-              <span className="modal-input-prefix">€</span>
-              <input
-                className="modal-input"
-                type="number"
-                inputMode="decimal"
-                placeholder="0"
-                min="0"
-                step="0.01"
-                value={limit}
-                onChange={e => setLimit(e.target.value)}
-              />
-            </div>
-            <div className="bgm-quick">
-              {[50, 100, 200, 500].map(v => (
-                <button key={v} type="button" className="bgm-quick-chip" onClick={() => setLimit(String(v))}>{fmt(v)}</button>
-              ))}
-            </div>
-            <span className="modal-field-hint">
-              El gasto real se obtiene automáticamente de tus transacciones
-            </span>
-          </div>
-
-          <div className="modal-field">
-            <label className="modal-label">Color de la barra</label>
-            <div className="modal-color-row">
-              {BUDGET_COLORS.map(c => (
-                <button
-                  key={c}
-                  type="button"
-                  className={`modal-color-dot${color === c ? ' active' : ''}`}
-                  style={{ background: c }}
-                  onClick={() => setColor(c)}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="modal-actions">
-            {onDelete && (
-              <button type="button" className="modal-delete-btn" onClick={onDelete}>
-                Eliminar
-              </button>
-            )}
-            <button type="submit" className="modal-save-btn" disabled={!canSave}>
-              {isEdit ? 'Guardar' : 'Añadir'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      {confirmDel && (
+        <ConfirmSheet
+          title="¿Eliminar este presupuesto?"
+          message={`Se quitará "${item?.name}" de tu planificación. Tus transacciones no se tocan.`}
+          onCancel={() => setConfirmDel(false)}
+          onConfirm={() => onDelete()}
+        />
+      )}
+    </FormScreen>
   )
 }

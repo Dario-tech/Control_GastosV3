@@ -4,15 +4,25 @@ import ConceptList from '../ui/ConceptList'
 import DonutChart from '../charts/DonutChart'
 import TransactionLogModal from '../ui/TransactionLogModal'
 import DayHeatmap from '../ui/DayHeatmap'
+import CalendarView from '../ui/CalendarView'
+import MonthYearSheet from '../ui/MonthYearSheet'
 import { useApp } from '../../context/AppContext'
-import { getMonthStats, getActiveMonths, mergeAnnualSplits, fmt } from '../../utils'
+import { getMonthStats, mergeAnnualSplits, filterDataByYear, getTransactionYears, fmt } from '../../utils'
 import { MONTH_NAMES } from '../../data/mockData'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
 
 export default function MonthTab() {
-  const { selectedMonth, setSelectedMonth } = useApp()
-  const { data: rawData } = useFinanceData()
+  const { selectedMonth, setSelectedMonth, selectedYear, setSelectedYear } = useApp()
+  const { data: finance } = useFinanceData()
+  const [pickerOpen, setPickerOpen] = useState(false)
+  // El backend agrega por índice de mes (sin año): el año elegido se resuelve
+  // aquí filtrando `transactions` (ver filterDataByYear).
+  const rawData = filterDataByYear(finance, selectedYear)
+  const txYears = getTransactionYears(finance)
+  const nowY = new Date().getFullYear()
+  const minYear = Math.min(nowY, selectedYear, ...(txYears.length ? txYears : [nowY]))
+  const maxYear = Math.max(nowY + 1, selectedYear)
   const { expenses: annualExpenses } = useAnnualExpenses()
   // Los repartos de gastos fijos anuales cuentan como gasto fijo del mes que
   // les toca — se fusionan aquí una vez y de ahí para abajo todo (saldo,
@@ -26,24 +36,24 @@ export default function MonthTab() {
   // Meses navegables: los que tienen transacciones reales o algún reparto de
   // gasto fijo anual (mergeAnnualSplits ya marca esos meses como activos),
   // más el mes seleccionado por si acaba de dejar de tener reparto.
-  const activeIndexSet = new Set(getActiveMonths(data).map(m => m.index))
-  activeIndexSet.add(selectedMonth)
-  const active = [...activeIndexSet].sort((a, b) => a - b).map(index => ({ active: true, index }))
 
   function toggleHeatmap() {
     const next = !heatmapOpen
     setHeatmapOpen(next)
     try { localStorage.setItem('mi-economia-cal-open', JSON.stringify(next)) } catch {}
   }
-  const currentIdx = active.findIndex(m => m.index === selectedMonth)
   const stats = getMonthStats(data, selectedMonth)
 
-  function prev() {
-    if (currentIdx > 0) setSelectedMonth(active[currentIdx - 1].index)
+  // Las flechas avanzan de mes en mes y cruzan de año (dic ↔ ene).
+  const canPrev = !(selectedYear <= minYear && selectedMonth === 0)
+  const canNext = !(selectedYear >= maxYear && selectedMonth === 11)
+  function step(delta) {
+    const n = selectedMonth + delta
+    setSelectedYear(selectedYear + Math.floor(n / 12))
+    setSelectedMonth(((n % 12) + 12) % 12)
   }
-  function next() {
-    if (currentIdx < active.length - 1) setSelectedMonth(active[currentIdx + 1].index)
-  }
+  function pickMonth(m, y) { setSelectedMonth(m); setSelectedYear(y) }
+  const hasData = (y, m) => !!filterDataByYear(finance, y).activeMonths?.[m]
 
   const balPos = stats.balance >= 0
   // Mes real en curso y todavía sin ingresos: el saldo en rojo desde el día 2
@@ -51,7 +61,7 @@ export default function MonthTab() {
   // se lo aclaramos en vez de dejar que parezca un cierre de mes real.
   const now = new Date()
   const isIncompleteCurrentMonth =
-    data.year === now.getFullYear() && selectedMonth === now.getMonth() && stats.income === 0
+    selectedYear === now.getFullYear() && selectedMonth === now.getMonth() && stats.income === 0
 
   function handleSelectConcept(item) {
     if (!item.isAnnualSplit) setSelectedConcept(item)
@@ -63,9 +73,12 @@ export default function MonthTab() {
       {/* Hero card */}
       <div className="hero-card">
         <div className="hero-month-nav">
-          <button className="hero-month-arrow" onClick={prev} disabled={currentIdx <= 0}>&#8249;</button>
-          <span className="hero-month-label">{MONTH_NAMES[selectedMonth]}</span>
-          <button className="hero-month-arrow" onClick={next} disabled={currentIdx >= active.length - 1}>&#8250;</button>
+          <button className="hero-month-arrow" onClick={() => step(-1)} disabled={!canPrev} aria-label="Mes anterior">&#8249;</button>
+          <button className="hero-month-label hero-month-pick" onClick={() => setPickerOpen(true)} aria-haspopup="dialog" aria-label={`${MONTH_NAMES[selectedMonth]} ${selectedYear}, elegir mes y año`}>
+            {MONTH_NAMES[selectedMonth]} {selectedYear}
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
+          </button>
+          <button className="hero-month-arrow" onClick={() => step(1)} disabled={!canNext} aria-label="Mes siguiente">&#8250;</button>
         </div>
 
         <div className="hero-balance">
@@ -106,7 +119,7 @@ export default function MonthTab() {
           <span className={`card-collapse-arrow${heatmapOpen ? ' open' : ''}`}>›</span>
         </button>
         {heatmapOpen && (
-          <DayHeatmap monthIndex={selectedMonth} year={data.year || new Date().getFullYear()} />
+          <CalendarView monthIndex={selectedMonth} year={selectedYear} annualExpenses={annualExpenses} />
         )}
       </div>
 
@@ -121,11 +134,22 @@ export default function MonthTab() {
         <ConceptList items={data.variableExpenses} monthIndex={selectedMonth} colorClass="expense-amt" onSelect={setSelectedConcept} />
       </Card>
 
+      {pickerOpen && (
+        <MonthYearSheet
+          year={selectedYear} month={selectedMonth}
+          minYear={minYear} maxYear={maxYear}
+          hasData={hasData}
+          onSelect={pickMonth}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+
       {selectedConcept && (
         <TransactionLogModal
           concept={selectedConcept.concept}
           emoji={selectedConcept.emoji}
           monthIndex={selectedMonth}
+          year={selectedYear}
           onClose={() => setSelectedConcept(null)}
         />
       )}

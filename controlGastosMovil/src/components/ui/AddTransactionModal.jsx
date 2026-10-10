@@ -3,7 +3,9 @@ import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
 import { postTransaction, suggestEmoji } from '../../services/api'
 import { TYPES, EMOJI_SUGGESTIONS } from '../../data/categories'
-import { isUnusualAmount } from '../../utils'
+import { isUnusualAmount, fmt } from '../../utils'
+import { FormScreen, Field, Section, AmountInput, Chips, PrimaryButton, Icon } from './FormKit'
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import { useCategories } from '../../hooks/useCategories'
 
 function today() {
@@ -11,7 +13,10 @@ function today() {
 }
 
 export default function AddTransactionModal({ onClose }) {
+  useLockBodyScroll()
   const [step, setStep]         = useState(1)
+  const [selected, setSelected] = useState(null)
+  const [showDate, setShowDate] = useState(false)
   const [tipo, setTipo]         = useState(null)
   const [importe, setImporte]   = useState('')
   const [fecha, setFecha]       = useState(today())
@@ -76,157 +81,147 @@ export default function AddTransactionModal({ onClose }) {
   }
 
   const allCats = tipo ? [...DEFAULT_CATEGORIES[tipo], ...(customCategories[tipo] || [])] : []
+  const amtNum = parseFloat(String(importe).replace(',', '.'))
+  const amtOk  = amtNum > 0
+  const hoy    = today()
+  const ayer   = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  const dateMode = fecha === hoy ? 'hoy' : fecha === ayer ? 'ayer' : 'otra'
+  const unusualSel = selected && amtOk ? isUnusualAmount(data, selected, amtNum) : null
+  const tipoMeta = TYPES.find(t => t.id === tipo)
+  const canSave = !!selected && amtOk && !loading
+  const missing = !amtOk ? 'Escribe un importe para continuar' : 'Elige una categoría para continuar'
+
+  function goBack() { setStep(1); setShowNewCat(false); setSelected(null); setError(null) }
 
   return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-sheet add-tx-sheet">
-        <div className="modal-handle" />
-
-        <div className="add-tx-header">
-          <span className="add-tx-title">
-            {step === 1 ? 'Nuevo movimiento' : tipo}
-          </span>
-          <button className="modal-close-btn" onClick={onClose} aria-label="Cerrar">✕</button>
+    <FormScreen
+      title={step === 1 ? 'Nuevo movimiento' : tipo}
+      subtitle={step === 1 ? '¿Qué quieres registrar?' : 'Importe, fecha y categoría.'}
+      onClose={step === 1 ? onClose : goBack}
+      headerRight={step === 2 && (
+        <button type="button" className="fm-icon-btn" onClick={onClose} aria-label="Cerrar">
+          <Icon name="close" />
+        </button>
+      )}
+      footer={step === 2 ? (
+        <>
+          {error && <p className="fm-error fm-footer-error" role="alert"><Icon name="alert" size={15} />{error}</p>}
+          <PrimaryButton loading={loading} disabled={!canSave} hint={missing} onClick={() => handleSubmit(selected)}>
+            {amtOk ? `Guardar ${fmt(amtNum, Number.isInteger(amtNum) ? 0 : 2)}` : 'Guardar movimiento'}
+          </PrimaryButton>
+        </>
+      ) : null}
+    >
+      {step === 1 && (
+        <div className="fm-types">
+          {TYPES.map(t => (
+            <button key={t.id} type="button" className="fm-type" onClick={() => handleType(t.id)} style={{ '--tc': t.color }}>
+              <span className="fm-type-emoji" aria-hidden="true">{t.emoji}</span>
+              <span className="fm-type-label">{t.label}</span>
+              <span className="fm-type-go" aria-hidden="true"><Icon name="back" size={18} /></span>
+            </button>
+          ))}
         </div>
+      )}
 
-        {step === 1 && (
-          <div className="catmodal-types" style={{ marginTop: 8 }}>
-            {TYPES.map(t => (
-              <button key={t.id} className="catmodal-type-card"
-                onClick={() => handleType(t.id)} style={{ '--card-color': t.color }}>
-                <span className="catmodal-type-emoji">{t.emoji}</span>
-                <span className="catmodal-type-label">{t.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
+      {step === 2 && (
+        <>
+          <Field label="Importe" error={error && !amtOk ? error : ''}>
+            {({ id, describedBy, invalid }) => (
+              <AmountInput id={id} describedBy={describedBy} invalid={invalid} value={importe} autoFocus
+                placeholder="0,00" onChange={v => { setImporte(v); setError(null) }} />
+            )}
+          </Field>
 
-        {step === 2 && (
-          <>
-            {/* Importe + fecha */}
-            <div className="add-tx-fields">
-              <div className="add-tx-field-row">
-                <div className="modal-field" style={{ flex: 1 }}>
-                  <label className="modal-label">Importe (€)</label>
-                  <div className="modal-input-wrap">
-                    <span className="modal-input-prefix">€</span>
-                    <input
-                      className="modal-input"
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="0.01"
-                      placeholder="0,00"
-                      value={importe}
-                      onChange={e => { setImporte(e.target.value); setError(null) }}
-                      autoFocus
-                    />
-                  </div>
-                </div>
-                <div className="modal-field">
-                  <label className="modal-label">Fecha</label>
-                  <div className="modal-input-wrap">
-                    <input
-                      className="modal-input"
-                      type="date"
-                      value={fecha}
-                      max={today()}
-                      onChange={e => setFecha(e.target.value)}
-                      style={{ minWidth: 130 }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="modal-field">
-                <label className="modal-label">Comentario (opcional)</label>
-                <input
-                  className="modal-input"
-                  type="text"
-                  placeholder="Añade una nota…"
-                  value={comentario}
-                  onChange={e => setComentario(e.target.value)}
-                  maxLength={200}
+          <Field label="Fecha">
+            {({ id }) => (
+              <>
+                <Chips
+                  label="Fecha del movimiento"
+                  align="start"
+                  options={[{ key: 'hoy', label: 'Hoy' }, { key: 'ayer', label: 'Ayer' }, { key: 'otra', label: 'Otra fecha' }]}
+                  isActive={o => dateMode === o.key}
+                  onPick={o => {
+                    if (o.key === 'hoy') { setFecha(hoy); setShowDate(false) }
+                    else if (o.key === 'ayer') { setFecha(ayer); setShowDate(false) }
+                    else setShowDate(true)
+                  }}
                 />
-              </div>
-            </div>
+                {(showDate || dateMode === 'otra') && (
+                  <input id={id} className="fm-input" type="date" value={fecha} max={hoy}
+                    onChange={e => setFecha(e.target.value || hoy)} />
+                )}
+              </>
+            )}
+          </Field>
 
-            {/* Category grid */}
-            <p className="modal-label" style={{ marginBottom: 10, marginTop: 4 }}>Categoría</p>
-            <div className="catmodal-grid">
+          <Field label="Comentario" optional>
+            {({ id }) => (
+              <input id={id} className="fm-input" type="text" placeholder="Añade una nota…" value={comentario}
+                onChange={e => setComentario(e.target.value)} maxLength={200} autoComplete="off" />
+            )}
+          </Field>
+
+          <Section title="Categoría">
+            <div className="fm-grid fm-grid--3" role="radiogroup" aria-label="Categoría">
               {allCats.map(c => {
-                const amt = parseFloat(String(importe).replace(',', '.'))
-                const unusual = amt > 0 ? isUnusualAmount(data, c.concepto, amt) : null
+                const unusual = amtOk ? isUnusualAmount(data, c.concepto, amtNum) : null
+                const sel = selected === c.concepto
                 return (
-                  <button key={c.concepto} className={`catmodal-cat-card${unusual ? ' unusual' : ''}`}
+                  <button key={c.concepto} type="button" role="radio" aria-checked={sel}
+                    className={`fm-tile${sel ? ' selected' : ''}`}
                     disabled={loading}
-                    onClick={() => handleSubmit(c.concepto)}
-                    title={unusual ? `${unusual.ratio}× tu gasto medio en ${c.concepto}` : undefined}>
-                    {unusual && <span className="catmodal-cat-warn">⚠️</span>}
-                    <span className="catmodal-cat-emoji">{c.emoji}</span>
-                    <span className="catmodal-cat-label">{c.concepto}</span>
+                    onClick={() => { setSelected(c.concepto); setShowNewCat(false); setError(null) }}>
+                    {unusual && <span className="fm-tile-warn" aria-label="Importe inusual">⚠️</span>}
+                    <span className="fm-tile-icon">{c.emoji}</span>
+                    <span className="fm-tile-label">{c.concepto}</span>
+                    {sel && <span className="fm-tile-check"><Icon name="check" size={13} /></span>}
                   </button>
                 )
               })}
-
-              {/* + Nueva categoría */}
               {!showNewCat && (
-                <button className="catmodal-cat-card cat-new-card"
-                  onClick={() => setShowNewCat(true)}>
-                  <span className="catmodal-cat-emoji">＋</span>
-                  <span className="catmodal-cat-label">Nueva</span>
+                <button type="button" className="fm-tile fm-tile--new" onClick={() => setShowNewCat(true)}>
+                  <span className="fm-tile-icon">＋</span>
+                  <span className="fm-tile-label">Nueva</span>
                 </button>
               )}
             </div>
+            {unusualSel && (
+              <p className="fm-warn"><span aria-hidden="true">⚠️</span>{unusualSel.ratio}× tu gasto medio en {selected}</p>
+            )}
+          </Section>
 
-            {/* Inline new-category form */}
-            {showNewCat && (
-              <div className="cat-inline-form">
-                <div className="cat-emoji-scroll">
-                  {EMOJI_SUGGESTIONS.map(e => (
-                    <button key={e} className={`cat-emoji-btn${newEmoji === e ? ' active' : ''}`}
-                      onClick={() => setNewEmoji(e)}>{e}</button>
-                  ))}
-                </div>
-                <div className="cat-add-input-row">
-                  <span className="cat-selected-emoji">{newEmoji}</span>
-                  <input
-                    className="cat-name-input"
-                    placeholder="Nombre de la categoría"
-                    value={newName}
-                    onChange={e => { setNewName(e.target.value); setNewCatErr('') }}
-                    onKeyDown={e => e.key === 'Enter' && handleAddNewCat()}
-                    maxLength={32}
-                    autoFocus
-                  />
-                  <button
-                    className="cat-suggest-btn"
-                    onClick={handleSuggestEmoji}
-                    disabled={!newName.trim() || suggesting}
-                    title="Sugerir emoji con IA"
-                  >
-                    {suggesting ? '…' : '✨'}
-                  </button>
-                  <button className="cat-add-btn" onClick={handleAddNewCat}>Añadir</button>
-                </div>
-                {newCatErr && <p className="cat-err">{newCatErr}</p>}
-                <button className="catmodal-back" style={{ marginTop: 6 }}
-                  onClick={() => { setShowNewCat(false); setNewName(''); setNewCatErr('') }}>
-                  Cancelar
+          {showNewCat && (
+            <div className="fm-card fm-newcat">
+              <span className="fm-label">Nueva categoría</span>
+              <div className="fm-emoji-scroll" role="radiogroup" aria-label="Emoji">
+                {EMOJI_SUGGESTIONS.map(e => (
+                  <button key={e} type="button" role="radio" aria-checked={newEmoji === e}
+                    className={`fm-emoji${newEmoji === e ? ' selected' : ''}`} onClick={() => setNewEmoji(e)}>{e}</button>
+                ))}
+              </div>
+              <div className="fm-newcat-row">
+                <span className="fm-newcat-emoji" aria-hidden="true">{newEmoji}</span>
+                <input className="fm-input" placeholder="Nombre de la categoría" value={newName} maxLength={32}
+                  aria-invalid={!!newCatErr || undefined} aria-label="Nombre de la categoría"
+                  onChange={e => { setNewName(e.target.value); setNewCatErr('') }}
+                  onKeyDown={e => e.key === 'Enter' && handleAddNewCat()} autoFocus />
+                <button type="button" className="fm-icon-btn" onClick={handleSuggestEmoji}
+                  disabled={!newName.trim() || suggesting} aria-label="Sugerir emoji con IA" title="Sugerir emoji con IA">
+                  {suggesting ? <span className="fm-spinner" aria-hidden="true" /> : '✨'}
                 </button>
               </div>
-            )}
-
-            {error && <p className="catmodal-error" style={{ marginTop: 12 }}>{error}</p>}
-
-            <div className="catmodal-footer" style={{ marginTop: 16 }}>
-              <button className="catmodal-back" onClick={() => { setStep(1); setShowNewCat(false) }}>
-                ← Cambiar tipo
-              </button>
+              {newCatErr && <p className="fm-error" role="alert"><Icon name="alert" size={15} />{newCatErr}</p>}
+              <div className="fm-sheet-actions">
+                <button type="button" className="fm-secondary" onClick={() => { setShowNewCat(false); setNewName(''); setNewCatErr('') }}>Cancelar</button>
+                <button type="button" className="fm-confirm" onClick={handleAddNewCat} disabled={loading}>
+                  <span>Añadir y guardar</span>
+                </button>
+              </div>
             </div>
-          </>
-        )}
-      </div>
-    </div>
+          )}
+        </>
+      )}
+    </FormScreen>
   )
 }

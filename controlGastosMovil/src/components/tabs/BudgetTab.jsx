@@ -4,6 +4,7 @@ import { useFinanceData } from '../../context/FinanceDataContext'
 import { useApp } from '../../context/AppContext'
 import { useSettings } from '../../context/SettingsContext'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
+import MonthYearSheet from '../ui/MonthYearSheet'
 import BudgetModal from '../ui/BudgetModal'
 import SavingsGoals from '../ui/SavingsGoals'
 import AnnualExpenses from '../ui/AnnualExpenses'
@@ -28,40 +29,6 @@ function daysLeftInMonth(monthIndex) {
   if (now.getMonth() !== monthIndex) return 0
   const lastDay = new Date(now.getFullYear(), monthIndex + 1, 0).getDate()
   return lastDay - now.getDate()
-}
-
-/* ── Month picker sheet ── */
-function MonthPickerSheet({ selected, activeMonths, onSelect, onClose }) {
-  useLockBodyScroll()
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-sheet bgt-month-sheet" onClick={e => e.stopPropagation()}>
-        <div className="modal-drag-handle" />
-        <div className="bgt-month-picker-title">Seleccionar mes</div>
-        <div className="bgt-month-grid">
-          {MONTH_NAMES.map((name, i) => (
-            <button
-              key={i}
-              className={[
-                'bgt-month-option',
-                i === selected       ? 'active'   : '',
-                activeMonths?.[i]    ? 'has-data' : '',
-              ].join(' ').trim()}
-              onClick={() => { onSelect(i); onClose() }}
-            >
-              <span className="bgt-month-option-name">{name}</span>
-              {activeMonths?.[i] && <span className="bgt-month-dot" />}
-              {i === selected    && (
-                <svg className="bgt-month-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M3 8l3.5 3.5L13 5"/>
-                </svg>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
 }
 
 /* ── Estado vacío ── */
@@ -329,10 +296,15 @@ export default function BudgetTab() {
 
       {/* Month picker */}
       {showMonthPicker && (
-        <MonthPickerSheet
-          selected={budgetMonth}
-          activeMonths={data.activeMonths}
-          onSelect={setBudgetMonth}
+        <MonthYearSheet
+          hideYear
+          title="Mes del presupuesto"
+          year={new Date().getFullYear()}
+          month={budgetMonth}
+          minYear={new Date().getFullYear()}
+          maxYear={new Date().getFullYear()}
+          hasData={(y, m) => !!data.activeMonths?.[m]}
+          onSelect={m => setBudgetMonth(m)}
           onClose={() => setShowMonthPicker(false)}
         />
       )}

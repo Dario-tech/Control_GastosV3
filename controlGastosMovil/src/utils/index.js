@@ -170,3 +170,43 @@ export function getTopExpenses(data, limit = 6) {
     .sort((a, b) => b.total - a.total)
     .slice(0, limit)
 }
+
+// Años presentes en las transacciones (el backend agrega por índice de mes sin
+// distinguir año, así que el año se resuelve aquí a partir de `transactions`).
+export function getTransactionYears(data) {
+  const ys = new Set()
+  ;(data?.transactions || []).forEach(t => {
+    const y = parseInt(String(t.fecha || '').slice(0, 4), 10)
+    if (!isNaN(y)) ys.add(y)
+  })
+  return [...ys].sort((a, b) => a - b)
+}
+
+// Devuelve los datos de un año concreto reconstruidos desde `transactions`.
+// Si todas las transacciones son de un único año (caso actual) y es el pedido,
+// devuelve `data` tal cual — sin ningún cambio de comportamiento.
+export function filterDataByYear(data, year) {
+  const years = getTransactionYears(data)
+  if (years.length === 0) return { ...data, year }
+  if (years.length === 1 && years[0] === year) return data
+  const emojis = {}
+  ;['income', 'fixedExpenses', 'variableExpenses'].forEach(k =>
+    (data[k] || []).forEach(e => { emojis[e.concept] = e.emoji }))
+  const txs = data.transactions.filter(t => parseInt(String(t.fecha).slice(0, 4), 10) === year)
+  const out = { ...data, year, activeMonths: Array(12).fill(false), income: [], fixedExpenses: [], variableExpenses: [], transactions: txs }
+  const byConcept = {}
+  txs.forEach(t => {
+    const m = t.month
+    if (m == null || m < 0 || m > 11) return
+    const key = `${t.bucket}|${t.concepto}`
+    if (!byConcept[key]) {
+      byConcept[key] = { bucket: t.bucket, entry: { concept: t.concepto, emoji: emojis[t.concepto] || '💶', amounts: Array(12).fill(0) } }
+    }
+    byConcept[key].entry.amounts[m] += t.importe
+    out.activeMonths[m] = true
+  })
+  Object.values(byConcept).forEach(({ bucket, entry }) => { if (out[bucket]) out[bucket].push(entry) })
+  ;['income', 'fixedExpenses', 'variableExpenses'].forEach(k =>
+    out[k].sort((a, b) => b.amounts.reduce((s, v) => s + v, 0) - a.amounts.reduce((s, v) => s + v, 0)))
+  return out
+}
