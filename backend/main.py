@@ -333,8 +333,10 @@ async def shortcut_create_pending(request: Request):
     No requiere abrir la app — el usuario categoriza después desde la campana."""
     try:
         data = await request.json()
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Body inválido: {e}")
+        if not isinstance(data, dict):
+            raise ValueError("el body debe ser un objeto JSON")
+    except Exception:
+        raise HTTPException(status_code=422, detail="Body inválido")
 
     token = data.get("shortcut_token") or data.get("token")
     if not token:
@@ -348,7 +350,7 @@ async def shortcut_create_pending(request: Request):
         raw = data.get("importe") or data.get("amount") or data.get("Importe")
         importe = float(str(raw).replace(",", ".").replace(" ", ""))
     except (KeyError, TypeError, ValueError):
-        raise HTTPException(status_code=422, detail=f"importe invalido: recibido={data}")
+        raise HTTPException(status_code=422, detail="importe inválido")
 
     if importe <= 0:
         raise HTTPException(status_code=422, detail="importe debe ser mayor que 0")
