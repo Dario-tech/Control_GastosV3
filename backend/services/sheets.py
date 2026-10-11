@@ -1,5 +1,6 @@
 from datetime import date as date_type
 from fastapi import HTTPException
+from cryptography.exceptions import InvalidTag
 from .db import db_cursor, run_in_thread
 from .crypto import encrypt_str, decrypt_str, encrypt_float, decrypt_float
 
@@ -159,6 +160,12 @@ def _build_finance(rows: list[dict]) -> dict:
 
 # ── I/O (PostgreSQL via psycopg2) ─────────────────────────────────────────────
 
+_KEY_MISMATCH = HTTPException(
+    status_code=500,
+    detail="No se pudieron descifrar las transacciones: DB_ENCRYPTION_KEY no coincide con la usada al cifrarlas.",
+)
+
+
 async def get_finance_data(email: str) -> dict:
     def _q():
         with db_cursor() as cur:
@@ -183,6 +190,13 @@ async def get_finance_data(email: str) -> dict:
         }
 
     # Descifrado en Python — el backend es el único que tiene la clave.
+    try:
+        return _decrypt_and_build(rows)
+    except InvalidTag:
+        raise _KEY_MISMATCH
+
+
+def _decrypt_and_build(rows) -> dict:
     data_rows = [
         {"_rowIndex": r["id"], "fecha": r["fecha"], "tipo": r["tipo"],
          "concepto": decrypt_str(bytes(r["concepto_enc"])), "importe": decrypt_float(bytes(r["importe_enc"])),
@@ -273,14 +287,18 @@ async def search_transactions(
             # tenemos `limit` resultados, el resto de esa tanda no se pierde:
             # queda pendiente para la siguiente página.
             last_fecha, last_id = row["fecha"], row["id"]
-            concepto = decrypt_str(bytes(row["concepto_enc"]))
+            try:
+                concepto = decrypt_str(bytes(row["concepto_enc"]))
+                importe = abs(decrypt_float(bytes(row["importe_enc"])))
+            except InvalidTag:
+                raise _KEY_MISMATCH
             if q_norm and q_norm not in concepto.lower():
                 continue
             results.append({
                 "rowIndex":   row["id"],
                 "fecha":      row["fecha"][:10],
                 "concepto":   concepto,
-                "importe":    abs(decrypt_float(bytes(row["importe_enc"]))),
+                "importe":    importe,
                 "bucket":     _normalize_tipo(row["tipo"], concepto),
                 "comentario": row["comentario"] or "",
             })

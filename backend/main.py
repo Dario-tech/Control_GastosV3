@@ -1,6 +1,7 @@
 import os
 import asyncio
 import json as json_lib
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -214,7 +215,8 @@ async def finance_data(email: str = Depends(get_current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logging.getLogger("uvicorn.error").exception("Error en GET /api/finance")
+        raise HTTPException(status_code=500, detail="Error interno al cargar los datos")
 
 
 @app.get("/api/transactions/search")
