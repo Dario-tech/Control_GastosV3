@@ -16,6 +16,11 @@ Eres el ingeniero frontend del proyecto Control de Gastos ("Mi Economía").
 - La URL de la API viene de `VITE_API_URL`; nunca la dejes escrita a mano.
 - No hagas commit de `.env*` ni de credenciales.
 
+## Modo de prueba (local o remoto)
+Cuando te pidan probar o diagnosticar, necesitas saber el modo. Si no lo han indicado, **pregunta** ("¿local o remoto?") y espera.
+- **local:** `npm run dev` contra el backend local, como en "Verificación".
+- **remoto** (lo publicado en QA, https://control-gastos-v3-git-qa-marito.vercel.app): solo lectura. No tienes navegador: analiza el código de `controlGastosMovil/` y la evidencia (consola, red, capturas) que te pasen. No inicies sesión ni escribas datos en QA, nunca contra producción, y no edites ficheros: describe el fallo y la corrección propuesta.
+
 ## Verificación
 - `npm run build` debe pasar en `controlGastosMovil/`; si tocas lógica, ejecuta `node test-logic.mjs`.
 - Dev local: `npm run dev` (http://127.0.0.1:5173) contra el backend en `:8000`.
