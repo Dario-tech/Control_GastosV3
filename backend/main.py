@@ -201,7 +201,7 @@ async def _broadcast():
 
 
 @app.post("/api/notify")
-async def notify_update():
+async def notify_update(email: str = Depends(get_current_user)):
     await _broadcast()
     return {"notified": len(_sse_clients)}
 
