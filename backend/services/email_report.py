@@ -75,14 +75,16 @@ async def send_monthly_report(email: str, name: str) -> dict:
     if not RESEND_API_KEY:
         return {"sent": False, "reason": "RESEND_API_KEY no configurada"}
 
-    data = await get_finance_data(email)
-    if not data.get("configured"):
-        return {"sent": False, "reason": "sin transacciones registradas"}
-
     today = date.today()
     month_idx = today.month - 2  # mes anterior, 0-indexado
+    report_year = today.year
     if month_idx < 0:
         month_idx = 11
+        report_year -= 1  # en enero, el mes anterior es diciembre del año pasado
+
+    data = await get_finance_data(email, report_year)
+    if not data.get("configured"):
+        return {"sent": False, "reason": "sin transacciones registradas"}
 
     stats = _month_stats(data, month_idx)
 

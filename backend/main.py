@@ -3,7 +3,7 @@ import asyncio
 import json as json_lib
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Request, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
@@ -219,9 +219,10 @@ async def notify_update(email: str = Depends(get_current_user)):
 # ── Finanzas (protegidas) ─────────────────────────────────────────────────────
 
 @app.get("/api/finance")
-async def finance_data(email: str = Depends(get_current_user)):
+async def finance_data(year: int | None = Query(default=None, ge=2000, le=2100),
+                       email: str = Depends(get_current_user)):
     try:
-        return await get_finance_data(email)
+        return await get_finance_data(email, year)
     except HTTPException:
         raise
     except Exception:

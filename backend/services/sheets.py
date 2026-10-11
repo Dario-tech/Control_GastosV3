@@ -94,10 +94,37 @@ def _emoji_for(concepto: str) -> str:
     return "💶"
 
 
-def _build_finance(rows: list[dict]) -> dict:
+def _row_year(fecha: str) -> int | None:
+    try:
+        return int(str(fecha)[:4])
+    except Exception:
+        return None
+
+
+def _pick_year(rows: list[dict], year: int | None) -> int:
+    """Año al que corresponden los agregados: el pedido, o si no el actual
+    (si hay datos suyos) o, en su defecto, el más reciente con datos."""
+    if year is not None:
+        return year
+    years = {y for y in (_row_year(r.get("fecha", "")) for r in rows) if y is not None}
+    today = date_type.today().year
+    if not years or today in years:
+        return today
+    return max(years)
+
+
+def _build_finance(rows: list[dict], year: int | None = None) -> dict:
+    """Agrega `rows` (que pueden abarcar varios años).
+
+    Los agregados por concepto (income/fixedExpenses/variableExpenses/activeMonths)
+    corresponden SOLO al año `year` (por defecto el actual, o el último con datos);
+    antes se sumaban los meses de todos los años en los mismos 12 huecos.
+    `transactions` contiene todas las filas recibidas, de cualquier año, para que el
+    cliente pueda navegar entre años.
+    """
     buckets: dict[str, dict] = {}
     transactions: list[dict] = []
-    year_counts: dict[int, int] = {}
+    year = _pick_year(rows, year)
 
     for row in rows:
         fecha    = str(row.get("fecha", "") or "")
@@ -111,17 +138,12 @@ def _build_finance(rows: list[dict]) -> dict:
         if m_idx is None or not (0 <= m_idx <= 11):
             continue
 
-        try:
-            yr = int(str(fecha)[:4])
-            year_counts[yr] = year_counts.get(yr, 0) + 1
-        except Exception:
-            pass
-
         bucket = _normalize_tipo(tipo_raw, concepto)
 
-        if concepto not in buckets:
-            buckets[concepto] = {"bucket": bucket, "emoji": _emoji_for(concepto), "amounts": [0.0] * 12}
-        buckets[concepto]["amounts"][m_idx] += abs(importe)
+        if _row_year(fecha) == year:
+            if concepto not in buckets:
+                buckets[concepto] = {"bucket": bucket, "emoji": _emoji_for(concepto), "amounts": [0.0] * 12}
+            buckets[concepto]["amounts"][m_idx] += abs(importe)
 
         transactions.append({
             "rowIndex":   row_id,
@@ -132,8 +154,6 @@ def _build_finance(rows: list[dict]) -> dict:
             "month":      m_idx,
             "comentario": comentario,
         })
-
-    year = max(year_counts, key=year_counts.get) if year_counts else date_type.today().year
 
     result: dict = {
         "configured":       True,
@@ -166,22 +186,42 @@ _KEY_MISMATCH = HTTPException(
 )
 
 
-async def get_finance_data(email: str) -> dict:
+async def get_finance_data(email: str, year: int | None = None) -> dict:
+    """Datos financieros del usuario.
+
+    Sin `year`: todas las transacciones (como siempre), con los agregados del año
+    actual (o el último con datos). Con `year`: solo se leen y descifran las filas
+    de ese año (filtro por rango de fecha en SQL). En ambos casos se devuelve
+    `availableYears` con los años que tienen transacciones.
+    """
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                "SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario FROM transactions WHERE user_email = %s ORDER BY fecha, id",
+                "SELECT DISTINCT EXTRACT(YEAR FROM fecha)::int AS y FROM transactions WHERE user_email = %s ORDER BY y",
                 (email,),
             )
-            return cur.fetchall()
+            years = [r["y"] for r in cur.fetchall()]
+            if year is None:
+                cur.execute(
+                    "SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario FROM transactions WHERE user_email = %s ORDER BY fecha, id",
+                    (email,),
+                )
+            else:
+                cur.execute(
+                    "SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario FROM transactions "
+                    "WHERE user_email = %s AND fecha >= make_date(%s, 1, 1) AND fecha < make_date(%s, 1, 1) ORDER BY fecha, id",
+                    (email, year, year + 1),
+                )
+            return years, cur.fetchall()
 
-    rows = await run_in_thread(_q)
+    available_years, rows = await run_in_thread(_q)
 
-    if not rows:
+    if not available_years:
         return {
             "configured":       False,
             "error":            "No hay transacciones registradas.",
-            "year":             date_type.today().year,
+            "year":             year or date_type.today().year,
+            "availableYears":   [],
             "activeMonths":     [False] * 12,
             "income":           [],
             "fixedExpenses":    [],
@@ -191,19 +231,21 @@ async def get_finance_data(email: str) -> dict:
 
     # Descifrado en Python — el backend es el único que tiene la clave.
     try:
-        return _decrypt_and_build(rows)
+        result = _decrypt_and_build(rows, year)
     except InvalidTag:
         raise _KEY_MISMATCH
+    result["availableYears"] = available_years
+    return result
 
 
-def _decrypt_and_build(rows) -> dict:
+def _decrypt_and_build(rows, year: int | None = None) -> dict:
     data_rows = [
         {"_rowIndex": r["id"], "fecha": r["fecha"], "tipo": r["tipo"],
          "concepto": decrypt_str(bytes(r["concepto_enc"])), "importe": decrypt_float(bytes(r["importe_enc"])),
          "comentario": r["comentario"]}
         for r in rows
     ]
-    return _build_finance(data_rows)
+    return _build_finance(data_rows, year)
 
 
 # Filtro SQL aproximado por tipo — barato porque `tipo` no está cifrado, así
