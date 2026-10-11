@@ -79,7 +79,7 @@ export async function fetchRecurring() {
 export async function fetchFinanceData() {
   const res = await fetch(`${BASE}/api/finance`, {
     headers: authHeaders(),
-    signal:  AbortSignal.timeout(15000),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
   return apiJson(res)
 }
