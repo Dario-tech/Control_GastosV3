@@ -96,6 +96,7 @@ export default function LoginScreen() {
                   className="login-input"
                   type="text"
                   placeholder="Nombre"
+                  aria-label="Nombre"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   autoComplete="name"
@@ -105,6 +106,7 @@ export default function LoginScreen() {
                 className="login-input"
                 type="email"
                 placeholder="Email"
+                  aria-label="Email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 autoComplete="email"
@@ -113,6 +115,7 @@ export default function LoginScreen() {
                 className="login-input"
                 type="password"
                 placeholder="Contraseña"
+                  aria-label="Contraseña"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
@@ -140,7 +143,7 @@ export default function LoginScreen() {
           </>
         )}
 
-        {error && <p className="login-error">{error}</p>}
+        {error && <p className="login-error" role="alert">{error}</p>}
       </div>
       <p className="build-marker">build {__BUILD_SHA__}</p>
     </div>

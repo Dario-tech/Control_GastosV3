@@ -1,4 +1,4 @@
-import { Component, useEffect, useState } from 'react'
+import { Component, lazy, Suspense, useEffect, useState } from 'react'
 import { wakeBackend } from './services/api'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppProvider, useApp } from './context/AppContext'
@@ -7,16 +7,37 @@ import { FinanceDataProvider } from './context/FinanceDataContext'
 import Header from './components/layout/Header'
 import BottomNav from './components/layout/BottomNav'
 import ProfilePanel from './components/layout/ProfilePanel'
-import CategorizeModal from './components/ui/CategorizeModal'
-import AddTransactionModal from './components/ui/AddTransactionModal'
 import Toast from './components/ui/Toast'
-import SpotlightTour, { shouldShowTour } from './components/ui/SpotlightTour'
+import { TabSkeleton, FormSkeleton } from './components/ui/Skeleton'
+import { shouldShowTour } from './utils/tour'
 import { usePendingTransaction } from './hooks/usePendingTransaction'
 import LoginScreen from './components/auth/LoginScreen'
 import YearTab from './components/tabs/YearTab'
-import MonthTab from './components/tabs/MonthTab'
-import StatsTab from './components/tabs/StatsTab'
-import BudgetTab from './components/tabs/BudgetTab'
+
+// Año es la pantalla de entrada y va en el bundle inicial. El resto de
+// pestañas (con recharts, calendario, formularios…) y los modales grandes se
+// descargan bajo demanda.
+const importMonthTab  = () => import('./components/tabs/MonthTab')
+const importStatsTab  = () => import('./components/tabs/StatsTab')
+const importBudgetTab = () => import('./components/tabs/BudgetTab')
+const MonthTab  = lazy(importMonthTab)
+const StatsTab  = lazy(importStatsTab)
+const BudgetTab = lazy(importBudgetTab)
+const CategorizeModal      = lazy(() => import('./components/ui/CategorizeModal'))
+const AddTransactionModal  = lazy(() => import('./components/ui/AddTransactionModal'))
+const SpotlightTour        = lazy(() => import('./components/ui/SpotlightTour'))
+
+// Cuando el navegador está ocioso, baja las demás pestañas para que cambiar
+// de una a otra sea instantáneo sin penalizar la carga inicial.
+function prefetchTabs() {
+  const run = () => { importMonthTab(); importStatsTab(); importBudgetTab() }
+  if ('requestIdleCallback' in window) {
+    const id = window.requestIdleCallback(run, { timeout: 4000 })
+    return () => window.cancelIdleCallback(id)
+  }
+  const id = setTimeout(run, 2000)
+  return () => clearTimeout(id)
+}
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -52,6 +73,7 @@ function AppContent() {
 
   const current = queue[0] ?? null
 
+  useEffect(prefetchTabs, [])
 
   return (
     <div className={`app${settings.hideAmounts ? ' hide-amounts' : ''}`}>
@@ -63,10 +85,12 @@ function AppContent() {
       />
       <main className="main">
         <ErrorBoundary>
-          {activeTab === 'year'        && <YearTab />}
-          {activeTab === 'month'       && <MonthTab />}
-          {activeTab === 'stats'       && <StatsTab />}
-          {activeTab === 'budget'      && <BudgetTab />}
+          <Suspense fallback={<TabSkeleton />}>
+            {activeTab === 'year'        && <YearTab />}
+            {activeTab === 'month'       && <MonthTab />}
+            {activeTab === 'stats'       && <StatsTab />}
+            {activeTab === 'budget'      && <BudgetTab />}
+          </Suspense>
         </ErrorBoundary>
       </main>
       <BottomNav onTabChange={() => setProfileOpen(false)} />
@@ -76,21 +100,25 @@ function AppContent() {
         onClose={() => setProfileOpen(false)}
         onShowGuide={() => { setProfileOpen(false); setGuideOpen(true) }}
       />
-      {guideOpen && (
-        <SpotlightTour
-          onFinish={() => setGuideOpen(false)}
-          modalOpen={addOpen || categorizeOpen}
-        />
-      )}
-      {categorizeOpen && current && (
-        <CategorizeModal
-          pending={current}
-          total={queue.length}
-          onCategorize={categorizePending}
-          onSkip={() => setCategorizeOpen(false)}
-        />
-      )}
-      {addOpen && <AddTransactionModal onClose={() => setAddOpen(false)} />}
+      <Suspense fallback={null}>
+        {guideOpen && (
+          <SpotlightTour
+            onFinish={() => setGuideOpen(false)}
+            modalOpen={addOpen || categorizeOpen}
+          />
+        )}
+      </Suspense>
+      <Suspense fallback={<FormSkeleton />}>
+        {categorizeOpen && current && (
+          <CategorizeModal
+            pending={current}
+            total={queue.length}
+            onCategorize={categorizePending}
+            onSkip={() => setCategorizeOpen(false)}
+          />
+        )}
+        {addOpen && <AddTransactionModal onClose={() => setAddOpen(false)} />}
+      </Suspense>
     </div>
   )
 }

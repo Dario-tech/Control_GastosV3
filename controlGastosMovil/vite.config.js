@@ -13,6 +13,20 @@ export default defineConfig({
     __BUILD_SHA__: JSON.stringify(commitSha.slice(0, 7)),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // React en su chunk y recharts (con d3) en otro: recharts solo lo piden
+        // el gráfico de Año y las pestañas Mes/Stats, nunca el arranque de la
+        // app. Sin separar React, Rollup lo mete dentro del chunk de recharts.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react'
+          if (/node_modules\/(recharts|d3-[^/]+|victory-vendor|recharts-scale|react-smooth|react-transition-group|decimal\.js-light|internmap|eventemitter3|fast-equals|lodash|tiny-invariant|clsx|prop-types|react-is)\//.test(id)) return 'vendor-recharts'
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

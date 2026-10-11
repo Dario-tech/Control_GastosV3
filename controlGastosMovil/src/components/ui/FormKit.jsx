@@ -5,6 +5,30 @@ import { createPortal } from 'react-dom'
    pantallas que se abren desde Planificación: presupuesto, meta de ahorro,
    gasto fijo y detalle de meta. Solo presentación: ninguna toca datos ni API. */
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/* Atrapa el foco con Tab dentro del diálogo y lo devuelve al elemento que lo
+   abrió al cerrarse (teclado y lectores de pantalla). */
+function useFocusTrap(ref) {
+  useEffect(() => {
+    const root = ref.current
+    const opener = document.activeElement
+    const onKey = e => {
+      if (e.key !== 'Tab' || !root) return
+      const items = [...root.querySelectorAll(FOCUSABLE)].filter(el => el.offsetParent !== null)
+      if (!items.length) { e.preventDefault(); root.focus(); return }
+      const first = items[0], last = items[items.length - 1]
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === root)) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+    }
+    root?.addEventListener('keydown', onKey)
+    return () => {
+      root?.removeEventListener('keydown', onKey)
+      if (opener instanceof HTMLElement && document.contains(opener)) opener.focus({ preventScroll: true })
+    }
+  }, [ref])
+}
+
 const ICONS = {
   back:   <path d="M15 18l-6-6 6-6" />,
   close:  <path d="M6 6l12 12M18 6L6 18" />,
@@ -34,6 +58,7 @@ export function FormScreen({ title, subtitle, onClose, headerRight, footer, erro
 
   const closeRef = useRef(onClose)
   closeRef.current = onClose
+  useFocusTrap(ref)
 
   useEffect(() => {
     if (!ref.current?.contains(document.activeElement)) ref.current?.focus({ preventScroll: true })
@@ -252,6 +277,7 @@ export function Sheet({ title, onClose, children, label }) {
   const ref = useRef(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
+  useFocusTrap(ref)
   useEffect(() => {
     ref.current?.focus({ preventScroll: true })
     const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); closeRef.current() } }

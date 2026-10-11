@@ -1,11 +1,15 @@
+import { lazy, Suspense } from 'react'
 import Card from '../ui/Card'
-import IncomeExpenseChart from '../charts/IncomeExpenseChart'
+import { ChartSkeleton } from '../ui/Skeleton'
 import SavingsGoals from '../ui/SavingsGoals'
 import { getYearStats, getActiveMonths, getMonthStats, mergeAnnualSplits, fmt } from '../../utils'
 import { MONTH_NAMES } from '../../data/mockData'
 import { useApp } from '../../context/AppContext'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
+
+// recharts pesa bastante: el gráfico se descarga aparte para que Año pinte antes.
+const IncomeExpenseChart = lazy(() => import('../charts/IncomeExpenseChart'))
 
 export default function YearTab() {
   const { goToMonth } = useApp()
@@ -47,7 +51,9 @@ export default function YearTab() {
 
       <Card title="Ingresos vs Gastos" noPad>
         <div style={{ padding: '14px 4px 8px' }}>
-          <IncomeExpenseChart data={data} />
+          <Suspense fallback={<ChartSkeleton height={210} />}>
+            <IncomeExpenseChart data={data} />
+          </Suspense>
         </div>
       </Card>
 

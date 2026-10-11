@@ -1,16 +1,18 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import Card from '../ui/Card'
 import ConceptList from '../ui/ConceptList'
 import DonutChart from '../charts/DonutChart'
-import TransactionLogModal from '../ui/TransactionLogModal'
-import DayHeatmap from '../ui/DayHeatmap'
-import CalendarView from '../ui/CalendarView'
-import MonthYearSheet from '../ui/MonthYearSheet'
+import { ChartSkeleton, FormSkeleton } from '../ui/Skeleton'
 import { useApp } from '../../context/AppContext'
 import { getMonthStats, mergeAnnualSplits, filterDataByYear, getTransactionYears, fmt } from '../../utils'
 import { MONTH_NAMES } from '../../data/mockData'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
+
+// Calendario, hoja de mes y detalle de movimientos: solo se bajan al usarlos.
+const CalendarView        = lazy(() => import('../ui/CalendarView'))
+const MonthYearSheet      = lazy(() => import('../ui/MonthYearSheet'))
+const TransactionLogModal = lazy(() => import('../ui/TransactionLogModal'))
 
 export default function MonthTab() {
   const { selectedMonth, setSelectedMonth, selectedYear, setSelectedYear } = useApp()
@@ -119,7 +121,9 @@ export default function MonthTab() {
           <span className={`card-collapse-arrow${heatmapOpen ? ' open' : ''}`}>›</span>
         </button>
         {heatmapOpen && (
-          <CalendarView monthIndex={selectedMonth} year={selectedYear} annualExpenses={annualExpenses} />
+          <Suspense fallback={<ChartSkeleton height={280} />}>
+            <CalendarView monthIndex={selectedMonth} year={selectedYear} annualExpenses={annualExpenses} />
+          </Suspense>
         )}
       </div>
 
@@ -135,23 +139,27 @@ export default function MonthTab() {
       </Card>
 
       {pickerOpen && (
-        <MonthYearSheet
-          year={selectedYear} month={selectedMonth}
-          minYear={minYear} maxYear={maxYear}
-          hasData={hasData}
-          onSelect={pickMonth}
-          onClose={() => setPickerOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <MonthYearSheet
+            year={selectedYear} month={selectedMonth}
+            minYear={minYear} maxYear={maxYear}
+            hasData={hasData}
+            onSelect={pickMonth}
+            onClose={() => setPickerOpen(false)}
+          />
+        </Suspense>
       )}
 
       {selectedConcept && (
-        <TransactionLogModal
-          concept={selectedConcept.concept}
-          emoji={selectedConcept.emoji}
-          monthIndex={selectedMonth}
-          year={selectedYear}
-          onClose={() => setSelectedConcept(null)}
-        />
+        <Suspense fallback={<FormSkeleton />}>
+          <TransactionLogModal
+            concept={selectedConcept.concept}
+            emoji={selectedConcept.emoji}
+            monthIndex={selectedMonth}
+            year={selectedYear}
+            onClose={() => setSelectedConcept(null)}
+          />
+        </Suspense>
       )}
 
     </div>

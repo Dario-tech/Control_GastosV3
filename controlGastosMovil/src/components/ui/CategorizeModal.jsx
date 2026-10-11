@@ -3,7 +3,7 @@ import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
 import { TYPES } from '../../data/categories'
 import { useCategories } from '../../hooks/useCategories'
-import { isUnusualAmount } from '../../utils'
+import { isUnusualAmount, fmt } from '../../utils'
 
 const DATE_FMT = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
 
@@ -20,7 +20,7 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip }
   const { customCategories }  = useSettings()
   const DEFAULT_CATEGORIES = useCategories()
 
-  const fmt = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(pending.importe)
+  const importeLabel = fmt(pending.importe, 2)
 
   function handleType(t) { setTipo(t); setStep(2) }
 
@@ -55,7 +55,7 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip }
       <div className="catmodal">
         <div className="catmodal-counter">{total > 1 ? `Quedan ${total} pagos por categorizar` : 'Pago pendiente'}</div>
         <div className="catmodal-date">{formatDate(pending.fecha)}</div>
-        <div className="catmodal-amount">{fmt}</div>
+        <div className="catmodal-amount">{importeLabel}</div>
         <p className="catmodal-subtitle">
           {step === 1 ? '¿Qué tipo de movimiento es?' : `${tipo} — ¿qué concepto?`}
         </p>

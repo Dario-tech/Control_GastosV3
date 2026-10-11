@@ -2,8 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import { searchTransactions } from '../../services/api'
 import { fmt } from '../../utils'
-
-const MONTH_SHORT = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+import { MONTH_SHORT_LC } from '../../data/mockData'
 
 const FILTERS = [
   { id: 'all',              label: 'Todos'     },
@@ -113,7 +112,7 @@ export default function TransactionSearchModal({ onClose }) {
                 <div key={t.rowIndex} className="search-row">
                   <div className="search-date-block">
                     <span className="search-day">{day}</span>
-                    <span className="search-month-short">{MONTH_SHORT[mIdx] ?? ''}</span>
+                    <span className="search-month-short">{MONTH_SHORT_LC[mIdx] ?? ''}</span>
                   </div>
                   <div className="search-info">
                     <span className="search-concepto">{t.concepto}</span>

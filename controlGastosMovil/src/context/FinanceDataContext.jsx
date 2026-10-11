@@ -64,7 +64,10 @@ export function FinanceDataProvider({ children }) {
   // SSE: recibe notificación del backend cuando hay datos nuevos
   const sseRef = useRef(null)
   useEffect(() => {
+    let closed = false
+    let retryTimer = null
     function connectSSE() {
+      if (closed) return
       const es = new EventSource(SSE_URL)
       sseRef.current = es
 
@@ -77,13 +80,16 @@ export function FinanceDataProvider({ children }) {
       es.onerror = () => {
         es.close()
         // Reintento con backoff de 5s si la conexión falla
-        setTimeout(connectSSE, 5_000)
+        retryTimer = setTimeout(connectSSE, 5_000)
       }
     }
 
     connectSSE()
 
     return () => {
+      // Sin esto, al cerrar sesión el reintento pendiente reabriría la conexión.
+      closed = true
+      clearTimeout(retryTimer)
       sseRef.current?.close()
     }
   }, [refresh])

@@ -1,11 +1,7 @@
 import { useState } from 'react'
 import { Sheet, Icon } from './FormKit'
+import { MONTH_NAMES as FULL, MONTH_SHORT as SHORT } from '../../data/mockData'
 
-const SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
-const FULL = [
-  'Enero','Febrero','Marzo','Abril','Mayo','Junio',
-  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
-]
 
 /* Hoja de cristal para elegir mes (y año). Se reutiliza en Mes y Planificación.
    `hasData(year, month)` marca los meses con datos; los futuros sin datos se

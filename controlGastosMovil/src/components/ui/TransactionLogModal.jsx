@@ -3,12 +3,8 @@ import { useFinanceData } from '../../context/FinanceDataContext'
 import { deleteTransaction, updateTransactionComment } from '../../services/api'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import { fmt } from '../../utils'
+import { MONTH_NAMES, MONTH_SHORT_LC } from '../../data/mockData'
 
-const MONTH_NAMES = [
-  'Enero','Febrero','Marzo','Abril','Mayo','Junio',
-  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
-]
-const MONTH_SHORT = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
 
 export default function TransactionLogModal({ concept, emoji, monthIndex, year, onClose }) {
   useLockBodyScroll()
@@ -93,7 +89,7 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, year, 
                   <div className="txlog-row">
                     <div className="txlog-date-block">
                       <span className="txlog-day">{day}</span>
-                      <span className="txlog-month-short">{MONTH_SHORT[mIdx] ?? ''}</span>
+                      <span className="txlog-month-short">{MONTH_SHORT_LC[mIdx] ?? ''}</span>
                     </div>
                     <div className="txlog-row-info">
                       <span className="txlog-concepto">{t.concepto}</span>

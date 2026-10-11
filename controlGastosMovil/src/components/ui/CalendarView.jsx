@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { fmt } from '../../utils'
 import { MONTH_NAMES } from '../../data/mockData'
@@ -11,25 +11,30 @@ import { MONTH_NAMES } from '../../data/mockData'
 const DOW = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 const DOW_LONG = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
+const NO_SUMS = { income: 0, expense: 0 }
+
 export default function CalendarView({ monthIndex, year, annualExpenses = [] }) {
   const { transactions } = useFinanceData()
   const [sel, setSel] = useState(null)
   useEffect(() => { setSel(null) }, [monthIndex, year])
 
-  const byDay = {}
-  transactions.forEach(t => {
-    if (t.month !== monthIndex) return
-    const [y, , d] = String(t.fecha).split('-').map(Number)
-    if (y !== year || isNaN(d)) return
-    ;(byDay[d] = byDay[d] || []).push(t)
-  })
-  const sums = day => {
-    const ts = byDay[day] || []
-    return {
-      income:  ts.filter(t => t.bucket === 'income').reduce((s, t) => s + t.importe, 0),
-      expense: ts.filter(t => t.bucket !== 'income').reduce((s, t) => s + t.importe, 0),
-    }
-  }
+  // Agrupa los movimientos del mes por día y suma ingresos/gastos de cada uno
+  // una sola vez (antes se recalculaba al pintar cada celda).
+  const { byDay, daySums } = useMemo(() => {
+    const byDay = {}
+    const daySums = {}
+    transactions.forEach(t => {
+      if (t.month !== monthIndex) return
+      const [y, , d] = String(t.fecha).split('-').map(Number)
+      if (y !== year || isNaN(d)) return
+      ;(byDay[d] = byDay[d] || []).push(t)
+      const s = (daySums[d] = daySums[d] || { income: 0, expense: 0 })
+      if (t.bucket === 'income') s.income += t.importe
+      else s.expense += t.importe
+    })
+    return { byDay, daySums }
+  }, [transactions, monthIndex, year])
+  const sums = day => daySums[day] || NO_SUMS
   const dueOn = day => annualExpenses.filter(e => e.mes - 1 === monthIndex && Number(e.dia) === day)
 
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()

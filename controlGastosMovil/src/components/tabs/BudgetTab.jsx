@@ -1,35 +1,20 @@
-import { useState, useEffect } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { useBudget } from '../../hooks/useBudget'
+import { useBudgetAlerts } from '../../hooks/useBudgetAlerts'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useApp } from '../../context/AppContext'
 import { useSettings } from '../../context/SettingsContext'
-import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
-import MonthYearSheet from '../ui/MonthYearSheet'
-import BudgetModal from '../ui/BudgetModal'
+import TotalHero from '../ui/budget/TotalHero'
+import BudgetItem from '../ui/budget/BudgetItem'
 import SavingsGoals from '../ui/SavingsGoals'
 import AnnualExpenses from '../ui/AnnualExpenses'
-import { fmt } from '../../utils'
+import { FormSkeleton } from '../ui/Skeleton'
+import { MONTH_NAMES } from '../../data/mockData'
+import { daysLeftInMonth } from '../../utils/budget'
 
-const NOTIF_LS_KEY = 'mi-economia-notif-v1'
-function getNotifCache() {
-  try { return JSON.parse(localStorage.getItem(NOTIF_LS_KEY) || '{}') }
-  catch { return {} }
-}
-function setNotifCache(cache) {
-  localStorage.setItem(NOTIF_LS_KEY, JSON.stringify(cache))
-}
-
-const MONTH_NAMES = [
-  'Enero','Febrero','Marzo','Abril','Mayo','Junio',
-  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
-]
-
-function daysLeftInMonth(monthIndex) {
-  const now = new Date()
-  if (now.getMonth() !== monthIndex) return 0
-  const lastDay = new Date(now.getFullYear(), monthIndex + 1, 0).getDate()
-  return lastDay - now.getDate()
-}
+// Hoja de mes y formulario de presupuesto: solo se cargan al abrirlos.
+const MonthYearSheet = lazy(() => import('../ui/MonthYearSheet'))
+const BudgetModal    = lazy(() => import('../ui/BudgetModal'))
 
 /* ── Estado vacío ── */
 function EmptyState({ onAdd }) {
@@ -48,101 +33,6 @@ function EmptyState({ onAdd }) {
   )
 }
 
-/* ── Estados visuales: color + icono + texto ── */
-const STATUS = {
-  ok:   { icon: '✓', label: 'En orden' },
-  warn: { icon: '!', label: 'Cerca del límite' },
-  over: { icon: '✕', label: 'Superado' },
-}
-function statusOf(spent, limit, threshold) {
-  if (limit > 0 && spent > limit) return 'over'
-  if (limit > 0 && (spent / limit) * 100 >= threshold) return 'warn'
-  return 'ok'
-}
-
-/* ── Hero total mensual ── */
-function TotalHero({ totalLimit, totalSpent, daysLeft, threshold }) {
-  const rawPct    = totalLimit > 0 ? (totalSpent / totalLimit) * 100 : 0
-  const pct       = Math.min(100, rawPct)
-  const remaining = totalLimit - totalSpent
-  const over      = remaining < 0
-  const st        = statusOf(totalSpent, totalLimit, threshold)
-  const pace      = !over && daysLeft > 0 ? remaining / daysLeft : null
-
-  return (
-    <div className={`bgt-hero bgt-st-${st}`}>
-      <div className="bgt-hero-top">
-        <div className="bgt-hero-left">
-          <span className="bgt-hero-title">Total mensual</span>
-          <span className="bgt-hero-sub tabular">{fmt(totalSpent)} de {fmt(totalLimit)}</span>
-        </div>
-        {daysLeft > 0 && <span className="bgt-days-badge">{daysLeft}d restantes</span>}
-      </div>
-
-      <div className="bgt-hero-main">
-        <span className="bgt-hero-remaining tabular">{fmt(Math.abs(remaining))}</span>
-        <span className="bgt-hero-remaining-label">{over ? 'excedido' : 'restantes'}</span>
-      </div>
-
-      <div className="bgt-bar-bg bgt-bar-bg--lg" role="progressbar" aria-valuemin={0} aria-valuemax={100}
-           aria-valuenow={Math.round(rawPct)} aria-label="Gastado del presupuesto total">
-        <div className="bgt-bar-fill" style={{ width: `${pct}%` }} />
-      </div>
-
-      <div className="bgt-bar-footer">
-        <span className="bgt-pct-label">Gastado {Math.round(rawPct)}%</span>
-        <span className="bgt-status-chip"><span aria-hidden="true">{STATUS[st].icon}</span>{STATUS[st].label}</span>
-      </div>
-      {pace != null && (
-        <div className="bgt-pace tabular">Ritmo sugerido: {fmt(pace)} al día</div>
-      )}
-    </div>
-  )
-}
-
-/* ── Ítem de categoría ── */
-function BudgetItem({ item, spent, threshold, onEdit }) {
-  const rawPct    = item.limit > 0 ? (spent / item.limit) * 100 : 0
-  const pct       = Math.min(100, rawPct)
-  const remaining = item.limit - spent
-  const over      = remaining < 0
-  const st        = statusOf(spent, item.limit, threshold)
-  const color     = item.color || 'var(--accent)'
-
-  return (
-    <div className={`bgt-item bgt-st-${st}`} onClick={onEdit}>
-      <div className="bgt-item-top">
-        <div className="bgt-item-left">
-          <span className="bgt-item-emoji">{item.emoji}</span>
-          <div className="bgt-item-titles">
-            <span className="bgt-item-name">{item.name}</span>
-            <span className="bgt-item-sub tabular">{fmt(spent)} / {fmt(item.limit)}</span>
-          </div>
-        </div>
-        <span className="bgt-item-pct tabular">{Math.round(rawPct)}%</span>
-      </div>
-
-      <div className="bgt-bar-bg" role="progressbar" aria-valuemin={0} aria-valuemax={100}
-           aria-valuenow={Math.round(rawPct)} aria-label={`Gastado en ${item.name}`}>
-        <div
-          className="bgt-bar-fill"
-          style={{
-            width: `${pct}%`,
-            '--bar-color': over ? 'var(--red)' : color,
-          }}
-        />
-      </div>
-
-      <div className="bgt-bar-footer">
-        <span className="bgt-status-chip"><span aria-hidden="true">{STATUS[st].icon}</span>{STATUS[st].label}</span>
-        <span className="bgt-rem-label tabular">
-          {over ? `Excedido ${fmt(-remaining)}` : `Quedan ${fmt(remaining)}`}
-        </span>
-      </div>
-    </div>
-  )
-}
-
 /* ── Tab principal ── */
 export default function BudgetTab() {
   const { itemsForMonth, addItem, updateItem, removeItem } = useBudget()
@@ -155,9 +45,6 @@ export default function BudgetTab() {
   const [showMonthPicker, setShowMonthPicker] = useState(false)
   const [showModal, setShowModal]             = useState(false)
   const [editItem,  setEditItem]              = useState(null)
-  const [notifPermission, setNotifPermission] = useState(
-    'Notification' in window ? Notification.permission : 'unsupported'
-  )
 
   // items del mes seleccionado — DESPUÉS de declarar budgetMonth
   const items = itemsForMonth(budgetMonth)
@@ -171,42 +58,7 @@ export default function BudgetTab() {
     return match ? (match.amounts[budgetMonth] ?? 0) : 0
   }
 
-  async function requestNotifPermission() {
-    if (!('Notification' in window)) return
-    const result = await Notification.requestPermission()
-    setNotifPermission(result)
-  }
-
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      requestNotifPermission()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!settings.budgetAlerts || notifPermission !== 'granted') return
-    const cache = getNotifCache()
-    let changed = false
-    items.forEach(item => {
-      const spent     = getRealSpent(item.name)
-      const pct       = item.limit > 0 ? (spent / item.limit) * 100 : 0
-      const cacheKey  = `${item.id}-${budgetMonth}`
-      const lastSpent = cache[cacheKey] ?? 0
-      if (spent !== lastSpent) {
-        cache[cacheKey] = spent
-        changed = true
-        const threshold = (settings.alertThreshold / 100) * item.limit
-        if (spent >= threshold && lastSpent < threshold) {
-          new Notification(`⚠️ Presupuesto: ${item.emoji} ${item.name}`, {
-            body: `Has gastado el ${Math.round(pct)}% de tu límite (${fmt(spent)} de ${fmt(item.limit)})`,
-            icon: '/icons/icon-192.png',
-            tag: cacheKey,
-          })
-        }
-      }
-    })
-    if (changed) setNotifCache(cache)
-  }, [data, items, budgetMonth, settings.budgetAlerts, settings.alertThreshold, notifPermission])
+  const { notifPermission, requestNotifPermission } = useBudgetAlerts({ items, getRealSpent, month: budgetMonth, data })
 
   const itemsWithSpent = items.map(item => ({ ...item, realSpent: getRealSpent(item.name) }))
   // Más consumido primero (los superados quedan arriba)
@@ -292,31 +144,35 @@ export default function BudgetTab() {
 
       {/* Metas de ahorro: aquí vive la gestión completa (crear, editar, compartir…) */}
       <div className="planning-section-divider" />
-      <SavingsGoals alignRight />
+      <SavingsGoals />
 
       {/* Month picker */}
       {showMonthPicker && (
-        <MonthYearSheet
-          hideYear
-          title="Mes del presupuesto"
-          year={new Date().getFullYear()}
-          month={budgetMonth}
-          minYear={new Date().getFullYear()}
-          maxYear={new Date().getFullYear()}
-          hasData={(y, m) => !!data.activeMonths?.[m]}
-          onSelect={m => setBudgetMonth(m)}
-          onClose={() => setShowMonthPicker(false)}
-        />
+        <Suspense fallback={null}>
+          <MonthYearSheet
+            hideYear
+            title="Mes del presupuesto"
+            year={new Date().getFullYear()}
+            month={budgetMonth}
+            minYear={new Date().getFullYear()}
+            maxYear={new Date().getFullYear()}
+            hasData={(y, m) => !!data.activeMonths?.[m]}
+            onSelect={m => setBudgetMonth(m)}
+            onClose={() => setShowMonthPicker(false)}
+          />
+        </Suspense>
       )}
 
       {/* Budget modal */}
       {showModal && (
-        <BudgetModal
-          item={editItem}
-          onSave={handleSave}
-          onClose={closeModal}
-          onDelete={editItem ? handleDelete : null}
-        />
+        <Suspense fallback={<FormSkeleton />}>
+          <BudgetModal
+            item={editItem}
+            onSave={handleSave}
+            onClose={closeModal}
+            onDelete={editItem ? handleDelete : null}
+          />
+        </Suspense>
       )}
     </div>
   )

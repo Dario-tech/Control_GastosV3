@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { markTourSeen } from '../../utils/tour'
 
 // Tour interactivo tipo "spotlight". Dos formas de avanzar:
 //  - "click": la pantalla se oscurece salvo un círculo/óvalo alrededor del
@@ -8,15 +9,6 @@ import { useState, useEffect, useRef } from 'react'
 //    calma — solo quedan bloqueadas la cabecera y la barra inferior, para
 //    que no se salga del paso — y avanza con un botón "Siguiente" explícito
 //    cuando ya ha terminado de mirar.
-export const TOUR_LS_KEY = 'mi-economia-tour-v1'
-
-export function shouldShowTour() {
-  try { return !localStorage.getItem(TOUR_LS_KEY) } catch { return false }
-}
-
-export function markTourSeen() {
-  try { localStorage.setItem(TOUR_LS_KEY, new Date().toISOString()) } catch {}
-}
 
 const STEPS = [
   {
