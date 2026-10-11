@@ -1,4 +1,5 @@
 import os
+import logging
 import bcrypt
 import httpx
 from datetime import datetime, timedelta
@@ -7,7 +8,13 @@ from jose import jwt as jose_jwt, JWTError
 
 GOOGLE_CLIENT_ID  = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_TOKENINFO  = "https://oauth2.googleapis.com/tokeninfo"
-JWT_SECRET        = os.getenv("JWT_SECRET", "dev-secret-change-in-production")
+_INSECURE_JWT_DEFAULT = "dev-secret-change-in-production"
+JWT_SECRET        = os.getenv("JWT_SECRET", "")
+if not JWT_SECRET or JWT_SECRET == _INSECURE_JWT_DEFAULT:
+    raise RuntimeError(
+        "JWT_SECRET no está definida (o es el valor inseguro por defecto). "
+        "Defínela en el entorno / backend/.env antes de arrancar."
+    )
 JWT_ALGORITHM     = "HS256"
 JWT_EXPIRE_DAYS   = 30
 
@@ -35,8 +42,9 @@ async def verify_google_token(token: str) -> dict:
         }
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Error verificando token: {e}")
+    except Exception:
+        logging.getLogger("uvicorn.error").exception("Error verificando el token de Google")
+        raise HTTPException(status_code=401, detail="No se pudo verificar el token de Google")
 
 
 def create_jwt(email: str) -> str:
