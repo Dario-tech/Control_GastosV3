@@ -52,3 +52,13 @@ Requires these env vars at minimum to run against a real database: `DATABASE_URL
 - Styling is one file, `src/App.css` (~2900 lines), using CSS custom properties for theming rather than a CSS-in-JS or utility framework. `:root` is the dark theme (default); `html.light` and `html.pastel` override the same variable set for the other two themes. New components should read colors/spacing from these variables, not hardcode values, so all three themes stay in sync.
 - The app shell is fixed-width, mobile-only (`max-width: 430px`, see `.app` in `App.css`) — there's no responsive/desktop layout to preserve.
 - `vite-plugin-pwa` handles the PWA manifest/service worker (config in `vite.config.js`); there's no native app wrapper (Capacitor etc.) in the codebase yet, though it's been discussed as a possible direction.
+
+## Trabajo en paralelo (varias sesiones o agentes)
+
+Varias sesiones de Claude (por ejemplo los agentes `frontal` y `backend` de `.claude/agents/`) pueden trabajar a la vez en la misma carpeta y la misma rama. Para no pisarse:
+
+- **Nunca uses `git add -A` ni `git add .`**: arrastran a tu commit los cambios sin terminar de otra sesión. Añade solo tus ficheros por ruta (`git add backend/main.py`) y comprueba `git status` / `git diff --cached` antes de commitear.
+- Cada agente toca solo su zona (`controlGastosMovil/` o `backend/`). Si necesita un cambio en la zona del otro, lo describe en lugar de editarlo.
+- Si ves cambios sin commitear que no son tuyos, déjalos como están: no los reviertas ni los incluyas en tu commit.
+- Antes de hacer push, haz `git fetch`; si la rama remota avanzó, integra con rebase en vez de forzar el push.
+- Para trabajo largo o de riesgo, usa un worktree aparte por sesión.
