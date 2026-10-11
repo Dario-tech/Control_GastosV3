@@ -1,4 +1,5 @@
 import os
+import logging
 import bcrypt
 import httpx
 from datetime import datetime, timedelta
@@ -41,8 +42,9 @@ async def verify_google_token(token: str) -> dict:
         }
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Error verificando token: {e}")
+    except Exception:
+        logging.getLogger("uvicorn.error").exception("Error verificando el token de Google")
+        raise HTTPException(status_code=401, detail="No se pudo verificar el token de Google")
 
 
 def create_jwt(email: str) -> str:

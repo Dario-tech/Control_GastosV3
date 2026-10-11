@@ -5,7 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 # Carga backend/.env si existe (no pisa variables ya definidas, así que en Render/Docker no cambia nada).
@@ -55,6 +55,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Control Gastos API", version="3.0.0", lifespan=lifespan)
+
+_log = logging.getLogger("uvicorn.error")
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    """Cualquier error no controlado: se registra en el servidor (con traza) y el
+    cliente solo recibe un mensaje genérico, sin detalles de SQL ni de Python."""
+    _log.error("Error no controlado en %s %s", request.method, request.url.path, exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "Error interno del servidor"})
 
 _raw_origins = os.getenv(
     "CORS_ORIGINS",
@@ -214,8 +224,8 @@ async def finance_data(email: str = Depends(get_current_user)):
         return await get_finance_data(email)
     except HTTPException:
         raise
-    except Exception as e:
-        logging.getLogger("uvicorn.error").exception("Error en GET /api/finance")
+    except Exception:
+        _log.exception("Error en GET /api/finance")
         raise HTTPException(status_code=500, detail="Error interno al cargar los datos")
 
 
@@ -228,8 +238,8 @@ async def search_transactions_endpoint(
         return await search_transactions(email, q=q, tipo=tipo, cursor=cursor, limit=limit)
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise  # lo gestiona el handler global (log en servidor, mensaje genérico)
 
 
 @app.delete("/api/transactions/{row_index}")
@@ -238,8 +248,8 @@ async def delete_transaction_endpoint(row_index: int, email: str = Depends(get_c
         return await delete_transaction(row_index, email)
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise  # lo gestiona el handler global (log en servidor, mensaje genérico)
 
 
 class TransactionIn(BaseModel):
@@ -259,8 +269,8 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
         if isinstance(data, str):
             data = json_lib.loads(data)
         tx = TransactionIn(**data)
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Body inválido: {e}")
+    except Exception:
+        raise HTTPException(status_code=422, detail="Body inválido")
 
     try:
         result = await post_transaction(
@@ -269,8 +279,9 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
         )
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error al escribir en la base de datos: {e}")
+    except Exception:
+        _log.exception("Error en POST /api/transaction")
+        raise HTTPException(status_code=502, detail="Error al guardar la transacción")
 
     await _broadcast()
     return result
@@ -288,8 +299,8 @@ async def update_transaction_comment_endpoint(
         result = await update_transaction_comment(row_index, email, body.comentario.strip())
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise  # lo gestiona el handler global (log en servidor, mensaje genérico)
     await _broadcast()
     return result
 
@@ -367,8 +378,8 @@ async def recurring_expenses(email: str = Depends(get_current_user)):
     """Detecta gastos recurrentes (suscripciones) en el historial del usuario."""
     try:
         return await get_recurring(email)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise  # lo gestiona el handler global (log en servidor, mensaje genérico)
 
 
 # ── Categorización con IA ───────────────────────────────────────────────────
@@ -565,8 +576,8 @@ async def delete_annual_expense_endpoint(expense_id: int, email: str = Depends(g
 async def investment_prices():
     try:
         return await get_all_prices()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise  # lo gestiona el handler global (log en servidor, mensaje genérico)
 
 
 # ── Debug ─────────────────────────────────────────────────────────────────────
@@ -577,5 +588,5 @@ async def debug_transactions(email: str = Depends(get_current_user)):
         return await get_raw_transactions(email)
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise  # lo gestiona el handler global (log en servidor, mensaje genérico)
