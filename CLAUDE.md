@@ -21,8 +21,9 @@ npm install
 npm run dev       # Vite dev server
 npm run build     # production build (also runs vite-plugin-pwa)
 npm run preview   # preview a production build
+npm test          # unit tests (vitest + jsdom), in controlGastosMovil/tests/
 ```
-No linter or unit test runner is configured. `check.mjs` (a Playwright smoke script) exists in this directory from earlier development but is currently stale: it targets `[data-tab="..."]` selectors that no longer exist in the markup (components now use `data-tour="tab-..."`). Fix it before relying on it, or verify changes with `npm run build` plus a manual check.
+Unit tests live in `controlGastosMovil/tests/` (pure logic in `src/utils` and `src/hooks`, plus render/import regression tests for the split modals). No linter is configured. `check.mjs` is a manual Playwright smoke script (375px, selectors `data-tour="tab-..."`); it needs `npm run dev` running and is not part of `npm test`. Verify changes with `npm test` plus `npm run build`.
 
 ### Backend (`backend/`)
 ```

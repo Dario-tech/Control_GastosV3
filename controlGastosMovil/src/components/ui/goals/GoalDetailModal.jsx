@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useLockBodyScroll } from '../../../hooks/useLockBodyScroll'
 import { fmt } from '../../../utils'
-import { FormScreen, Field, Section, AmountInput, Chips, DangerButton, ConfirmSheet, Sheet, Icon } from '../FormKit'
+import { FormScreen, Field, Section, AmountInput, Chips, DangerButton, PrimaryButton, ConfirmSheet, Sheet, Icon } from '../FormKit'
 import { GoalRing, GoalIcon } from './GoalRing'
 import { goalRemaining, formatGoalDate, formatContribDate, compressImage } from './goalUtils'
 

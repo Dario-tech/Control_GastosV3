@@ -1,8 +1,10 @@
+// Smoke manual (NO forma parte de `npm test`): requiere `npm run dev` en marcha y,
+// para pasar del login, una sesión válida (ver QA-SETUP.md). Ancho 375px.
 import { chromium } from 'playwright';
 import { writeFileSync } from 'fs';
 
 const browser = await chromium.launch({ headless: true });
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+const ctx = await browser.newContext({ viewport: { width: 375, height: 812 } });
 const page = await ctx.newPage();
 
 const errors = [];
@@ -20,14 +22,20 @@ await page.waitForTimeout(2000);
 await page.screenshot({ path: 'screenshot-year.png', fullPage: false });
 
 // Click Mes tab
-await page.click('[data-tab="month"]');
+await page.click('[data-tour="tab-month"]');
 await page.waitForTimeout(1000);
 await page.screenshot({ path: 'screenshot-month.png' });
 
 // Click Stats tab
-await page.click('[data-tab="stats"]');
+await page.click('[data-tour="tab-stats"]');
 await page.waitForTimeout(1000);
 await page.screenshot({ path: 'screenshot-stats.png' });
+
+await page.click('[data-tour="tab-budget"]');
+await page.waitForTimeout(1000);
+await page.screenshot({ path: 'screenshot-budget.png' });
+await page.click('[data-tour="tab-year"]');
+await page.waitForTimeout(500);
 
 console.log('ERRORS:', errors.length ? errors : 'none');
 console.log('WARNINGS:', warnings.length ? warnings.slice(0, 5) : 'none');
