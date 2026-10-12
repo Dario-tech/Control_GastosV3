@@ -8,9 +8,9 @@
 # Uso:
 #   docker compose -f docker-compose.local.yml up
 # Primera vez (o para resetear los datos de ejemplo), en otra terminal:
-#   docker compose -f docker-compose.local.yml exec backend python seed_qa.py
+#   docker compose -f docker-compose.local.yml exec -e QA_PASSWORD=Local12345! backend python seed_qa.py
 #
-# Login de prueba: qa@mieconomia.test / QaTest1234!
+# Login de prueba (solo local): qa@mieconomia.test / la QA_PASSWORD que pongas al sembrar
 #
 # URLs:
 #   Frontend → http://localhost:5173

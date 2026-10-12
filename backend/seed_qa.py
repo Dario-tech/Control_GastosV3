@@ -2,25 +2,55 @@
 cifrados (ver services/crypto.py). Sustituye a seed_qa.sql, que ya no vale
 porque el cifrado se hace en la aplicación, no se puede expresar en SQL puro.
 
-Requiere las variables de entorno DATABASE_URL y DB_ENCRYPTION_KEY.
+Requiere las variables de entorno DATABASE_URL, DB_ENCRYPTION_KEY y
+QA_PASSWORD (contraseña del usuario de test, mínimo 10 caracteres). El repo es
+público: ni la contraseña ni el shortcut_token se guardan en el código. El
+shortcut_token se regenera aleatoriamente en cada ejecución.
 Re-ejecutable: limpia los datos del usuario de test antes de insertar.
 
 Uso:
     cd backend
-    DATABASE_URL=... DB_ENCRYPTION_KEY=... python seed_qa.py
+    DATABASE_URL=... DB_ENCRYPTION_KEY=... QA_PASSWORD=... python seed_qa.py
 
-Login de test →  email: qa@mieconomia.test   contraseña: QaTest1234!
+Login de test →  email: qa@mieconomia.test   contraseña: la de QA_PASSWORD
 """
 import os
 import sys
+import secrets
 import psycopg2
 
 sys.path.insert(0, os.path.dirname(__file__))
 from services.crypto import encrypt_str, encrypt_float  # noqa: E402
 
 EMAIL = "qa@mieconomia.test"
-# bcrypt (cost 12) de "QaTest1234!"
-PASSWORD_HASH = "$2b$12$ZOxOt1mTOEQkgdM0M4280./030CE2uomJR2Lr57Sd881gekEmltya"
+MIN_PASSWORD_LEN = 10
+
+
+def read_qa_password() -> str:
+    """Lee QA_PASSWORD del entorno; error claro si falta o es demasiado corta."""
+    password = os.environ.get("QA_PASSWORD", "")
+    if not password:
+        raise SystemExit(
+            "ERROR: define la variable de entorno QA_PASSWORD con la contraseña del "
+            f"usuario de test ({EMAIL}), mínimo {MIN_PASSWORD_LEN} caracteres."
+        )
+    if len(password) < MIN_PASSWORD_LEN:
+        raise SystemExit(
+            f"ERROR: QA_PASSWORD debe tener al menos {MIN_PASSWORD_LEN} caracteres."
+        )
+    return password
+
+
+def build_credentials() -> tuple[str, str]:
+    """(password_hash, shortcut_token) para el usuario de test.
+    El hash usa services.auth.hash_password (bcrypt), igual que el registro real."""
+    password = read_qa_password()
+    # services/auth.py exige JWT_SECRET al importarse, aunque la semilla no firma
+    # ningún JWT: si no está definida se pone una aleatoria solo para este proceso.
+    if not os.environ.get("JWT_SECRET"):
+        os.environ["JWT_SECRET"] = secrets.token_urlsafe(48)
+    from services.auth import hash_password  # noqa: E402 (import diferido)
+    return hash_password(password), secrets.token_urlsafe(32)
 
 # (fecha, tipo, concepto, importe)
 TRANSACTIONS = [
@@ -48,14 +78,16 @@ TRANSACTIONS = [
 
 
 def main():
+    password_hash, shortcut_token = build_credentials()  # falla antes de tocar la BD
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
     conn.autocommit = False
     cur = conn.cursor()
     try:
         cur.execute(
             """INSERT INTO users (email, name, shortcut_token, password_hash) VALUES (%s, %s, %s, %s)
-               ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, password_hash = EXCLUDED.password_hash""",
-            (EMAIL, "QA Tester", "BlsAlWmj1igk6ICuLA9qncvOThYGyARiRj_6v9Fb_qQ", PASSWORD_HASH),
+               ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, password_hash = EXCLUDED.password_hash,
+                                                  shortcut_token = EXCLUDED.shortcut_token""",
+            (EMAIL, "QA Tester", shortcut_token, password_hash),
         )
 
         cur.execute("DELETE FROM transactions WHERE user_email = %s", (EMAIL,))

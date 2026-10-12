@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { SESSION_EXPIRED_EVENT } from '../services/api'
+import { AUTH_KEY as LS_KEY, clearUserData } from '../utils/storageKeys'
 
 const BASE   = import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com'
-const LS_KEY = 'mi-economia-auth-v1'
 
 // Render (plan gratuito) puede dormir el backend tras inactividad y tardar
 // 30-60s en despertar. Sin timeout, en móvil la petición se queda "esperando"
@@ -32,6 +32,9 @@ export function AuthProvider({ children }) {
   // en vez de que cada sitio de la app muestre su propio error genérico.
   useEffect(() => {
     function handleExpired() {
+      // Misma limpieza que logout(): no dejar datos financieros en el
+      // dispositivo para quien inicie sesión después.
+      clearUserData()
       setUser(null)
       setSessionExpiredMsg('Tu sesión ha caducado. Vuelve a iniciar sesión.')
     }
@@ -98,8 +101,11 @@ export function AuthProvider({ children }) {
     return authWithEmail('/api/auth/login-email', { email, password })
   }
 
+  // Borra la sesión y todas las cachés con datos del usuario (finanzas,
+  // presupuestos, categorías propias, avisos ya enviados). Las preferencias de
+  // interfaz (tema, acento...) se conservan.
   function logout() {
-    localStorage.removeItem(LS_KEY)
+    clearUserData()
     setUser(null)
   }
 

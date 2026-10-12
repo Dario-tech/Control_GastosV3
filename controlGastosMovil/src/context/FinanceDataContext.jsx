@@ -1,9 +1,10 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { fetchFinanceData } from '../services/api'
+import { FINANCE_CACHE_KEY } from '../utils/storageKeys'
 
 const SSE_URL = (import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com') + '/api/events'
 
-const LS_KEY = 'mi-economia-finance-cache-v1'
+const LS_KEY = FINANCE_CACHE_KEY
 
 const EMPTY = {
   year:             new Date().getFullYear(),
@@ -38,10 +39,19 @@ export function FinanceDataProvider({ children }) {
   const [lastUpdated, setLastUpdated] = useState(null)
   const [errorMsg, setErrorMsg]       = useState('')
 
+  // Al cerrar sesión el provider se desmonta; si había una petición en vuelo,
+  // su respuesta no debe volver a escribir la caché que logout() acaba de borrar.
+  const aliveRef = useRef(true)
+  useEffect(() => {
+    aliveRef.current = true
+    return () => { aliveRef.current = false }
+  }, [])
+
   const refresh = useCallback(async () => {
     setStatus('loading')
     try {
       const result = await fetchFinanceData()
+      if (!aliveRef.current) return
       if (!result.configured) {
         setStatus('idle')
         setErrorMsg(result.error || '')
@@ -54,6 +64,7 @@ export function FinanceDataProvider({ children }) {
       setErrorMsg('')
       saveCache(result)
     } catch (err) {
+      if (!aliveRef.current) return
       // Mantiene los últimos datos guardados — no borra ni pone datos de ejemplo
       setStatus('offline')
       setErrorMsg(err.message)

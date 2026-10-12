@@ -20,9 +20,12 @@ después de descifrar, no en la base de datos.
 """
 import os
 import base64
+import logging
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 _NONCE_LEN = 12
+
+_log = logging.getLogger("uvicorn.error")
 
 
 class EncryptionNotConfigured(RuntimeError):
@@ -74,3 +77,24 @@ def encrypt_float(value: float) -> bytes:
 
 def decrypt_float(blob: bytes) -> float:
     return float(decrypt_str(blob))
+
+
+def decrypt_transaction(concepto_enc, importe_enc, row_id) -> tuple[str, float] | None:
+    """Descifra (concepto, importe) de una fila de `transactions`.
+
+    Tolerante: si la fila no se puede descifrar (InvalidTag porque se cifró con
+    otra DB_ENCRYPTION_KEY, blob truncado/NULL, importe no numérico...) devuelve
+    None y registra un warning con el id de la fila — nunca el contenido ni la
+    clave — para que una fila corrupta no tumbe la respuesta entera.
+    Si la clave no está configurada sí se propaga el error (fallo global).
+    """
+    try:
+        return decrypt_str(bytes(concepto_enc)), decrypt_float(bytes(importe_enc))
+    except EncryptionNotConfigured:
+        raise
+    except Exception as e:
+        _log.warning(
+            "No se pudo descifrar la transacción id=%s (%s); se omite de la respuesta",
+            row_id, type(e).__name__,
+        )
+        return None

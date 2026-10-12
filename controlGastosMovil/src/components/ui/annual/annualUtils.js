@@ -1,9 +1,10 @@
 import { fmt } from '../../../utils'
 import { createNotifCache } from '../../../utils/notifCache'
+import { ANNUAL_NOTIF_KEY } from '../../../utils/storageKeys'
 
 // Utilidades de los gastos fijos anuales (estado, progreso, recordatorio .ics, caché de avisos).
 
-export const notifCache = createNotifCache('mi-economia-annual-notif-v1')
+export const notifCache = createNotifCache(ANNUAL_NOTIF_KEY)
 
 // Genera un .ics descargable con un aviso `dias_aviso` días antes del
 // vencimiento — lo abre el Calendario de Apple/Google (la web no tiene

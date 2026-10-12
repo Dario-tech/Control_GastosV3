@@ -1,8 +1,7 @@
 from datetime import date as date_type
 from fastapi import HTTPException
-from cryptography.exceptions import InvalidTag
 from .db import db_cursor, run_in_thread
-from .crypto import encrypt_str, decrypt_str, encrypt_float, decrypt_float
+from .crypto import encrypt_str, encrypt_float, decrypt_transaction
 
 
 def ensure_comentario_column():
@@ -180,12 +179,6 @@ def _build_finance(rows: list[dict], year: int | None = None) -> dict:
 
 # ── I/O (PostgreSQL via psycopg2) ─────────────────────────────────────────────
 
-_KEY_MISMATCH = HTTPException(
-    status_code=500,
-    detail="No se pudieron descifrar las transacciones: DB_ENCRYPTION_KEY no coincide con la usada al cifrarlas.",
-)
-
-
 async def get_finance_data(email: str, year: int | None = None) -> dict:
     """Datos financieros del usuario.
 
@@ -230,21 +223,20 @@ async def get_finance_data(email: str, year: int | None = None) -> dict:
         }
 
     # Descifrado en Python — el backend es el único que tiene la clave.
-    try:
-        result = _decrypt_and_build(rows, year)
-    except InvalidTag:
-        raise _KEY_MISMATCH
+    # Las filas que no se puedan descifrar se omiten (ver decrypt_transaction).
+    result = _decrypt_and_build(rows, year)
     result["availableYears"] = available_years
     return result
 
 
 def _decrypt_and_build(rows, year: int | None = None) -> dict:
-    data_rows = [
-        {"_rowIndex": r["id"], "fecha": r["fecha"], "tipo": r["tipo"],
-         "concepto": decrypt_str(bytes(r["concepto_enc"])), "importe": decrypt_float(bytes(r["importe_enc"])),
-         "comentario": r["comentario"]}
-        for r in rows
-    ]
+    data_rows = []
+    for r in rows:
+        dec = decrypt_transaction(r["concepto_enc"], r["importe_enc"], r["id"])
+        if dec is None:
+            continue  # fila indescifrable: se omite (ya registrada en el log)
+        data_rows.append({"_rowIndex": r["id"], "fecha": r["fecha"], "tipo": r["tipo"],
+                          "concepto": dec[0], "importe": dec[1], "comentario": r["comentario"]})
     return _build_finance(data_rows, year)
 
 
@@ -329,11 +321,10 @@ async def search_transactions(
             # tenemos `limit` resultados, el resto de esa tanda no se pierde:
             # queda pendiente para la siguiente página.
             last_fecha, last_id = row["fecha"], row["id"]
-            try:
-                concepto = decrypt_str(bytes(row["concepto_enc"]))
-                importe = abs(decrypt_float(bytes(row["importe_enc"])))
-            except InvalidTag:
-                raise _KEY_MISMATCH
+            dec = decrypt_transaction(row["concepto_enc"], row["importe_enc"], row["id"])
+            if dec is None:
+                continue  # fila indescifrable: se omite (ya registrada en el log)
+            concepto, importe = dec[0], abs(dec[1])
             if q_norm and q_norm not in concepto.lower():
                 continue
             results.append({
@@ -414,19 +405,3 @@ async def update_transaction_comment(row_index: int, email: str, comentario: str
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
     return {"status": "ok", "id": row_index, "comentario": comentario}
 
-
-async def get_raw_transactions(email: str = "") -> dict:
-    def _q():
-        with db_cursor() as cur:
-            cur.execute(
-                "SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario FROM transactions WHERE user_email = %s ORDER BY fecha DESC, id DESC LIMIT 100",
-                (email,),
-            )
-            return cur.fetchall()
-
-    rows = await run_in_thread(_q)
-    return {"data": [
-        {"id": r["id"], "fecha": r["fecha"], "tipo": r["tipo"], "comentario": r["comentario"],
-         "concepto": decrypt_str(bytes(r["concepto_enc"])), "importe": decrypt_float(bytes(r["importe_enc"]))}
-        for r in rows
-    ]}

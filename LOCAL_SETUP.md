@@ -19,8 +19,10 @@ docker compose -f docker-compose.local.yml up
 La primera vez (o para resetear los datos de ejemplo), en otra terminal:
 
 ```
-docker compose -f docker-compose.local.yml exec backend python seed_qa.py
+docker compose -f docker-compose.local.yml exec -e QA_PASSWORD=Local12345! backend python seed_qa.py
 ```
+
+`QA_PASSWORD` (mínimo 10 caracteres) es la contraseña del usuario de prueba local; elige la que quieras.
 
 ## URLs
 
@@ -30,7 +32,7 @@ docker compose -f docker-compose.local.yml exec backend python seed_qa.py
 | Backend  | http://localhost:8000 |
 | Comprobar que el backend vive | http://localhost:8000/api/health |
 
-**Login de prueba** (creado por `seed_qa.py`): `qa@mieconomia.test` / `QaTest1234!`
+**Login de prueba** (creado por `seed_qa.py`): `qa@mieconomia.test` / la `QA_PASSWORD` que usaste al sembrar.
 
 ## Qué hace cada servicio
 

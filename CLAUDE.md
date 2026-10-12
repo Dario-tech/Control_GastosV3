@@ -63,7 +63,7 @@ Optional backend env vars (features degrade gracefully when unset): `ANTHROPIC_A
 
 - Branch `qa` drives the isolated QA environment (see `QA-SETUP.md`); production config is in `render.yaml` (backend) and `vercel.json` (frontend).
 - `.github/workflows/keep-alive.yml` pings the production `/api/health` every 10 min because Render's free tier sleeps after 15 min idle — keep `/api/health` cheap and unauthenticated.
-- Specialist subagents live in `.claude/agents/` (`frontal`, `backend`, `infra`, `qa`, `seguridad`); the README is only a one-line stub, so don't rely on it for context.
+- Specialist subagents live in `.claude/agents/` (`frontal`, `backend`, `infra`, `qa`, `seguridad`, `tester`). Typical flow: `qa`/`seguridad` find issues (read-only) → `backend`/`frontal` fix them on a `fix/*` branch → `tester` adds regression tests → `qa` re-verifies. When invoked as subagents they assume **local** mode unless told otherwise. The README is only a one-line stub, so don't rely on it for context.
 
 ## Trabajo en paralelo (varias sesiones o agentes)
 
