@@ -85,3 +85,16 @@ CREATE TABLE IF NOT EXISTS annual_fixed_expenses (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_annual_exp_user ON annual_fixed_expenses(user_email);
+
+-- Row Level Security en todas las tablas de public, SIN políticas: bloquea el
+-- acceso por la API REST de Supabase (roles anon/authenticated) a estas tablas.
+-- El backend se conecta como owner de las tablas, que no está sujeto a RLS
+-- (no se usa FORCE ROW LEVEL SECURITY), así que su comportamiento no cambia.
+-- Idempotente: activar RLS sobre una tabla que ya la tiene no hace nada.
+ALTER TABLE public.users                      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transactions               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pending_transactions       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.savings_goals              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.savings_goal_members       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.savings_goal_contributions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.annual_fixed_expenses      ENABLE ROW LEVEL SECURITY;
