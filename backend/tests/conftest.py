@@ -25,3 +25,14 @@ def client():
 def auth_headers():
     from services.auth import create_jwt
     return {"Authorization": f"Bearer {create_jwt('test@example.com')}"}
+
+
+@pytest.fixture(autouse=True)
+def _reset_ratelimit():
+    """El limitador guarda estado global en memoria: se vacía antes y después de cada test."""
+    from services import ratelimit
+    ratelimit._hits.clear()
+    ratelimit._blocked.clear()
+    yield
+    ratelimit._hits.clear()
+    ratelimit._blocked.clear()

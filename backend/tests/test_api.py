@@ -39,9 +39,16 @@ def test_validacion_goals_sin_body_422(client, auth_headers):
     assert client.post("/api/goals", headers=auth_headers, json={}).status_code == 422
 
 
-def test_registro_password_corta_422(client):
-    r = client.post("/api/auth/register", json={"email": "a@b.com", "name": "A", "password": "corta"})
-    assert r.status_code == 422
+def test_registro_password_corta_422(client, monkeypatch):
+    import main
+
+    async def create(email, name, pw_hash):
+        return {"name": name, "shortcut_token": "tok"}
+    monkeypatch.setattr(main, "create_user_with_password", create)
+    corta = client.post("/api/auth/register", json={"email": "a@b.com", "name": "A", "password": "x" * 9})
+    assert corta.status_code == 422
+    limite = client.post("/api/auth/register", json={"email": "a@b.com", "name": "A", "password": "x" * 10})
+    assert limite.status_code == 200
 
 
 def test_registro_email_invalido_422(client):
@@ -94,7 +101,7 @@ def test_registro_ok_con_bd_simulada(client, monkeypatch):
         seen.update(email=email, pw_hash=pw_hash)
         return {"name": name, "shortcut_token": "tok"}
     monkeypatch.setattr(main, "create_user_with_password", create)
-    r = client.post("/api/auth/register", json={"email": " Ana@X.com ", "name": "", "password": "12345678"})
+    r = client.post("/api/auth/register", json={"email": " Ana@X.com ", "name": "", "password": "clave-test-1234"})
     assert r.status_code == 200
     assert seen["email"] == "ana@x.com" and seen["pw_hash"] != "12345678"
     assert r.json()["user"]["name"] == "ana"
@@ -106,7 +113,7 @@ def test_registro_duplicado_409(client, monkeypatch):
     async def create(*a):
         return None
     monkeypatch.setattr(main, "create_user_with_password", create)
-    r = client.post("/api/auth/register", json={"email": "a@b.com", "name": "A", "password": "12345678"})
+    r = client.post("/api/auth/register", json={"email": "a@b.com", "name": "A", "password": "clave-test-1234"})
     assert r.status_code == 409
 
 

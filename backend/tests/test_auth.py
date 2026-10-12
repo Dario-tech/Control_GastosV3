@@ -84,3 +84,72 @@ def test_jwt_sin_sub_da_keyerror():
     t = jwt.encode({"exp": datetime.utcnow() + timedelta(days=1)}, auth.JWT_SECRET, algorithm="HS256")
     with pytest.raises(KeyError):
         auth.get_current_user(f"Bearer {t}")
+
+
+# ── Verificación de Google (httpx simulado, sin red) ─────────────────────────
+
+class _FakeResp:
+    def __init__(self, status=200, data=None):
+        self.status_code = status
+        self._data = data or {}
+
+    def json(self):
+        return self._data
+
+
+def _fake_google(monkeypatch, resp):
+    class _Client:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, *a, **k):
+            return resp
+    monkeypatch.setattr(auth.httpx, "AsyncClient", _Client)
+    monkeypatch.setattr(auth, "GOOGLE_CLIENT_ID", "cid")
+
+
+def _info(**over):
+    d = {"aud": "cid", "iss": "accounts.google.com", "email": "a@b.com",
+         "email_verified": "true", "name": "Ana", "picture": "p"}
+    d.update(over)
+    return d
+
+
+def test_google_ok(monkeypatch):
+    import asyncio
+    _fake_google(monkeypatch, _FakeResp(200, _info()))
+    assert asyncio.run(auth.verify_google_token("t")) == {"email": "a@b.com", "name": "Ana", "picture": "p"}
+
+
+@pytest.mark.parametrize("valor", ["false", False, "", None])
+def test_google_email_no_verificado_401(monkeypatch, valor):
+    import asyncio
+    _fake_google(monkeypatch, _FakeResp(200, _info(email_verified=valor)))
+    with pytest.raises(HTTPException) as e:
+        asyncio.run(auth.verify_google_token("t"))
+    assert e.value.status_code == 401
+
+
+def test_google_email_verified_ausente_401(monkeypatch):
+    import asyncio
+    d = _info()
+    del d["email_verified"]
+    _fake_google(monkeypatch, _FakeResp(200, d))
+    with pytest.raises(HTTPException) as e:
+        asyncio.run(auth.verify_google_token("t"))
+    assert e.value.status_code == 401
+
+
+@pytest.mark.parametrize("over", [{"aud": "otra-app"}, {"iss": "evil.com"}])
+def test_google_aud_o_iss_invalidos_401(monkeypatch, over):
+    import asyncio
+    _fake_google(monkeypatch, _FakeResp(200, _info(**over)))
+    with pytest.raises(HTTPException) as e:
+        asyncio.run(auth.verify_google_token("t"))
+    assert e.value.status_code == 401
