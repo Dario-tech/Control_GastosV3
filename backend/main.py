@@ -33,7 +33,13 @@ from services.users import (
 )
 from services.db import init_pool
 from services.ratelimit import enforce, reset as ratelimit_reset, client_ip
-from services.pending import create_pending, get_pending, categorize_pending
+from services.pending import (
+    create_pending, get_pending, categorize_pending, delete_pending,
+    create_pending_dedup, ensure_wallet_schema,
+)
+from services.wallet import (
+    parse_importe, parse_fecha, today_madrid, clean_comercio, clean_id_externo,
+)
 from services.recurring import get_recurring
 from services.ai_categorize import suggest_emoji
 from services.email_report import send_monthly_report, send_monthly_reports_to_all
@@ -57,6 +63,7 @@ async def lifespan(app: FastAPI):
     ensure_encrypted_columns()  # migración aditiva idempotente (concepto/importe cifrados)
     ensure_annual_expenses_table()  # migración aditiva idempotente (gastos fijos anuales)
     ensure_search_index()  # migración aditiva idempotente (índice para paginar la búsqueda)
+    ensure_wallet_schema()  # migración aditiva idempotente (Atajo de Cartera: comercio, reglas)
     yield
 
 
@@ -448,16 +455,69 @@ async def update_transaction_endpoint(
 
 # ── Pendientes (Shortcut → DB → App) ─────────────────────────────────────────
 
-class PendingIn(BaseModel):
-    importe: float
-    fecha: str | None = None  # YYYY-MM-DD; si no se pasa, el backend usa CURRENT_DATE
+_PENDING_BODY_MAX = 4096  # bytes
+_FUENTES_PENDING = ("wallet", "manual")
+
 
 @app.post("/api/pending")
-async def create_pending_tx(body: PendingIn, email: str = Depends(get_current_user)):
-    """La app guarda el importe con la fecha real del Atajo usando la sesión activa."""
-    if body.importe <= 0:
-        raise HTTPException(status_code=422, detail="importe inválido")
-    return await create_pending(email, body.importe, body.fecha)
+async def create_pending_tx(request: Request, email: str = Depends(get_current_user)):
+    """Crea un gasto PENDIENTE de categorizar con la sesión activa.
+
+    Flujo Apple Pay: la automatización "Transacción" de Cartera ejecuta un Atajo
+    que abre la app con comercio + importe en la URL, y la app (con su JWT) lo
+    envía aquí. Body: {importe: number|string, comercio?, fecha?, fuente?:
+    "wallet"|"manual", id_externo?}. Compatible con el body antiguo {importe, fecha?}.
+    Deduplica reintentos (mismo id_externo en 24 h, o mismo importe+comercio en
+    < 2 min) devolviendo el existente con estado "duplicada".
+    Nunca se registra en logs el comercio ni el importe; los 422 son genéricos.
+    """
+    # 30/min y 300/día por usuario (frena un Atajo o una pestaña en bucle)
+    enforce("pending-min", [email], limit=30, window=60, block=300)
+    enforce("pending-day", [email], limit=300, window=86400, block=3600)
+
+    cl = request.headers.get("content-length")
+    if cl and cl.isdigit() and int(cl) > _PENDING_BODY_MAX:
+        raise HTTPException(status_code=413, detail="Body demasiado grande")
+    raw = await request.body()
+    if len(raw) > _PENDING_BODY_MAX:
+        raise HTTPException(status_code=413, detail="Body demasiado grande")
+    try:
+        data = json_lib.loads(raw)
+        if isinstance(data, str):  # JSON enviado como texto
+            data = json_lib.loads(data)
+    except Exception:
+        data = None
+    if not isinstance(data, dict):
+        _err422("Body inválido")
+
+    try:
+        importe = parse_importe(data.get("importe"))
+    except ValueError:
+        _err422("importe inválido")
+    try:
+        fecha = parse_fecha(data.get("fecha"))  # falta → hoy en Europe/Madrid
+    except ValueError:
+        _err422("fecha inválida")
+    fuente = data.get("fuente")
+    if fuente is None:
+        fuente = "manual"
+    if fuente not in _FUENTES_PENDING:
+        _err422("fuente inválida")
+    comercio = clean_comercio(data.get("comercio"))
+    id_externo = clean_id_externo(data.get("id_externo"))
+
+    r = await create_pending_dedup(email, importe, fecha.isoformat(), comercio, id_externo, fuente)
+    s = r["sugerencia"]
+    if not r["duplicada"]:
+        await _broadcast()
+    return {
+        "estado": "duplicada" if r["duplicada"] else "pendiente",
+        "id": r["id"],
+        "importe": r["importe"],
+        "comercio": r["comercio"],
+        "fecha": r["fecha"],
+        "sugerencia": {"tipo": s["tipo"], "concepto": s["concepto"], "origen": s["origen"]} if s else None,
+    }
 
 
 @app.get("/api/pending")
@@ -466,13 +526,29 @@ async def get_pending_txs(email: str = Depends(get_current_user)):
 
 
 class CategorizeIn(BaseModel):
-    tipo:     str
-    concepto: str
+    tipo:       str
+    concepto:   str
+    recordar:   bool = True         # aprender la regla comercio → categoría
+    comentario: str | None = None   # ≤ 500, se guarda en la transacción creada
 
 
 @app.post("/api/pending/{pending_id}/categorize")
 async def categorize_pending_tx(pending_id: int, body: CategorizeIn, email: str = Depends(get_current_user)):
-    result = await categorize_pending(pending_id, email, body.tipo, body.concepto)
+    comentario = (body.comentario or "").strip() or None
+    if comentario and len(comentario) > _COMENTARIO_MAX:
+        _err422(f"El comentario no puede superar {_COMENTARIO_MAX} caracteres")
+    result = await categorize_pending(
+        pending_id, email, body.tipo, body.concepto,
+        recordar=body.recordar, comentario=comentario,
+    )
+    await _broadcast()
+    return result
+
+
+@app.delete("/api/pending/{pending_id}")
+async def delete_pending_tx(pending_id: int, email: str = Depends(get_current_user)):
+    """Descarta un pendiente propio (Wallet también avisa de pagos rechazados)."""
+    result = await delete_pending(pending_id, email)  # 404 si no es suyo / no existe
     await _broadcast()
     return result
 
@@ -515,7 +591,15 @@ async def shortcut_create_pending(request: Request):
     if importe > SHORTCUT_MAX_IMPORTE:
         raise HTTPException(status_code=422, detail="importe demasiado alto")
 
-    result = await create_pending(email, importe)
+    # Fecha recibida si es válida; si falta o no se entiende, HOY en Europe/Madrid
+    # (no CURRENT_DATE de la BD, que va en UTC). Se tolera un formato desconocido
+    # por compatibilidad con Atajos antiguos que nunca enviaron fecha.
+    try:
+        fecha = parse_fecha(data.get("fecha"))
+    except ValueError:
+        fecha = today_madrid()
+
+    result = await create_pending(email, importe, fecha.isoformat(), fuente="atajo")
     await _broadcast()  # la PWA recibe SSE y actualiza la campana en tiempo real
     return result
 
