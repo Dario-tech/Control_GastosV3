@@ -2122,6 +2122,39 @@ html.light .s-action-btn  { background: var(--surface2); color: var(--text2); bo
   -webkit-box-orient: vertical;
   line-height: 1.3;
 }
+.txlog-note.empty { color: var(--text3); font-style: italic; }
+
+/* Barra fija con el total del mes cuando el resumen sale de la vista */
+.txlog-sticky {          /* altura 0: se superpone sin desplazar la lista */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 0;
+  margin: 0 -16px;
+  pointer-events: none;
+}
+.txlog-sticky-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  font-size: var(--fs-sm);
+  color: var(--text2);
+  background: var(--surface2);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: 0 6px 12px -8px rgba(0,0,0,0.35);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.18s, transform 0.18s;
+}
+.txlog-sticky.show .txlog-sticky-bar { opacity: 1; transform: none; }
+.txlog-sticky-total {
+  font-weight: 750;
+  color: var(--red);
+  font-variant-numeric: tabular-nums;
+}
+.txlog-sticky-total.is-income { color: var(--green); }
 .txlog-importe {
   font-size: var(--fs-lg);
   font-weight: 750;

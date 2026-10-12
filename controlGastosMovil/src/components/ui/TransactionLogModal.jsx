@@ -35,6 +35,17 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, year, 
   useEffect(() => { setOverrides({}); setDeleted(new Set()) }, [transactions])
 
   const ref = useRef(null)
+  const scrollRef  = useRef(null)
+  const summaryRef = useRef(null)
+  // Barra compacta con el total cuando el resumen sale de la vista (listas largas).
+  const [compact, setCompact] = useState(false)
+  useEffect(() => {
+    const root = scrollRef.current, target = summaryRef.current
+    if (!root || !target || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(([e]) => setCompact(!e.isIntersecting), { root, threshold: 0 })
+    io.observe(target)
+    return () => io.disconnect()
+  }, [])
   const editingRef = useRef(editing)
   editingRef.current = editing
   const closeRef = useRef(onClose)
@@ -131,8 +142,16 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, year, 
             </button>
           </div>
 
-          <div className="txlog-scroll">
-            <section className="txlog-summary" aria-label="Resumen del mes">
+          <div className="txlog-scroll" ref={scrollRef}>
+            <div className={`txlog-sticky${compact ? ' show' : ''}`} aria-hidden={!compact}>
+              <div className="txlog-sticky-bar">
+                <span>Total {monthName.toLowerCase()} · {sum.count} mov.</span>
+                <span className={`txlog-sticky-total ${isIncome ? 'is-income' : ''}`}>
+                  {sum.count ? sign : ''}{money(sum.total)}
+                </span>
+              </div>
+            </div>
+            <section className="txlog-summary" aria-label="Resumen del mes" ref={summaryRef}>
               <div className="txlog-summary-main">
                 <span className="txlog-summary-label">Total {monthName.toLowerCase()}</span>
                 <span className={`txlog-summary-total ${isIncome ? 'is-income' : ''}`}>
@@ -193,7 +212,7 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, year, 
                                 aria-label={`Editar movimiento de ${money(t.importe)}, ${d.long}${t.comentario ? `, nota: ${t.comentario}` : ''}`}
                               >
                                 <span className={`txlog-note${t.comentario ? '' : ' empty'}`}>
-                                  {t.comentario}
+                                  {t.comentario || 'Sin nota'}
                                 </span>
                                 <span className={`txlog-importe ${isIncome ? 'is-income' : ''}`}>{sign}{money(t.importe)}</span>
                                 <span className="txlog-chevron" aria-hidden="true"><Icon name="back" size={16} /></span>
