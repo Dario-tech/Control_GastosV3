@@ -4,6 +4,8 @@ import math
 import asyncio
 import json as json_lib
 import logging
+import re
+from datetime import date as date_type
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +20,7 @@ from services.prices import get_all_prices
 from services.sheets import (
     get_finance_data, delete_transaction, post_transaction,
     ensure_comentario_column, update_transaction_comment, ensure_encrypted_columns,
+    update_transaction,
     ensure_search_index, search_transactions,
 )
 from services.auth import (
@@ -345,6 +348,100 @@ async def update_transaction_comment_endpoint(
         raise
     except Exception:
         raise  # lo gestiona el handler global (log en servidor, mensaje genérico)
+    await _broadcast()
+    return result
+
+
+# ── Edición de transacciones ─────────────────────────────────────────────────
+
+TIPOS_VALIDOS = ("Ingreso", "Gasto Fijo", "Gasto Variable")  # = TYPES del frontend
+_CONCEPTO_MAX   = 60
+_COMENTARIO_MAX = 500
+_IMPORTE_MAX    = 1_000_000
+_FECHA_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_CAMPOS_EDITABLES = ("fecha", "importe", "tipo", "concepto", "comentario")
+
+
+def _err422(msg: str):
+    raise HTTPException(status_code=422, detail=msg)
+
+
+def _validate_tx_patch(data) -> dict:
+    """Valida el body parcial de PATCH /api/transactions/{id} y devuelve solo los
+    campos editables, ya normalizados. Claves desconocidas se ignoran."""
+    if not isinstance(data, dict):
+        _err422("El cuerpo debe ser un objeto JSON")
+    changes: dict = {}
+
+    if "fecha" in data:
+        f = data["fecha"]
+        if not isinstance(f, str) or not _FECHA_RE.match(f.strip()):
+            _err422("La fecha debe tener el formato AAAA-MM-DD")
+        try:
+            d = date_type.fromisoformat(f.strip())
+        except ValueError:
+            _err422("La fecha no es válida")
+        if d.year < 2000 or d.year > date_type.today().year + 1:
+            _err422(f"El año de la fecha debe estar entre 2000 y {date_type.today().year + 1}")
+        changes["fecha"] = d.isoformat()
+
+    if "importe" in data:
+        v = data["importe"]
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            _err422("El importe debe ser un número")
+        try:
+            v = float(v)  # enteros enormes -> OverflowError
+        except OverflowError:
+            _err422("El importe no puede superar 1.000.000")
+        if not math.isfinite(v):
+            _err422("El importe debe ser un número finito")
+        if v <= 0:
+            _err422("El importe debe ser mayor que 0")
+        if v > _IMPORTE_MAX:
+            _err422("El importe no puede superar 1.000.000")
+        changes["importe"] = float(v)
+
+    if "tipo" in data:
+        t = data["tipo"]
+        if not isinstance(t, str) or t.strip() not in TIPOS_VALIDOS:
+            _err422("El tipo debe ser uno de: " + ", ".join(TIPOS_VALIDOS))
+        changes["tipo"] = t.strip()
+
+    if "concepto" in data:
+        c = data["concepto"]
+        if not isinstance(c, str) or not c.strip():
+            _err422("El concepto no puede estar vacío")
+        c = c.strip()
+        if len(c) > _CONCEPTO_MAX:
+            _err422(f"El concepto no puede superar {_CONCEPTO_MAX} caracteres")
+        changes["concepto"] = c
+
+    if "comentario" in data:
+        cm = data["comentario"]
+        if cm is None:
+            cm = ""  # null = borrar, igual que ""
+        if not isinstance(cm, str):
+            _err422("El comentario debe ser texto")
+        cm = cm.strip()
+        if len(cm) > _COMENTARIO_MAX:
+            _err422(f"El comentario no puede superar {_COMENTARIO_MAX} caracteres")
+        changes["comentario"] = cm
+
+    if not changes:
+        _err422("Indica al menos un campo a modificar: " + ", ".join(_CAMPOS_EDITABLES))
+    return changes
+
+
+@app.patch("/api/transactions/{tx_id}")
+async def update_transaction_endpoint(
+    tx_id: int, request: Request, email: str = Depends(get_current_user)
+):
+    try:
+        data = json_lib.loads(await request.body() or b"null")
+    except ValueError:
+        _err422("El cuerpo no es JSON válido")
+    changes = _validate_tx_patch(data)
+    result = await update_transaction(tx_id, email, changes)  # 404 si no es suyo
     await _broadcast()
     return result
 

@@ -390,6 +390,77 @@ async def post_transaction(
     return {"status": "ok", "id": row["id"], "fecha": row["fecha"]}
 
 
+# Columnas editables vía PATCH /api/transactions/{id}. Lista blanca: los nombres
+# de columna nunca salen del cliente, solo los valores (que van parametrizados).
+_EDITABLE_COLUMNS = ("fecha", "tipo", "concepto_enc", "importe_enc", "comentario")
+
+
+async def update_transaction(tx_id: int, email: str, changes: dict) -> dict:
+    """Edición parcial de una transacción del usuario.
+
+    `changes` llega ya validado (ver main._validate_tx_patch) con claves de
+    entre: fecha, tipo, concepto, importe, comentario. concepto e importe se
+    cifran aquí antes de guardarse; nunca se escriben en claro.
+    Lanza 404 si el id no existe o es de otro usuario (sin distinguir).
+    Devuelve los valores ya guardados, con concepto/importe descifrados.
+    """
+    values: dict = {}
+    if "fecha" in changes:
+        values["fecha"] = changes["fecha"]
+    if "tipo" in changes:
+        values["tipo"] = changes["tipo"]
+    if "concepto" in changes:
+        values["concepto_enc"] = encrypt_str(changes["concepto"])
+    if "importe" in changes:
+        values["importe_enc"] = encrypt_float(changes["importe"])
+    if "comentario" in changes:
+        values["comentario"] = changes["comentario"] or None
+    if not values:
+        raise HTTPException(status_code=422, detail="No hay ningún campo que actualizar")
+
+    sets, params = [], []
+    for col in _EDITABLE_COLUMNS:
+        if col in values:
+            sets.append(f"{col} = %s::date" if col == "fecha" else f"{col} = %s")
+            params.append(values[col])
+    params.extend([tx_id, email])
+
+    def _q():
+        with db_cursor() as cur:
+            cur.execute(
+                f"""UPDATE transactions SET {', '.join(sets)}
+                    WHERE id = %s AND user_email = %s
+                    RETURNING id, fecha::text, tipo, concepto_enc, importe_enc, comentario""",
+                params,
+            )
+            return cur.fetchone()
+
+    row = await run_in_thread(_q)
+    if not row:
+        raise HTTPException(status_code=404, detail="Transacción no encontrada")
+
+    if "concepto" in changes and "importe" in changes:
+        concepto, importe = changes["concepto"], changes["importe"]
+    else:
+        dec = decrypt_transaction(row["concepto_enc"], row["importe_enc"], row["id"])
+        if dec is None:
+            # Ya registrado en el log por decrypt_transaction (solo el id).
+            raise HTTPException(status_code=500, detail="No se pudo leer la transacción guardada")
+        concepto = changes.get("concepto", dec[0])
+        importe = changes.get("importe", dec[1])
+
+    return {
+        "id":         row["id"],
+        "fecha":      str(row["fecha"])[:10],
+        "tipo":       row["tipo"],
+        "concepto":   concepto,
+        # Mismo convenio que /api/finance y la búsqueda: el importe se expone en
+        # positivo; el sentido (gasto/ingreso) lo da `tipo`.
+        "importe":    abs(float(importe)),
+        "comentario": row["comentario"] or "",
+    }
+
+
 async def update_transaction_comment(row_index: int, email: str, comentario: str) -> dict:
     """Añadir o editar el comentario de una transacción ya guardada."""
     def _q():
