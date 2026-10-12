@@ -240,3 +240,55 @@ export async function deleteAnnualExpense(id) {
   })
   return apiJson(res)
 }
+
+// ── Pagos pendientes (Apple Pay vía Atajo de iOS) ───────────────────────────
+
+export async function fetchPending() {
+  const res = await fetch(`${BASE}/api/pending`, {
+    headers: authHeaders(),
+    signal:  AbortSignal.timeout(15000),
+  })
+  return apiJson(res)
+}
+
+// Crea un pendiente con lo que manda el Atajo de iOS al abrir la app
+// (?atajo=1&importe=…&comercio=…). `id_externo` permite al backend reconocer
+// un reenvío del mismo pago y responder estado "duplicada" en vez de crearlo
+// otra vez. Respuesta: { estado, id, importe, comercio, fecha, sugerencia }.
+export async function createPending({ importe, comercio, fecha, fuente = 'wallet', id_externo }) {
+  const body = { importe, fuente }
+  if (comercio)   body.comercio = comercio
+  if (fecha)      body.fecha = fecha
+  if (id_externo) body.id_externo = id_externo
+  const res = await fetch(`${BASE}/api/pending`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify(body),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return apiJson(res)
+}
+
+// `recordar` (por defecto true) hace que el backend aprenda comercio → categoría
+// para sugerirla la próxima vez que se pague en el mismo sitio.
+export async function categorizePending(id, { tipo, concepto, recordar = true, comentario } = {}) {
+  const body = { tipo, concepto, recordar }
+  if (comentario) body.comentario = comentario
+  const res = await fetch(`${BASE}/api/pending/${id}/categorize`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify(body),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return apiJson(res)
+}
+
+// Descarta un pendiente sin apuntarlo (pago rechazado, duplicado, prueba...).
+export async function discardPending(id) {
+  const res = await fetch(`${BASE}/api/pending/${id}`, {
+    method:  'DELETE',
+    headers: authHeaders(),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return apiJson(res)
+}

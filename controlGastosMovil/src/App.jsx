@@ -11,7 +11,9 @@ import Toast from './components/ui/Toast'
 import { TabSkeleton, FormSkeleton } from './components/ui/Skeleton'
 import { shouldShowTour } from './utils/tour'
 import { usePendingTransaction } from './hooks/usePendingTransaction'
+import { useShortcutIntake } from './hooks/useShortcutIntake'
 import LoginScreen from './components/auth/LoginScreen'
+import IntakeLoginBanner from './components/auth/IntakeLoginBanner'
 import YearTab from './components/tabs/YearTab'
 
 // Año es la pantalla de entrada y va en el bundle inicial. El resto de
@@ -69,7 +71,9 @@ function AppContent() {
   const [categorizeOpen, setCategorizeOpen] = useState(false)
   const [addOpen,        setAddOpen]        = useState(false)
   const [guideOpen,      setGuideOpen]      = useState(shouldShowTour)
-  const { queue, fetchQueue, categorizePending } = usePendingTransaction()
+  const { queue, fetchQueue, categorizePending, discardPending } = usePendingTransaction()
+  // Pagos de Apple Pay que llegan por URL desde el Atajo de iOS (?atajo=1…)
+  const intake = useShortcutIntake({ onChange: fetchQueue })
 
   const current = queue[0] ?? null
 
@@ -109,11 +113,22 @@ function AppContent() {
         )}
       </Suspense>
       <Suspense fallback={<FormSkeleton />}>
-        {categorizeOpen && current && (
+        {intake.received && (
+          <CategorizeModal
+            variant="received"
+            pending={intake.received}
+            total={1}
+            onCategorize={async (...args) => { await categorizePending(...args); intake.dismiss() }}
+            onDiscard={async id => { await discardPending(id); intake.dismiss() }}
+            onSkip={intake.dismiss}
+          />
+        )}
+        {!intake.received && categorizeOpen && current && (
           <CategorizeModal
             pending={current}
             total={queue.length}
             onCategorize={categorizePending}
+            onDiscard={discardPending}
             onSkip={() => setCategorizeOpen(false)}
           />
         )}
@@ -125,7 +140,9 @@ function AppContent() {
 
 function AuthGate() {
   const { user } = useAuth()
-  if (!user) return <LoginScreen />
+  // Sin sesión, un pago llegado del Atajo se guarda en la cola (lo captura el
+  // banner) y useShortcutIntake lo envía en cuanto se inicia sesión.
+  if (!user) return <><IntakeLoginBanner /><LoginScreen /></>
   // key: si cambia la cuenta, se desmonta y vuelve a montar todo el estado en
   // memoria (datos financieros, pendientes...) en vez de reutilizar el anterior.
   return (
