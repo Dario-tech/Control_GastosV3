@@ -57,3 +57,11 @@ def enforce(scope: str, keys: list[str], limit: int, window: int = 60, block: in
         _gc(now)
         for k in keys:
             _check(f"{scope}:{k}", limit, window, block, now)
+
+
+def reset(scope: str, key: str) -> None:
+    """Olvida los intentos acumulados (y un bloqueo activo) de una clave, p. ej.
+    tras un login correcto, para que los aciertos no cuenten contra el límite."""
+    with _lock:
+        _hits.pop(f"{scope}:{key}", None)
+        _blocked.pop(f"{scope}:{key}", None)

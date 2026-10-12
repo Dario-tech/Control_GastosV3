@@ -1,7 +1,5 @@
 from datetime import date
 
-import pytest
-
 from services.annual_expenses import _enrich, _next_due_date
 
 

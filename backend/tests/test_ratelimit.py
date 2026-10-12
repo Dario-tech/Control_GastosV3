@@ -137,3 +137,68 @@ def test_registro_429_por_ip_tras_5(client, monkeypatch):
         assert r.status_code == 409
     r = client.post("/api/auth/register", json={"email": "u9@b.com", "name": "A", "password": "clave-test-1234"})
     assert r.status_code == 429
+
+
+# ── reset(): los logins correctos no cuentan para el límite por email ─────────
+
+def test_reset_borra_intentos_y_bloqueo(clock):
+    for _ in range(3):
+        ratelimit.enforce("s", ["k"], limit=3, window=60, block=300)
+    with pytest.raises(HTTPException):
+        ratelimit.enforce("s", ["k"], limit=3, window=60, block=300)  # bloqueada
+    ratelimit.reset("s", "k")
+    ratelimit.enforce("s", ["k"], limit=3, window=60, block=300)      # vuelve a pasar
+    ratelimit.reset("s", "no-existe")                                  # no falla
+
+
+def _login_mocks(monkeypatch, ok_password="buena"):
+    import main
+
+    async def get_hash(_):
+        return "hash"
+
+    async def get_user(_):
+        return {"name": "Ana", "shortcut_token": "tok"}
+    monkeypatch.setattr(main, "get_password_hash", get_hash)
+    monkeypatch.setattr(main, "get_user", get_user)
+    monkeypatch.setattr(main, "verify_password", lambda pw, h: pw == ok_password)
+
+
+def test_login_correcto_no_cuenta_para_limite_por_email(client, monkeypatch):
+    _login_mocks(monkeypatch)
+    body = {"email": "ana@y.com", "password": "buena"}
+    for _ in range(10):
+        assert client.post("/api/auth/login-email", json=body).status_code == 200
+
+
+def test_login_correcto_reinicia_fallos_previos(client, monkeypatch):
+    _login_mocks(monkeypatch)
+    mala = {"email": "ana@y.com", "password": "mala"}
+    buena = {"email": "ana@y.com", "password": "buena"}
+    for _ in range(4):
+        assert client.post("/api/auth/login-email", json=mala).status_code == 401
+    assert client.post("/api/auth/login-email", json=buena).status_code == 200
+    # contador reiniciado: caben otros 5 fallos antes del 429
+    for _ in range(5):
+        assert client.post("/api/auth/login-email", json=mala).status_code == 401
+    assert client.post("/api/auth/login-email", json=mala).status_code == 429
+
+
+def test_login_correcto_no_reinicia_limite_por_ip(client, monkeypatch):
+    _login_mocks(monkeypatch)
+    for i in range(20):
+        assert client.post("/api/auth/login-email", json={"email": f"u{i}@y.com", "password": "buena"}).status_code == 200
+    assert client.post("/api/auth/login-email", json={"email": "z@y.com", "password": "buena"}).status_code == 429
+
+
+def test_login_google_429_por_ip(client, monkeypatch):
+    import main
+
+    async def bad_token(_):
+        raise HTTPException(status_code=401, detail="Token inválido")
+    monkeypatch.setattr(main, "verify_google_token", bad_token)
+    for _ in range(20):
+        assert client.post("/api/auth/login", json={"token": "x"}).status_code == 401
+    r = client.post("/api/auth/login", json={"token": "x"})
+    assert r.status_code == 429
+    assert "Retry-After" in r.headers

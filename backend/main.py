@@ -1,4 +1,6 @@
 import os
+import hmac
+import math
 import asyncio
 import json as json_lib
 import logging
@@ -14,7 +16,7 @@ load_dotenv()
 
 from services.prices import get_all_prices
 from services.sheets import (
-    get_finance_data, get_raw_transactions, delete_transaction, post_transaction,
+    get_finance_data, delete_transaction, post_transaction,
     ensure_comentario_column, update_transaction_comment, ensure_encrypted_columns,
     ensure_search_index, search_transactions,
 )
@@ -27,7 +29,7 @@ from services.users import (
     ensure_password_column, get_password_hash, create_user_with_password,
 )
 from services.db import init_pool
-from services.ratelimit import enforce, client_ip
+from services.ratelimit import enforce, reset as ratelimit_reset, client_ip
 from services.pending import create_pending, get_pending, categorize_pending
 from services.recurring import get_recurring
 from services.ai_categorize import suggest_emoji
@@ -71,7 +73,26 @@ _raw_origins = os.getenv(
     "CORS_ORIGINS",
     "http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173,https://control-beta-ten.vercel.app"
 )
-origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
+
+def _normalize_origin(origin: str) -> str:
+    """Normaliza un origen de CORS_ORIGINS: sin espacios, comillas, barra final
+    ni mayúsculas (el navegador envía el Origin exacto, p. ej. sin '/' final)."""
+    return origin.strip().strip('"\'').rstrip('/').lower()
+
+
+def _parse_origins(raw: str) -> list[str]:
+    origins: list[str] = []
+    for part in raw.split(","):
+        o = _normalize_origin(part)
+        if o and o not in origins:
+            origins.append(o)
+    # "*" en la lista = permitir cualquier origen (comportamiento estándar de Starlette)
+    return ["*"] if "*" in origins else origins
+
+
+origins = _parse_origins(_raw_origins)
+_log.info("CORS: orígenes permitidos = %s", origins)
 
 app.add_middleware(
     CORSMiddleware,
@@ -90,8 +111,10 @@ class GoogleLoginIn(BaseModel):
 
 
 @app.post("/api/auth/login")
-async def auth_login(body: GoogleLoginIn):
+async def auth_login(body: GoogleLoginIn, request: Request):
     """Verifica el token de Google y auto-registra al usuario si es nuevo."""
+    # 20 intentos/min por IP; al superarlo, bloqueo de 5 min
+    enforce("google-login-ip", [client_ip(request)], limit=20, window=60, block=300)
     google_user   = await verify_google_token(body.token)
     email         = google_user["email"]
     name          = google_user.get("name") or email.split("@")[0]
@@ -166,6 +189,11 @@ async def auth_register(body: RegisterIn, request: Request):
     return _session_response(email, created["name"], created["shortcut_token"])
 
 
+# Hash bcrypt (cost 12, igual que hash_password) de un valor aleatorio descartado:
+# solo sirve para igualar tiempos en el login cuando el email no tiene contraseña.
+_DUMMY_PASSWORD_HASH = "$2b$12$qhPMykdSQCNekEYVLcPpDuDQnNZiGgY4bwnnuetzdUsewqqMBM3Py"
+
+
 @app.post("/api/auth/login-email")
 async def auth_login_email(body: EmailLoginIn, request: Request):
     email = body.email.strip().lower()
@@ -175,8 +203,15 @@ async def auth_login_email(body: EmailLoginIn, request: Request):
     pw_hash = await get_password_hash(email)
 
     # Error genérico: no revela si el email existe (evita enumeración de usuarios)
-    if not pw_hash or not verify_password(body.password, pw_hash):
+    if not pw_hash:
+        # Sin hash (email inexistente o cuenta solo-Google): se ejecuta igualmente
+        # un bcrypt de relleno para que el tiempo de respuesta no delate qué emails existen.
+        verify_password(body.password, _DUMMY_PASSWORD_HASH)
         raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
+    if not verify_password(body.password, pw_hash):
+        raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
+    # Login correcto: los aciertos no cuentan para el límite por email (el de IP se mantiene)
+    ratelimit_reset("login-email", email)
 
     user = await get_user(email)
     return _session_response(email, (user or {}).get("name", ""), (user or {}).get("shortcut_token", ""))
@@ -347,6 +382,8 @@ async def categorize_pending_tx(pending_id: int, body: CategorizeIn, email: str 
 
 # ── Atajo iOS (token permanente, sin JWT) ────────────────────────────────────
 
+SHORTCUT_MAX_IMPORTE = 1_000_000
+
 @app.post("/api/shortcut/pending")
 async def shortcut_create_pending(request: Request):
     """Atajo iOS: guarda un gasto pendiente usando el token permanente del usuario.
@@ -361,6 +398,8 @@ async def shortcut_create_pending(request: Request):
     token = data.get("shortcut_token") or data.get("token")
     if not token:
         raise HTTPException(status_code=401, detail="shortcut_token requerido")
+    # 30 peticiones/min por token (también frena el tanteo de tokens inválidos)
+    enforce("shortcut", [str(token)], limit=30, window=60, block=300)
 
     email = await get_email_by_shortcut_token(token)
     if not email:
@@ -372,8 +411,12 @@ async def shortcut_create_pending(request: Request):
     except (KeyError, TypeError, ValueError):
         raise HTTPException(status_code=422, detail="importe inválido")
 
+    if not math.isfinite(importe):
+        raise HTTPException(status_code=422, detail="importe inválido")
     if importe <= 0:
         raise HTTPException(status_code=422, detail="importe debe ser mayor que 0")
+    if importe > SHORTCUT_MAX_IMPORTE:
+        raise HTTPException(status_code=422, detail="importe demasiado alto")
 
     result = await create_pending(email, importe)
     await _broadcast()  # la PWA recibe SSE y actualiza la campana en tiempo real
@@ -425,7 +468,8 @@ async def send_all_monthly_reports(request: Request):
     Pensado para un cron externo — protegido por un secreto compartido,
     no por sesión de usuario."""
     secret = request.headers.get("x-cron-secret", "")
-    if not CRON_SECRET or secret != CRON_SECRET:
+    # Comparación en tiempo constante (no filtra el secreto por timing)
+    if not CRON_SECRET or not hmac.compare_digest(secret.encode("utf-8"), CRON_SECRET.encode("utf-8")):
         raise HTTPException(status_code=401, detail="No autorizado")
     return {"results": await send_monthly_reports_to_all()}
 
@@ -588,14 +632,3 @@ async def investment_prices():
     except Exception:
         raise  # lo gestiona el handler global (log en servidor, mensaje genérico)
 
-
-# ── Debug ─────────────────────────────────────────────────────────────────────
-
-@app.get("/api/debug/transactions")
-async def debug_transactions(email: str = Depends(get_current_user)):
-    try:
-        return await get_raw_transactions(email)
-    except HTTPException:
-        raise
-    except Exception:
-        raise  # lo gestiona el handler global (log en servidor, mensaje genérico)

@@ -126,8 +126,10 @@ function AppContent() {
 function AuthGate() {
   const { user } = useAuth()
   if (!user) return <LoginScreen />
+  // key: si cambia la cuenta, se desmonta y vuelve a montar todo el estado en
+  // memoria (datos financieros, pendientes...) en vez de reutilizar el anterior.
   return (
-    <FinanceDataProvider>
+    <FinanceDataProvider key={user.email}>
       <AppProvider>
         <AppContent />
       </AppProvider>

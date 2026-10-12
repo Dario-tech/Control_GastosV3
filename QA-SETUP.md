@@ -19,9 +19,9 @@ Vercel (rama qa)  ──►  Render (backend QA, rama qa)  ──►  Supabase (
    VITE_API_URL=backend QA                                schema.sql + seed_qa.sql
 ```
 
-**Credenciales de test** (creadas por `seed_qa.sql`):
+**Credenciales de test** (creadas por `backend/seed_qa.py`):
 - Email: `qa@mieconomia.test`
-- Contraseña: `QaTest1234!`
+- Contraseña: la que definas en la variable de entorno `QA_PASSWORD` al sembrar (mínimo 10 caracteres; no se guarda en el repo)
 
 ---
 
@@ -37,7 +37,7 @@ Vercel (rama qa)  ──►  Render (backend QA, rama qa)  ──►  Supabase (
 5. Aplica el usuario de test y los datos de muestra con el script (ya no es SQL puro, porque cifra al insertar):
    ```bash
    cd backend
-   DATABASE_URL="..." DB_ENCRYPTION_KEY="..." python seed_qa.py
+   DATABASE_URL="..." DB_ENCRYPTION_KEY="..." QA_PASSWORD="..." python seed_qa.py
    ```
 
 > Con esto la BD de QA queda lista y con datos. Producción no se toca en ningún momento.
@@ -100,7 +100,7 @@ Objetivo: que el preview de la rama apunte al backend QA, no al de producción.
 1. Abre la URL del frontend QA.
 2. Pantalla de login → **no** uses Google → rellena:
    - Email: `qa@mieconomia.test`
-   - Contraseña: `QaTest1234!`
+   - Contraseña: la que pusiste en `QA_PASSWORD` al ejecutar `seed_qa.py`
 3. Deberías entrar y ver los datos de muestra. Comprueba:
    - **Mes (julio)** → tarjeta *"Resumen del mes"* comparando con junio.
    - **Stats** → *"Suscripciones detectadas: Netflix"*.

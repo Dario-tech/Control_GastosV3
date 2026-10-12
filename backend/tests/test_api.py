@@ -21,7 +21,6 @@ PROTEGIDAS = [
     ("delete", "/api/annual-expenses/1"),
     ("post", "/api/notify"),
     ("post", "/api/reports/monthly/send"),
-    ("get", "/api/debug/transactions"),
 ]
 
 

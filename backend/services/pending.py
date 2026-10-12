@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from .db import db_cursor, run_in_thread
 from .suggest import suggest_category
-from .crypto import encrypt_str, decrypt_str, encrypt_float, decrypt_float
+from .crypto import encrypt_str, encrypt_float, decrypt_transaction
 
 
 async def create_pending(email: str, importe: float, fecha: str | None = None) -> dict:
@@ -31,17 +31,20 @@ async def get_pending(email: str) -> list:
             pending = cur.fetchall()
             # Historial del usuario para sugerir categoría (una sola query)
             cur.execute(
-                "SELECT tipo, concepto_enc, importe_enc FROM transactions WHERE user_email = %s",
+                "SELECT id, tipo, concepto_enc, importe_enc FROM transactions WHERE user_email = %s",
                 (email,),
             )
             history = cur.fetchall()
             return pending, history
 
     pending, history = await run_in_thread(_q)
-    history = [
-        {"tipo": h["tipo"], "concepto": decrypt_str(bytes(h["concepto_enc"])), "importe": decrypt_float(bytes(h["importe_enc"]))}
-        for h in history
-    ]
+    decrypted = []
+    for h in history:
+        dec = decrypt_transaction(h["concepto_enc"], h["importe_enc"], h["id"])
+        if dec is None:
+            continue  # fila indescifrable: se omite (ya registrada en el log)
+        decrypted.append({"tipo": h["tipo"], "concepto": dec[0], "importe": dec[1]})
+    history = decrypted
 
     result = []
     for r in pending:
