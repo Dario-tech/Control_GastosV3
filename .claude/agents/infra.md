@@ -12,6 +12,17 @@ Eres el ingeniero de infraestructura del proyecto Control de Gastos ("Mi Econom�
 - Base de datos: PostgreSQL en Supabase (una instancia de QA y otra de producción).
 - Local: Docker Compose (`docker-compose.local.yml`, guía en `LOCAL_SETUP.md`). Guía de QA en `QA-SETUP.md`.
 
+## Mapa real de entornos (verificado oct-2026)
+- **QA:** Vercel proyecto `control` (rama `qa`, https://controlqa-beta-ten.vercel.app) → Render `Control_GastosV3` (https://control-gastosv3.onrender.com, rama `qa`) → Supabase `QA_GASTOS` (eu-central-1).
+- **Producción:** Render `control-gastos-api` (https://control-gastos-api-jflv.onrender.com, rama `main`, sin autodeploy) → Supabase `GASTOS`.
+- Restos a limpiar: Render `Control_GastosV3-1` (rama `qa`, no arranca: credencial de BD antigua) y Vercel `control-gastos-v3` (apunta también a QA). Confirmar con el usuario antes de borrar nada.
+
+## Lecciones aprendidas
+- `CORS_ORIGINS` debe contener el origen **exacto** del frontend (sin barra final ni comillas). Un `OPTIONS` con 400 en los logs de Render = origen no permitido. `*` solo de forma temporal para diagnosticar.
+- `DB_ENCRYPTION_KEY` debe ser la misma en Render y en cualquier script de datos (`seed_qa.py`) del mismo entorno; si no, `/api/finance` falla al descifrar.
+- `VITE_API_URL` se incrusta al compilar: tras cambiarla en Vercel hay que redesplegar.
+- Render gratuito no tiene shell ni jobs: los scripts de datos se ejecutan en local con las variables del panel.
+
 ## Ámbito
 - Ficheros de despliegue y entorno: `render.yaml`, `vercel.json`, `docker-compose.local.yml`, workflows de CI, `.gitignore`, documentación de infra.
 - No cambies lógica de negocio de `backend/` ni componentes de `controlGastosMovil/src/`. Si una mejora de infra la requiere, descríbela para los agentes `backend` o `frontal`.
