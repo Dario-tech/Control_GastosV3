@@ -27,6 +27,7 @@ from services.users import (
     ensure_password_column, get_password_hash, create_user_with_password,
 )
 from services.db import init_pool
+from services.ratelimit import enforce, client_ip
 from services.pending import create_pending, get_pending, categorize_pending
 from services.recurring import get_recurring
 from services.ai_categorize import suggest_emoji
@@ -145,14 +146,18 @@ def _session_response(email: str, name: str, shortcut_token: str) -> dict:
 
 
 @app.post("/api/auth/register")
-async def auth_register(body: RegisterIn):
+async def auth_register(body: RegisterIn, request: Request):
     email = body.email.strip().lower()
     name  = body.name.strip() or email.split("@")[0]
 
+    # 5 registros/10 min por IP (bloqueo 15 min); 3/10 min por email
+    enforce("reg-ip", [client_ip(request)], limit=5, window=600, block=900)
+    enforce("reg-email", [email], limit=3, window=600, block=900)
+
     if not _EMAIL_RE.match(email):
         raise HTTPException(status_code=422, detail="Email no válido")
-    if len(body.password) < 8:
-        raise HTTPException(status_code=422, detail="La contraseña debe tener al menos 8 caracteres")
+    if len(body.password) < 10:
+        raise HTTPException(status_code=422, detail="La contraseña debe tener al menos 10 caracteres")
 
     created = await create_user_with_password(email, name, hash_password(body.password))
     if created is None:
@@ -162,8 +167,11 @@ async def auth_register(body: RegisterIn):
 
 
 @app.post("/api/auth/login-email")
-async def auth_login_email(body: EmailLoginIn):
+async def auth_login_email(body: EmailLoginIn, request: Request):
     email = body.email.strip().lower()
+    # 5 intentos/min por email y 20/min por IP; al superarlo, bloqueo de 5 min
+    enforce("login-ip", [client_ip(request)], limit=20, window=60, block=300)
+    enforce("login-email", [email], limit=5, window=60, block=300)
     pw_hash = await get_password_hash(email)
 
     # Error genérico: no revela si el email existe (evita enumeración de usuarios)

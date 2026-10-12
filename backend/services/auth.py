@@ -35,6 +35,13 @@ async def verify_google_token(token: str) -> dict:
         if info.get("aud") != GOOGLE_CLIENT_ID:
             raise HTTPException(status_code=401, detail="Token no corresponde a esta aplicación")
 
+        if info.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
+            raise HTTPException(status_code=401, detail="Emisor del token no válido")
+
+        # tokeninfo devuelve email_verified como cadena "true"/"false"
+        if str(info.get("email_verified", "")).lower() != "true":
+            raise HTTPException(status_code=401, detail="El email de Google no está verificado")
+
         return {
             "email":   info["email"],
             "name":    info.get("name", ""),
