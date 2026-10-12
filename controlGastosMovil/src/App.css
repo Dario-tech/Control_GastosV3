@@ -213,7 +213,9 @@ html, body, #root {
   top: 0; left: 50%;
   width: 100%; max-width: 430px;
   height: calc(100dvh - var(--nav-h));
-  z-index: 50;
+  /* Por encima del header flotante (70) y la nav (60) para que "Volver" sea
+     pulsable; por debajo de formularios (120), modales (200+) y tour (390). */
+  z-index: 80;
   transform: translateX(-50%) translateX(100%);
   transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
   display: flex; flex-direction: column;
