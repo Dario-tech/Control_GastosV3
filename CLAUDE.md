@@ -31,6 +31,10 @@ uvicorn main:app --reload
 ```
 Requires these env vars at minimum to run against a real database: `DATABASE_URL` (Postgres), `JWT_SECRET`, `DB_ENCRYPTION_KEY` (32 bytes, base64 — see `services/crypto.py` for how to generate one). `GOOGLE_CLIENT_ID` is only needed to test Google login; email/password login works without it. See `backend/.env.example` and `QA-SETUP.md` for the full list and how to stand up an isolated QA environment (separate Render + Vercel + Supabase instances, driven by the `qa` branch).
 
+There is no test suite for the backend either (no pytest). Verify backend changes by running the API against a local/QA database and hitting endpoints. `schema.sql` is the schema source of truth (idempotent `CREATE TABLE IF NOT EXISTS`); `seed_qa.py` seeds a QA DB and `migrate_encrypt_existing.py` is a one-off migration for pre-encryption rows.
+
+Optional backend env vars (features degrade gracefully when unset): `ANTHROPIC_API_KEY` (emoji suggestion for new categories), `RESEND_API_KEY` / `REPORT_FROM_EMAIL` (monthly email report), `CRON_SECRET` (guards the all-users report endpoint, which is meant to be hit by an external cron), `DB_POOL_MAX`.
+
 ## Architecture
 
 ### Backend
@@ -40,6 +44,7 @@ Requires these env vars at minimum to run against a real database: `DATABASE_URL
 - **`concepto` and `importe` are encrypted at rest** (AES-GCM, `services/crypto.py`, key from `DB_ENCRYPTION_KEY`) so a DB leak doesn't expose amounts/categories; `tipo`, `fecha` and `comentario` stay in plaintext. Aggregation (sums, top categories) happens in Python after decrypting, not in SQL.
 - **Two independent login paths** into the same JWT session: Google ID token verification (`verify_google_token`) and email+bcrypt (`hash_password`/`verify_password`), both in `services/auth.py`.
 - **A third, separate auth path** exists for the iOS Shortcuts integration: `/api/shortcut/pending` takes a permanent per-user `shortcut_token` instead of a JWT, so a Shortcut can log a pending expense without opening the app.
+- **Shortcut-pending categorization has no merchant text** (only amount + date), so `services/suggest.py` guesses the category from the user's own history; `services/ai_categorize.py` (Claude) is only used for emoji on manually-created categories.
 - **Live updates are SSE, not polling-only**: `/api/events` holds open connections in a module-level `_sse_clients` set; any mutating endpoint calls `_broadcast()`, which pushes to *every* connected client (not scoped per-user), and the frontend refetches `/api/finance` on receipt.
 
 ### Frontend
@@ -52,6 +57,12 @@ Requires these env vars at minimum to run against a real database: `DATABASE_URL
 - Styling is one file, `src/App.css` (~2900 lines), using CSS custom properties for theming rather than a CSS-in-JS or utility framework. `:root` is the dark theme (default); `html.light` and `html.pastel` override the same variable set for the other two themes. New components should read colors/spacing from these variables, not hardcode values, so all three themes stay in sync.
 - The app shell is fixed-width, mobile-only (`max-width: 430px`, see `.app` in `App.css`) — there's no responsive/desktop layout to preserve.
 - `vite-plugin-pwa` handles the PWA manifest/service worker (config in `vite.config.js`); there's no native app wrapper (Capacitor etc.) in the codebase yet, though it's been discussed as a possible direction.
+
+## Deployment notes
+
+- Branch `qa` drives the isolated QA environment (see `QA-SETUP.md`); production config is in `render.yaml` (backend) and `vercel.json` (frontend).
+- `.github/workflows/keep-alive.yml` pings the production `/api/health` every 10 min because Render's free tier sleeps after 15 min idle — keep `/api/health` cheap and unauthenticated.
+- Specialist subagents live in `.claude/agents/` (`frontal`, `backend`, `infra`, `qa`, `seguridad`); the README is only a one-line stub, so don't rely on it for context.
 
 ## Trabajo en paralelo (varias sesiones o agentes)
 
