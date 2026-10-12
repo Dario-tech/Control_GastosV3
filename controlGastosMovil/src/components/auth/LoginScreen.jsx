@@ -58,8 +58,8 @@ export default function LoginScreen() {
       setError('Introduce tu email y contraseña')
       return
     }
-    if (mode === 'register' && password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres')
+    if (mode === 'register' && password.length < 10) {
+      setError('La contraseña debe tener al menos 10 caracteres')
       return
     }
 
@@ -114,8 +114,9 @@ export default function LoginScreen() {
               <input
                 className="login-input"
                 type="password"
-                placeholder="Contraseña"
-                  aria-label="Contraseña"
+                placeholder={mode === 'register' ? 'Contraseña (mínimo 10 caracteres)' : 'Contraseña'}
+                aria-label="Contraseña"
+                minLength={mode === 'register' ? 10 : undefined}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 autoComplete={mode === 'register' ? 'new-password' : 'current-password'}

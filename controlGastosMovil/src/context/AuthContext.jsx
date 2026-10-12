@@ -39,6 +39,12 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleExpired)
   }, [])
 
+  function authErrorMessage(res, body, fallback) {
+    if (typeof body?.detail === 'string' && body.detail) return body.detail
+    if (res.status === 429) return 'Demasiados intentos, espera unos minutos'
+    return fallback
+  }
+
   async function loginWithGoogle(googleToken) {
     let res
     try {
@@ -53,7 +59,7 @@ export function AuthProvider({ children }) {
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
-      throw new Error(err.detail || 'Login fallido')
+      throw new Error(authErrorMessage(res, err, 'Login fallido'))
     }
     const data   = await res.json()
     const stored = { ...data.user, sessionToken: data.session_token }
@@ -76,7 +82,7 @@ export function AuthProvider({ children }) {
     }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      throw new Error(data.detail || 'Error de autenticación')
+      throw new Error(authErrorMessage(res, data, 'Error de autenticación'))
     }
     const stored = { ...data.user, sessionToken: data.session_token }
     localStorage.setItem(LS_KEY, JSON.stringify(stored))
