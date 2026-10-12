@@ -42,13 +42,9 @@ describe('useBudget', () => {
   beforeEach(() => localStorage.clear())
   afterEach(() => vi.useRealTimers())
   it('añade, filtra por mes, edita y elimina; persiste en localStorage', () => {
-    // addItem usa Date.now() como id: se avanza el reloj para evitar ids repetidos en el mismo ms
-    vi.useFakeTimers()
     const { result } = renderHook(() => useBudget())
     act(() => { result.current.addItem({ name: 'Ocio', limit: 50 }, 2) })
-    vi.advanceTimersByTime(5)
     act(() => { result.current.addItem({ name: 'Comida', limit: 200 }, 2) })
-    vi.advanceTimersByTime(5)
     act(() => { result.current.addItem({ name: 'Otro', limit: 10 }, 3) })
     expect(result.current.itemsForMonth(2)).toHaveLength(2)
     expect(result.current.itemsForMonth(2)[0].color).toBe(BUDGET_COLORS[0])
@@ -59,6 +55,30 @@ describe('useBudget', () => {
     act(() => { result.current.removeItem(id) })
     expect(result.current.itemsForMonth(3)).toHaveLength(0)
     expect(JSON.parse(localStorage.getItem('mi-economia-budget-v3'))).toHaveLength(2)
+  })
+  it('dos altas en el mismo instante tienen ids distintos y borrar una no borra la otra', () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 1, 10)) // reloj congelado: mismo ms
+    const { result } = renderHook(() => useBudget())
+    act(() => {
+      result.current.addItem({ name: 'A', limit: 1 }, 2)
+      result.current.addItem({ name: 'B', limit: 2 }, 2)
+    })
+    const [a, b] = result.current.itemsForMonth(2)
+    expect(a.id).not.toBe(b.id)
+    act(() => { result.current.updateItem(a.id, { limit: 77 }) })
+    expect(result.current.itemsForMonth(2).find(i => i.id === b.id).limit).toBe(2)
+    act(() => { result.current.removeItem(a.id) })
+    expect(result.current.itemsForMonth(2)).toHaveLength(1)
+    expect(result.current.itemsForMonth(2)[0].id).toBe(b.id)
+  })
+  it('conserva ids antiguos (Date.now) y sigue operando sobre ellos', () => {
+    localStorage.setItem('mi-economia-budget-v3', JSON.stringify([{ id: '1700000000000', name: 'Old', limit: 5, month: 2, color: '#fff' }]))
+    const { result } = renderHook(() => useBudget())
+    act(() => { result.current.addItem({ name: 'New', limit: 6 }, 2) })
+    expect(result.current.itemsForMonth(2).map(i => i.id)[0]).toBe('1700000000000')
+    act(() => { result.current.removeItem('1700000000000') })
+    expect(result.current.itemsForMonth(2)).toHaveLength(1)
+    expect(result.current.itemsForMonth(2)[0].name).toBe('New')
   })
   it('migra v2 a v3 asignando mes y color', () => {
     localStorage.setItem('mi-economia-budget-v2', JSON.stringify([{ id: '1', name: 'X', limit: 5 }]))

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { newId } from '../utils/id'
 
 const LS_KEY = 'mi-economia-budget-v3'
 
@@ -63,10 +64,11 @@ export function useBudget() {
   }
 
   const addItem = useCallback((data, month) => {
+    const id = newId()
     setAllItems(prev => {
       const monthItems = prev.filter(i => i.month === month)
       const color = data.color || autoColor(monthItems.length)
-      const next  = [...prev, { ...data, color, month, id: Date.now().toString() }]
+      const next  = [...prev, { ...data, color, month, id }]
       persist(next)
       return next
     })
