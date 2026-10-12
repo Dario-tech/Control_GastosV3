@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { useSettings } from '../context/SettingsContext'
 import { fmt } from '../utils'
 import { createNotifCache } from '../utils/notifCache'
+import { BUDGET_NOTIF_KEY } from '../utils/storageKeys'
 
-const notifCache = createNotifCache('mi-economia-notif-v1')
+const notifCache = createNotifCache(BUDGET_NOTIF_KEY)
 
 // Permiso de notificaciones + aviso cuando una categoría de presupuesto cruza
 // el umbral de alerta. `getRealSpent(nombre)` devuelve lo gastado en el mes.

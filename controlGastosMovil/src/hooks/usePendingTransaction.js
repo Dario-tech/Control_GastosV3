@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { SESSION_EXPIRED_EVENT } from '../services/api'
+import { AUTH_KEY as LS_KEY } from '../utils/storageKeys'
 
 const BASE   = import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com'
-const LS_KEY = 'mi-economia-auth-v1'
 
 function authHeaders() {
   try {

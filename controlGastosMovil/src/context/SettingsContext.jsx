@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { useAuth } from './AuthContext'
+import { CUSTOM_CATS_KEY as LS_CATS_KEY } from '../utils/storageKeys'
 
 const LS_KEY      = 'mi-economia-settings-v1'
-const LS_CATS_KEY = 'mi-economia-custom-cats-v1'
 
 export const ACCENTS = [
   { id: 'indigo',   color: '#6366f1', label: 'Índigo'   },
@@ -78,6 +79,18 @@ const Ctx = createContext(null)
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState(load)
   const [customCategories, setCustomCategories] = useState(loadCats)
+
+  // SettingsProvider vive por encima del login, así que su estado sobrevive al
+  // cambio de usuario: al cerrar sesión o entrar con otra cuenta se recargan
+  // las categorías propias (logout ya ha borrado las del usuario anterior).
+  const auth = useAuth()
+  const userKey = auth?.user?.email ?? null
+  const prevUserKey = useRef(userKey)
+  useEffect(() => {
+    if (prevUserKey.current === userKey) return
+    prevUserKey.current = userKey
+    setCustomCategories(loadCats())
+  }, [userKey])
 
   function update(key, value) {
     setSettings(prev => {

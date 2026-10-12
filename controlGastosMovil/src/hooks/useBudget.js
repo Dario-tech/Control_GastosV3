@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react'
 import { newId } from '../utils/id'
-
-const LS_KEY = 'mi-economia-budget-v3'
+import { BUDGET_KEY as LS_KEY, BUDGET_KEY_V2, BUDGET_KEY_V1 } from '../utils/storageKeys'
 
 export const BUDGET_COLORS = [
   '#6366f1', '#3b82f6', '#a855f7', '#22c55e',
@@ -20,7 +19,7 @@ function load() {
     if (v3) return JSON.parse(v3)
 
     // Migrar v2 → v3: asignar mes actual a items existentes
-    const v2 = localStorage.getItem('mi-economia-budget-v2')
+    const v2 = localStorage.getItem(BUDGET_KEY_V2)
     if (v2) {
       const currentMonth = new Date().getMonth()
       const items = JSON.parse(v2).map((item, i) => ({
@@ -33,7 +32,7 @@ function load() {
     }
 
     // Migrar v1 → v3
-    const v1 = localStorage.getItem('mi-economia-budget-v1')
+    const v1 = localStorage.getItem(BUDGET_KEY_V1)
     if (v1) {
       const currentMonth = new Date().getMonth()
       const items = JSON.parse(v1).map((item, i) => ({

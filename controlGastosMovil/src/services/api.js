@@ -1,5 +1,6 @@
+import { AUTH_KEY as LS_KEY } from '../utils/storageKeys'
+
 export const BASE = import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com'
-const LS_KEY = 'mi-economia-auth-v1'
 
 // Emitido cuando cualquier llamada a la API recibe un 401: el token guardado
 // ya no vale (caducado, o el backend cambió de JWT_SECRET). AuthContext
