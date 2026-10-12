@@ -9,7 +9,7 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
 
 /* Atrapa el foco con Tab dentro del diálogo y lo devuelve al elemento que lo
    abrió al cerrarse (teclado y lectores de pantalla). */
-function useFocusTrap(ref) {
+export function useFocusTrap(ref) {
   useEffect(() => {
     const root = ref.current
     const opener = document.activeElement

@@ -127,6 +127,19 @@ export async function updateTransactionComment(rowIndex, comentario) {
   return apiJson(res)
 }
 
+// Edición parcial de un movimiento: `changes` lleva solo los campos que
+// cambian (fecha "YYYY-MM-DD", importe positivo, tipo, concepto, comentario;
+// comentario "" lo borra). El signo lo decide `tipo`, igual que al crear.
+export async function updateTransaction(rowIndex, changes) {
+  const res = await fetch(`${BASE}/api/transactions/${rowIndex}`, {
+    method:  'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify(changes),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return apiJson(res)
+}
+
 // ── Metas de ahorro (compartibles entre usuarios) ──────────────────────────
 
 export async function fetchGoals() {
