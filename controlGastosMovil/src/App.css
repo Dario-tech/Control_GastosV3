@@ -284,6 +284,157 @@ html, body, #root {
 .shortcut-token-value { flex: 1; font-size: var(--fs-sm); color: var(--text); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shortcut-token-copy  { background: var(--accent-dim); border: 1px solid var(--accent); border-radius: 8px; color: var(--accent-fg); font-size: var(--fs-sm); font-weight: 600; padding: 6px 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .shortcut-token-copy:active { background: var(--accent); color: var(--on-accent); }
+.shortcut-token-copy:disabled { opacity: 0.6; cursor: default; }
+
+/* Entrada a la guía "Pagos automáticos (iPhone)" */
+.shortcut-setup-btn {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  background: none; border: none; padding: 2px 0; cursor: pointer;
+  text-align: left; font: inherit; color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+}
+.shortcut-setup-btn:active { opacity: 0.7; }
+.shortcut-setup-icon {
+  width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0;
+  display: grid; place-items: center; font-size: var(--fs-lg);
+  background: var(--accent-dim);
+}
+.shortcut-setup-text  { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.shortcut-setup-title { font-size: var(--fs-md); font-weight: 650; color: var(--text); }
+.shortcut-setup-desc  { font-size: var(--fs-xs); color: var(--text2); }
+.shortcut-setup-chev  { font-size: var(--fs-xl); color: var(--text3, var(--text2)); line-height: 1; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ===== GUÍA ATAJO APPLE PAY (sc-) ===== */
+.sc-list, .sc-sublist { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--text2); line-height: 1.45; }
+.sc-list strong, .sc-sublist strong, .sc-text strong, .sc-tip strong, .sc-hint strong { color: var(--text); font-weight: 650; }
+.sc-text { margin: 0; font-size: var(--fs-sm); color: var(--text2); line-height: 1.45; }
+.sc-hint { margin: 0; font-size: var(--fs-xs); color: var(--text3, var(--text2)); line-height: 1.4; }
+.sc-warn { margin: 0; font-size: var(--fs-sm); color: var(--red); line-height: 1.4; }
+
+.sc-step-head  { display: flex; align-items: center; gap: 12px; }
+.sc-step-num {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center;
+  background: var(--accent); color: var(--on-accent);
+  font-size: var(--fs-md); font-weight: 750;
+  box-shadow: 0 0 0 4px var(--accent-dim);
+}
+.sc-step-title { margin: 0; font-size: var(--fs-lg); font-weight: 700; color: var(--text); }
+
+/* Ilustración: iPhone con la notificación del Atajo */
+.sc-intro { align-items: stretch; }
+.sc-phone {
+  position: relative; align-self: center; width: 220px; padding: 26px 12px 16px;
+  border-radius: 28px; border: 3px solid var(--border2, var(--border));
+  background: var(--surface2);
+}
+.sc-phone-notch {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  width: 64px; height: 10px; border-radius: 10px; background: var(--border2, var(--border));
+}
+.sc-phone-notif {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 14px;
+  background: var(--glass-bg-strong, var(--surface)); border: 1px solid var(--glass-border, var(--border));
+  animation: scNotif 2.8s var(--ease-glass, ease) infinite;
+}
+@keyframes scNotif { 0%, 8% { opacity: 0; transform: translateY(-8px); } 18%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sc-phone-notif { animation: none; } }
+.sc-phone-app { width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; background: var(--accent-dim); font-size: var(--fs-sm); flex-shrink: 0; }
+.sc-phone-text { display: flex; flex-direction: column; min-width: 0; font-size: var(--fs-xs); color: var(--text2); line-height: 1.3; }
+.sc-phone-text strong { color: var(--text); font-weight: 650; }
+.sc-phone-cta {
+  margin-top: 10px; padding: 8px; border-radius: 12px; text-align: center;
+  background: var(--accent); color: var(--on-accent); font-size: var(--fs-xs); font-weight: 700;
+}
+
+/* Paso 1: datos para copiar */
+.sc-copy {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px;
+  border-radius: var(--radius-sm, 14px); background: var(--surface2); border: 1px solid var(--border2, var(--border));
+}
+.sc-copy-label { font-size: var(--fs-xs); color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.sc-copy-value { font-family: monospace; font-size: var(--fs-sm); color: var(--text); word-break: break-all; user-select: all; -webkit-user-select: all; }
+.sc-copy-btn { align-self: flex-start; min-height: 40px; padding: 8px 14px; }
+/* Paso 2: acciones de Atajos */
+.sc-actions { display: flex; flex-direction: column; gap: 10px; }
+.sc-action {
+  --sc-tone: var(--accent);
+  border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px;
+  background: var(--surface2); border: 1px solid var(--border2, var(--border));
+  border-left: 4px solid var(--sc-tone);
+}
+.sc-action--green  { --sc-tone: var(--green); }
+.sc-action--orange { --sc-tone: var(--orange, var(--accent)); }
+.sc-action--red    { --sc-tone: var(--red); }
+.sc-action-head { display: flex; align-items: center; gap: 10px; }
+.sc-action-icon { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--glass-bg-inner, var(--surface)); font-size: var(--fs-sm); flex-shrink: 0; }
+.sc-action-name { font-size: var(--fs-md); font-weight: 650; color: var(--text); }
+.sc-action-body { display: flex; flex-direction: column; gap: 6px; }
+.sc-action-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: var(--fs-sm); }
+.sc-action-k { color: var(--text2); flex-shrink: 0; font-family: monospace; }
+.sc-action-v { color: var(--text); text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.sc-action-v em { color: var(--text2); font-style: normal; }
+.sc-action-n { color: var(--text2); font-weight: 600; }
+.sc-var {
+  display: inline-block; padding: 1px 7px; border-radius: 7px; margin: 1px 0;
+  background: var(--accent-dim); color: var(--accent-fg); font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: 650;
+  white-space: nowrap;
+}
+.sc-formula {
+  display: block; padding: 10px; border-radius: 12px; line-height: 1.8;
+  background: var(--glass-bg-inner, var(--surface)); border: 1px dashed var(--border2, var(--border));
+  font-family: monospace; font-size: var(--fs-xs); color: var(--text); overflow-wrap: anywhere;
+}
+
+.sc-tip {
+  display: flex; gap: 10px; padding: 12px; border-radius: 14px;
+  background: var(--accent-dim); border: 1px solid var(--accent);
+}
+.sc-tip p { margin: 0; font-size: var(--fs-sm); color: var(--text2); line-height: 1.45; }
+.sc-tip--warn { background: var(--orange-dim, var(--accent-dim)); border-color: var(--orange, var(--accent)); }
+
+/* Aviso en el login: pago del Atajo esperando a que se inicie sesión */
+.intake-login-banner {
+  position: fixed; top: calc(12px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  width: calc(100% - 32px); max-width: 398px; z-index: 10;
+  display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--accent); box-shadow: var(--shadow);
+}
+.intake-login-banner p { margin: 0; font-size: var(--fs-sm); color: var(--text2); line-height: 1.4; }
+.intake-login-banner strong { color: var(--text); }
+
+/* Pendiente con comercio (CategorizeModal) */
+.catmodal:focus { outline: none; }
+.catmodal-merchant {
+  margin: 0; text-align: center; font-size: var(--fs-xl); font-weight: 700; color: var(--text);
+  overflow-wrap: anywhere;
+}
+.catmodal-remember {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: var(--fs-sm); color: var(--text2); cursor: pointer; min-height: 32px;
+}
+.catmodal-remember input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+.catmodal-suggested.selected { cursor: default; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
+.catmodal-suggested.selected:active { transform: none; }
+.catmodal-save {
+  min-height: 50px; border: none; border-radius: 16px; cursor: pointer;
+  background: var(--accent); color: var(--on-accent); font: inherit; font-size: var(--fs-md); font-weight: 700;
+}
+.catmodal-save:disabled { opacity: 0.6; cursor: progress; }
+.catmodal-save:active { transform: scale(0.98); }
+.catmodal-change {
+  min-height: 44px; border-radius: 14px; cursor: pointer; font: inherit; font-size: var(--fs-sm); font-weight: 600;
+  background: var(--surface2); border: 1px solid var(--border2, var(--border)); color: var(--text);
+}
+.catmodal-change:disabled { opacity: 0.5; }
+.catmodal-footer { flex-wrap: wrap; }
+.catmodal-discard { background: none; border: none; color: var(--text2); font-size: var(--fs-sm); cursor: pointer; font-weight: 600; }
+.catmodal-discard:disabled { opacity: 0.5; }
 
 .profile-logout-wrap {
   padding: 8px 16px 24px;

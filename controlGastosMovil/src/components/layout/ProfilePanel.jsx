@@ -1,12 +1,19 @@
-import { useRef, useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../../context/AuthContext'
 import SettingsTab from '../tabs/SettingsTab'
+
+const ShortcutSetupScreen = lazy(() => import('../ui/ShortcutSetupScreen'))
 
 export default function ProfilePanel({ open, onClose, onShowGuide }) {
   const { user, logout } = useAuth()
   const touchStartX = useRef(null)
+  const [setupOpen, setSetupOpen] = useState(false)
 
   function handleTouchStart(e) {
+    // Con la guía del Atajo abierta, el gesto de "deslizar para volver" no
+    // debe cerrar el perfil (los eventos de React suben también desde el portal).
+    if (setupOpen) { touchStartX.current = null; return }
     touchStartX.current = e.touches[0].clientX
   }
   function handleTouchEnd(e) {
@@ -19,14 +26,6 @@ export default function ProfilePanel({ open, onClose, onShowGuide }) {
   function handleLogout() {
     onClose()
     logout()
-  }
-
-  const [copied, setCopied] = useState(false)
-
-  function copyToken() {
-    navigator.clipboard.writeText(user?.shortcut_token ?? '')
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
   }
 
   const initials = user?.name
@@ -62,17 +61,17 @@ export default function ProfilePanel({ open, onClose, onShowGuide }) {
       </div>
 
       <div className="profile-screen-body">
-        {user?.shortcut_token && (
-          <div className="shortcut-token-section">
-            <p className="shortcut-token-label">Token para iOS Shortcuts</p>
-            <div className="shortcut-token-row">
-              <code className="shortcut-token-value">{user.shortcut_token.slice(0, 16)}…</code>
-              <button className="shortcut-token-copy" onClick={copyToken}>
-                {copied ? '✓ Copiado' : 'Copiar'}
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="shortcut-token-section">
+          <p className="shortcut-token-label">Apple Pay en iPhone</p>
+          <button type="button" className="shortcut-setup-btn" onClick={() => setSetupOpen(true)}>
+            <span className="shortcut-setup-icon" aria-hidden="true">📲</span>
+            <span className="shortcut-setup-text">
+              <span className="shortcut-setup-title">Pagos automáticos (iPhone)</span>
+              <span className="shortcut-setup-desc">Apunta solos tus pagos con Apple Pay</span>
+            </span>
+            <span className="shortcut-setup-chev" aria-hidden="true">›</span>
+          </button>
+        </div>
         <SettingsTab />
         {onShowGuide && (
           <button className="profile-guide-btn" onClick={onShowGuide}>
@@ -86,6 +85,14 @@ export default function ProfilePanel({ open, onClose, onShowGuide }) {
         </div>
         <p className="build-marker-inline">build {__BUILD_SHA__} · {__BUILD_TIME__.slice(0, 16).replace('T', ' ')}</p>
       </div>
+      {/* Portal: .profile-screen tiene transform/contain, que encerrarían el
+          position:fixed de la pantalla completa dentro del panel. */}
+      {setupOpen && createPortal(
+        <Suspense fallback={null}>
+          <ShortcutSetupScreen onClose={() => setSetupOpen(false)} />
+        </Suspense>,
+        document.body,
+      )}
     </div>
   )
 }

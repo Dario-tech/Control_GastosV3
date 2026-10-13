@@ -13,6 +13,9 @@ export const BUDGET_KEY_V1     = 'mi-economia-budget-v1'
 export const CUSTOM_CATS_KEY   = 'mi-economia-custom-cats-v1'
 export const BUDGET_NOTIF_KEY  = 'mi-economia-notif-v1'
 export const ANNUAL_NOTIF_KEY  = 'mi-economia-annual-notif-v1'
+// Gastos recibidos del Atajo de iOS (Apple Pay) que aún no se han podido
+// enviar al backend (sin conexión, servidor dormido o sin sesión iniciada).
+export const SHORTCUT_QUEUE_KEY = 'mi-economia-shortcut-queue-v1'
 
 export const USER_DATA_KEYS = [
   AUTH_KEY,
@@ -23,6 +26,7 @@ export const USER_DATA_KEYS = [
   CUSTOM_CATS_KEY,
   BUDGET_NOTIF_KEY,
   ANNUAL_NOTIF_KEY,
+  SHORTCUT_QUEUE_KEY,
 ]
 
 export function clearUserData() {

@@ -1,31 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
-import { SESSION_EXPIRED_EVENT } from '../services/api'
-import { AUTH_KEY as LS_KEY } from '../utils/storageKeys'
+import {
+  fetchPending,
+  categorizePending as apiCategorizePending,
+  discardPending as apiDiscardPending,
+} from '../services/api'
 
-const BASE   = import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com'
-
-function authHeaders() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(LS_KEY))
-    if (stored?.sessionToken) return { Authorization: `Bearer ${stored.sessionToken}` }
-  } catch { /* no-op */ }
-  return {}
-}
-
+// Cola de pagos pendientes de categorizar (Apple Pay vía Atajo de iOS, u otros
+// orígenes). El 401 lo gestiona apiJson en services/api.js (cierra la sesión).
 export function usePendingTransaction() {
   const [queue, setQueue] = useState([])
 
   const fetchQueue = useCallback(async () => {
     try {
-      const res = await fetch(`${BASE}/api/pending`, { headers: authHeaders() })
-      if (res.status === 401) {
-        try { localStorage.removeItem(LS_KEY) } catch { /* no-op */ }
-        window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
-        return
-      }
-      if (!res.ok) return
-      setQueue(await res.json())
-    } catch { /* no-op */ }
+      const list = await fetchPending()
+      if (Array.isArray(list)) setQueue(list)
+    } catch { /* no-op: sin red o backend dormido, se reintenta luego */ }
   }, [])
 
   useEffect(() => {
@@ -55,20 +44,17 @@ export function usePendingTransaction() {
     }
   }, [fetchQueue])
 
-  async function categorizePending(id, tipo, concepto) {
-    const res = await fetch(`${BASE}/api/pending/${id}/categorize`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body:    JSON.stringify({ tipo, concepto }),
-    })
-    if (res.status === 401) {
-      try { localStorage.removeItem(LS_KEY) } catch { /* no-op */ }
-      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
-      throw new Error('Tu sesión ha caducado. Vuelve a iniciar sesión.')
-    }
-    if (!res.ok) throw new Error('Error al categorizar')
+  // opts: { recordar = true, comentario } — recordar enseña al backend que este
+  // comercio va a esta categoría.
+  const categorizePending = useCallback(async (id, tipo, concepto, opts = {}) => {
+    await apiCategorizePending(id, { tipo, concepto, recordar: opts.recordar ?? true, comentario: opts.comentario })
     setQueue(q => q.filter(t => t.id !== id))
-  }
+  }, [])
 
-  return { queue, fetchQueue, categorizePending }
+  const discardPending = useCallback(async id => {
+    await apiDiscardPending(id)
+    setQueue(q => q.filter(t => t.id !== id))
+  }, [])
+
+  return { queue, fetchQueue, categorizePending, discardPending }
 }

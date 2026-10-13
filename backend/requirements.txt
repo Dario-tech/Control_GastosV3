@@ -8,3 +8,4 @@ psycopg2-binary==2.9.9
 bcrypt==4.2.1
 anthropic>=0.40.0
 cryptography>=42.0.0
+tzdata>=2024.1

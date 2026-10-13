@@ -96,7 +96,7 @@ def shortcut_ok(monkeypatch):
     async def email_by_token(token):
         return "user@example.com" if token == "tok-valido" else None
 
-    async def create(email, importe, fecha=None):
+    async def create(email, importe, fecha=None, fuente=None):
         created.append(importe)
         return {"id": 1, "importe": importe}
     monkeypatch.setattr(main, "get_email_by_shortcut_token", email_by_token)

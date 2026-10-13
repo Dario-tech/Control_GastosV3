@@ -20,8 +20,12 @@ después de descifrar, no en la base de datos.
 """
 import os
 import base64
+import hashlib
+import hmac
 import logging
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 _NONCE_LEN = 12
 
@@ -98,3 +102,31 @@ def decrypt_transaction(concepto_enc, importe_enc, row_id) -> tuple[str, float] 
             row_id, type(e).__name__,
         )
         return None
+
+
+# ── HMAC para comparar por igualdad sin guardar el texto en claro ─────────────
+#
+# El comercio de los pendientes y de las reglas aprendidas va cifrado con
+# AES-GCM (nonce aleatorio), así que no se puede buscar por igualdad en SQL.
+# Para eso se guarda además un HMAC-SHA256 con una SUBCLAVE derivada de
+# DB_ENCRYPTION_KEY vía HKDF (la clave maestra no se reutiliza tal cual para
+# otro fin). Sin la clave, el tag no permite recuperar ni comprobar el texto.
+# Si DB_ENCRYPTION_KEY cambia, los tags antiguos dejan de coincidir (las
+# reglas aprendidas se "olvidan", no se rompe nada).
+
+_HMAC_INFO = b"control-gastos/hmac-tag/v1"
+_hmac_cache: tuple[bytes, bytes] | None = None  # (clave maestra, subclave)
+
+
+def _get_hmac_key() -> bytes:
+    global _hmac_cache
+    master = _get_key()
+    if _hmac_cache is None or _hmac_cache[0] != master:
+        sub = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=_HMAC_INFO).derive(master)
+        _hmac_cache = (master, sub)
+    return _hmac_cache[1]
+
+
+def hmac_tag(texto: str) -> bytes:
+    """HMAC-SHA256 (32 bytes) de `texto` con la subclave derivada. Determinista."""
+    return hmac.new(_get_hmac_key(), texto.encode("utf-8"), hashlib.sha256).digest()
