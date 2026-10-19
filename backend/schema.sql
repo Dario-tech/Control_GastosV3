@@ -114,6 +114,29 @@ CREATE TABLE IF NOT EXISTS annual_fixed_expenses (
 );
 CREATE INDEX IF NOT EXISTS idx_annual_exp_user ON annual_fixed_expenses(user_email);
 
+-- Categorías propias de cada usuario (nombre cifrado; unicidad por HMAC del
+-- nombre normalizado). OJO: no confundir con la tabla antigua `categories`.
+CREATE TABLE IF NOT EXISTS user_categories (
+    id            BIGSERIAL PRIMARY KEY,
+    user_email    TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    tipo          TEXT NOT NULL CHECK (tipo IN ('Gasto Variable', 'Gasto Fijo', 'Ingreso')),
+    concepto_enc  BYTEA NOT NULL,
+    concepto_hmac BYTEA NOT NULL,
+    emoji         TEXT NOT NULL DEFAULT '',
+    created_at    TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (user_email, tipo, concepto_hmac)
+);
+
+-- Preferencias por usuario (settings, budgets, hidden_categories, tour): el
+-- JSON entero va cifrado con AES-GCM.
+CREATE TABLE IF NOT EXISTS user_prefs (
+    user_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    kind       TEXT NOT NULL,
+    data_enc   BYTEA NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (user_email, kind)
+);
+
 -- Row Level Security en todas las tablas de public, SIN políticas: bloquea el
 -- acceso por la API REST de Supabase (roles anon/authenticated) a estas tablas.
 -- El backend se conecta como owner de las tablas, que no está sujeto a RLS
@@ -127,3 +150,5 @@ ALTER TABLE public.savings_goal_members       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.savings_goal_contributions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.annual_fixed_expenses      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.merchant_rules             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_categories           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_prefs                 ENABLE ROW LEVEL SECURITY;
