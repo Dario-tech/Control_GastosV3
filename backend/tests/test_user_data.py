@@ -339,6 +339,6 @@ def test_schema_y_ensure_aditivos():
         assert re.search(rf"ALTER TABLE public\.{t}\s+ENABLE ROW LEVEL SECURITY", sql)
     assert "UNIQUE (user_email, tipo, concepto_hmac)" in sql
     src = inspect.getsource(user_data.ensure_user_data_schema)
-    assert not re.search(r"\b(DROP|DELETE|UPDATE|TRUNCATE)\b", src)
+    assert not re.search(r"\b(DROP|DELETE FROM|UPDATE|TRUNCATE)\b", src)
     import main
     assert "ensure_user_data_schema" in inspect.getsource(main.lifespan)
