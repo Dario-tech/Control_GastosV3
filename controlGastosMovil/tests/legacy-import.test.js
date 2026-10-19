@@ -33,7 +33,7 @@ describe('importación única de datos antiguos', () => {
 
   it('sube categorías, presupuestos, ajustes y tour, y solo entonces borra las claves antiguas', async () => {
     const api = makeApi()
-    const out = await importLegacy({ user: { name: 'Mario' }, prefs: NO_PREFS, api })
+    const out = await importLegacy({ user: { name: 'Mario', email: 'm@m.es' }, prefs: NO_PREFS, api })
     expect(api.importCategories).toHaveBeenCalledTimes(1)
     expect(api.importCategories.mock.calls[0][0]).toEqual([
       { tipo: 'Gasto Variable', concepto: 'Clínica', emoji: '🏥' },
@@ -47,10 +47,10 @@ describe('importación única de datos antiguos', () => {
   })
 
   it('es idempotente: la segunda pasada no vuelve a llamar al servidor', async () => {
-    await importLegacy({ user: { name: 'Mario' }, prefs: NO_PREFS, api: makeApi() })
+    await importLegacy({ user: { name: 'Mario', email: 'm@m.es' }, prefs: NO_PREFS, api: makeApi() })
     const api2 = makeApi()
     const prefs2 = { ...NO_PREFS, hidden_categories: [] }
-    await importLegacy({ user: { name: 'Mario' }, prefs: prefs2, api: api2 })
+    await importLegacy({ user: { name: 'Mario', email: 'm@m.es' }, prefs: prefs2, api: api2 })
     expect(api2.importCategories).not.toHaveBeenCalled()
     expect(api2.putPref).not.toHaveBeenCalled()
   })
@@ -58,7 +58,7 @@ describe('importación única de datos antiguos', () => {
   it('si el servidor ya tiene datos, gana el servidor: no se sube lo antiguo pero se limpia', async () => {
     const api = makeApi()
     const prefs = { settings: { theme: 'dark' }, budgets: { version: 3, items: [] }, hidden_categories: [], tour: { seen_at: 'x' }, updated_at: {} }
-    await importLegacy({ user: { name: 'Mario' }, prefs, api })
+    await importLegacy({ user: { name: 'Mario', email: 'm@m.es' }, prefs, api })
     expect(api.putPref).not.toHaveBeenCalled()
     expect(localStorage.getItem(SETTINGS_KEY)).toBeNull()
     expect(localStorage.getItem(BUDGET_KEY)).toBeNull()
@@ -75,14 +75,14 @@ describe('importación única de datos antiguos', () => {
       putPref: vi.fn(async () => { throw mkErr() }),
     })
     const before = remaining()
-    const out = await importLegacy({ user: { name: 'Mario' }, prefs: NO_PREFS, api })
+    const out = await importLegacy({ user: { name: 'Mario', email: 'm@m.es' }, prefs: NO_PREFS, api })
     expect(remaining()).toEqual(before)
     expect(out.failed).toEqual(expect.arrayContaining(['categories', 'settings', 'budgets', 'hidden_categories', 'tour']))
   })
 
   it('si GET /api/prefs falló (prefs null) solo importa categorías y no borra lo demás', async () => {
     const api = makeApi()
-    await importLegacy({ user: { name: 'Mario' }, prefs: null, api })
+    await importLegacy({ user: { name: 'Mario', email: 'm@m.es' }, prefs: null, api })
     expect(api.putPref).not.toHaveBeenCalled()
     expect(localStorage.getItem(CUSTOM_CATS_KEY)).toBeNull()
     expect(remaining().sort()).toEqual([BUDGET_KEY, SETTINGS_KEY, TOUR_KEY].sort())
@@ -92,13 +92,13 @@ describe('importación única de datos antiguos', () => {
     const api = makeApi({
       putPref: vi.fn(async kind => { if (kind === 'budgets') throw new Error('API 500'); return { updated_at: 'x' } }),
     })
-    await importLegacy({ user: { name: 'Mario' }, prefs: NO_PREFS, api })
+    await importLegacy({ user: { name: 'Mario', email: 'm@m.es' }, prefs: NO_PREFS, api })
     expect(remaining()).toEqual([BUDGET_KEY])
   })
 
   it('respuesta sin lista de categorías no cuenta como éxito', async () => {
     const api = makeApi({ importCategories: vi.fn(async () => ({})) })
-    await importLegacy({ user: { name: 'Mario' }, prefs: null, api })
+    await importLegacy({ user: { name: 'Mario', email: 'm@m.es' }, prefs: null, api })
     expect(localStorage.getItem(CUSTOM_CATS_KEY)).not.toBeNull()
   })
 
@@ -106,7 +106,7 @@ describe('importación única de datos antiguos', () => {
     const many = Array.from({ length: 450 }, (_, i) => ({ concepto: `C${i}`, emoji: '🙂' }))
     localStorage.setItem(CUSTOM_CATS_KEY, JSON.stringify({ 'Gasto Variable': many }))
     const api = makeApi()
-    await importLegacy({ user: { name: 'Mario' }, prefs: null, api })
+    await importLegacy({ user: { name: 'Mario', email: 'm@m.es' }, prefs: null, api })
     expect(api.importCategories.mock.calls.map(c => c[0].length)).toEqual([200, 200, 50])
   })
 
@@ -115,7 +115,7 @@ describe('importación única de datos antiguos', () => {
     localStorage.setItem(BUDGET_KEY_V2, JSON.stringify([{ id: '1', name: 'X', limit: 5 }]))
     localStorage.setItem(BUDGET_KEY_V1, JSON.stringify([{ id: '2', name: 'Y', limit: 6 }]))
     const api = makeApi()
-    await importLegacy({ user: { name: 'Mario' }, prefs: NO_PREFS, api })
+    await importLegacy({ user: { name: 'Mario', email: 'm@m.es' }, prefs: NO_PREFS, api })
     const sent = api.putPref.mock.calls.find(c => c[0] === 'budgets')[1]
     expect(sent.items).toHaveLength(1)
     expect(sent.items[0]).toMatchObject({ id: '1', month: new Date().getMonth(), color: expect.any(String) })
@@ -134,19 +134,19 @@ describe('regla antigua de categorías ocultas', () => {
     ])
     expect(legacyHiddenFor('Mario')).toEqual([])
     const api = makeApi()
-    await importLegacy({ user: { name: 'julia' }, prefs: NO_PREFS, api })
+    await importLegacy({ user: { name: 'julia', email: 'm@m.es' }, prefs: NO_PREFS, api })
     expect(api.putPref).toHaveBeenCalledWith('hidden_categories', legacyHiddenFor('julia'))
   })
 
   it('si el servidor ya tiene la lista (aunque vacía) no se recalcula', async () => {
     const api = makeApi()
-    await importLegacy({ user: { name: 'Julia' }, prefs: { ...NO_PREFS, hidden_categories: [] }, api })
+    await importLegacy({ user: { name: 'Julia', email: 'm@m.es' }, prefs: { ...NO_PREFS, hidden_categories: [] }, api })
     expect(api.putPref).not.toHaveBeenCalled()
   })
 
   it('si falla la subida se reintenta en la siguiente carga', async () => {
     const api = makeApi({ putPref: vi.fn(async () => { throw new Error('API 500') }) })
-    const out = await importLegacy({ user: { name: 'Julia' }, prefs: NO_PREFS, api })
+    const out = await importLegacy({ user: { name: 'Julia', email: 'm@m.es' }, prefs: NO_PREFS, api })
     expect(out.failed).toContain('hidden_categories')
   })
 })

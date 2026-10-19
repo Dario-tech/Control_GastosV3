@@ -65,7 +65,7 @@ class ErrorBoundary extends Component {
 
 function AppContent() {
   const { activeTab, showToast } = useApp()
-  const { settings, tourSeen, prefsLoaded, syncNotice } = useSettings()
+  const { settings, tourSeen, prefsLoaded, syncNotice, syncWarnings } = useSettings()
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [categorizeOpen, setCategorizeOpen] = useState(false)
   const [addOpen,        setAddOpen]        = useState(false)
@@ -99,6 +99,9 @@ function AppContent() {
         onAddClick={() => setAddOpen(true)}
       />
       <main className="main">
+        {syncWarnings?.map(msg => (
+          <div key={msg} className="sync-warning" role="alert">⚠️ {msg}</div>
+        ))}
         <ErrorBoundary>
           <Suspense fallback={<TabSkeleton />}>
             {activeTab === 'year'        && <YearTab />}

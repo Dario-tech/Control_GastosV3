@@ -63,11 +63,12 @@ describe('limpieza de datos del usuario al cerrar sesión', () => {
     expectLegacyKept()
   })
 
-  it('logout() borra sesión y cachés, y deja las claves antiguas sin importar', () => {
+  it('logout() borra sesión y cachés, y deja las claves antiguas sin importar', async () => {
     const { result } = renderHook(() => useAuth(), { wrapper })
     expect(result.current.user?.email).toBe('a@a.es')
 
-    act(() => result.current.logout())
+    // Con datos antiguos pendientes intenta antes un último import (aquí falla: 404)
+    await act(async () => { await result.current.logout() })
 
     expect(result.current.user).toBeNull()
     expectUserDataGone()
@@ -92,7 +93,7 @@ describe('limpieza de datos del usuario al cerrar sesión', () => {
     const { result } = renderHook(() => ({ auth: useAuth(), settings: useSettings() }), { wrapper })
     expect(result.current.settings.customCategories['Gasto Variable']).toHaveLength(1)
 
-    act(() => result.current.auth.logout())
+    await act(async () => { await result.current.auth.logout() })
 
     await waitFor(() => expect(result.current.settings.customCategories['Gasto Variable']).toEqual([]))
   })

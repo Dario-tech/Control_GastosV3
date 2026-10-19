@@ -26,6 +26,11 @@ export const CUSTOM_CATS_KEY   = 'mi-economia-custom-cats-v1'
 export const SETTINGS_KEY      = 'mi-economia-settings-v1'
 export const TOUR_KEY          = 'mi-economia-tour-v1'
 
+// Dueño (email) de las claves antiguas: se anota la primera vez que se ven
+// tras un login. Solo ese usuario puede verlas e importarlas; para cualquier
+// otro se ignoran y se conservan. Nunca la borra el cierre de sesión ni el 401.
+export const LEGACY_OWNER_KEY  = 'mi-economia-legacy-owner-v1'
+
 export const LEGACY_KEYS = [
   BUDGET_KEY, BUDGET_KEY_V2, BUDGET_KEY_V1, CUSTOM_CATS_KEY, SETTINGS_KEY, TOUR_KEY,
 ]
@@ -45,6 +50,21 @@ export const USER_DATA_KEYS = [
 
 // Sesión caducada (401): solo se pierde el token y la caché de finanzas.
 export const SESSION_EXPIRED_KEYS = [AUTH_KEY, FINANCE_CACHE_KEY]
+
+// Al entrar un usuario con otro email se borran las cachés de categorías y
+// ajustes etiquetadas con el email de otra persona (llevan presupuestos en claro).
+export function purgeForeignCaches(email) {
+  if (!email) return
+  for (const key of [CATS_CACHE_KEY, PREFS_CACHE_KEY]) {
+    try {
+      const raw = localStorage.getItem(key)
+      if (raw == null) continue
+      let tag
+      try { tag = JSON.parse(raw)?.email } catch { tag = undefined }
+      if (tag !== email) localStorage.removeItem(key)
+    } catch { /* no-op */ }
+  }
+}
 
 function removeAll(keys) {
   for (const key of keys) {

@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from './AuthContext'
-import { CUSTOM_CATS_KEY, CATS_CACHE_KEY, PREFS_CACHE_KEY } from '../utils/storageKeys'
+import { CUSTOM_CATS_KEY, CATS_CACHE_KEY, PREFS_CACHE_KEY, purgeForeignCaches } from '../utils/storageKeys'
 import { fetchPrefs, putPref } from '../services/prefsApi'
 import { fetchCategories, createCategory, deleteCategory, importCategories } from '../services/categoriesApi'
-import { importLegacy, legacyHiddenFor, readLegacyCats, readLegacyBudgets, readLegacySettings, hasLegacyTour } from '../utils/legacyImport'
+import { importLegacy, claimLegacy, legacyHiddenFor, readLegacyCats, readLegacyBudgets, readLegacySettings, hasLegacyTour } from '../utils/legacyImport'
 import { newId } from '../utils/id'
 
 export const ACCENTS = [
@@ -53,16 +53,24 @@ const KIND_LABEL = {
 }
 const TMP = 'tmp-'
 
+const unreadableMsg = (what) =>
+  `No se han podido leer ${what} del servidor; no se guardarán cambios hasta que se resuelva.`
+const KIND_UNREAD = {
+  settings: 'tus ajustes', budgets: 'tus presupuestos', hidden_categories: 'tus categorías ocultas', tour: 'el estado de la guía',
+}
+
 // Un usuario nuevo en el dispositivo parte de los ajustes por defecto; si hay
 // ajustes antiguos del móvil (aún sin importar) se usan solo para pintar.
+// Los datos antiguos solo se usan si son de este usuario (claimLegacy).
 function initialPrefs(email) {
   const cache = readPrefsCache(email)
-  const budgets = cache.budgets ?? readLegacyBudgets() ?? []
+  const mine = claimLegacy(email)
+  const budgets = cache.budgets ?? (mine ? readLegacyBudgets() : undefined) ?? []
   return {
-    settings: { ...DEFAULT, ...(cache.settings ?? readLegacySettings() ?? {}) },
+    settings: { ...DEFAULT, ...(cache.settings ?? (mine ? readLegacySettings() : undefined) ?? {}) },
     budgets:  Array.isArray(budgets) ? budgets : [],
     hidden:   Array.isArray(cache.hidden) ? cache.hidden : [],
-    tour:     cache.tour ?? (hasLegacyTour() ? 'legacy' : null),
+    tour:     cache.tour ?? (mine && hasLegacyTour() ? 'legacy' : null),
   }
 }
 
@@ -85,7 +93,7 @@ function readCatsCache(email) {
 function initialCats(email) {
   const cached = readCatsCache(email)
   if (cached) return cached
-  return email ? (readLegacyCats() || []) : []
+  return email && claimLegacy(email) ? (readLegacyCats() || []) : []
 }
 
 // Forma que viaja al servidor (budgets es un objeto; el resto, tal cual)
@@ -121,6 +129,10 @@ export function SettingsProvider({ children }) {
   const [cats, setCatsState] = useState(() => initialCats(email))
   const [loaded, setLoaded] = useState(false)   // GET /api/prefs ya respondió bien
   const [notice, setNotice] = useState(null)
+  // Datos que existen en el servidor pero no se pudieron descifrar: solo lectura
+  const [unreadable, setUnreadable] = useState({ kinds: [], cats: 0 })
+  const unreadableRef = useRef(unreadable)
+  function setUnread(next) { unreadableRef.current = next; setUnreadable(next) }
 
   const prefsRef = useRef(prefs)
   const catsRef  = useRef(cats)
@@ -170,8 +182,10 @@ export function SettingsProvider({ children }) {
     chains.current = {}
     pendingAdds.current = new Map()
     const stale = () => gen !== genRef.current
+    purgeForeignCaches(email) // cachés de otra persona fuera del dispositivo
 
     if (changed) {
+      setUnread({ kinds: [], cats: 0 })
       const p = initialPrefs(email)
       prefsRef.current = p
       setPrefs(p)
@@ -185,18 +199,22 @@ export function SettingsProvider({ children }) {
       const [pr, cr] = await Promise.allSettled([fetchPrefs(), fetchCategories()])
       if (stale()) return
       const server = pr.status === 'fulfilled' && pr.value && typeof pr.value === 'object' ? pr.value : null
+      const unreadKinds = Array.isArray(server?.unreadable) ? server.unreadable.filter(k => k in PREF_STATE_KEY) : []
+      const unreadCats = cr.status === 'fulfilled' ? Number(cr.value?.unreadable) || 0 : 0
+      setUnread({ kinds: unreadKinds, cats: unreadCats })
 
       const imp = await importLegacy({
         user: userRef.current,
         prefs: server,
         api: { importCategories, putPref },
+        catsUnreadable: unreadCats,
       })
       if (stale()) return
 
       // Categorías propias
       let list = imp.categories ?? (cr.status === 'fulfilled' && Array.isArray(cr.value?.categories) ? cr.value.categories : null)
       if (list) {
-        if (imp.failed.includes('categories')) {
+        if (imp.failed.includes('categories') && claimLegacy(userRef.current?.email)) {
           // Importación pendiente: las antiguas siguen visibles hasta que suba.
           const old = readLegacyCats() || []
           const have = new Set(list.map(c => `${c.tipo}|${c.concepto}`))
@@ -211,6 +229,7 @@ export function SettingsProvider({ children }) {
       if (server) {
         const patch = {}
         for (const kind of Object.keys(PREF_STATE_KEY)) {
+          if (unreadKinds.includes(kind)) continue // ilegible: se deja lo que hay, sin escribir
           if (seqs.current[kind]) continue // el usuario ya lo ha cambiado durante la carga
           const sk = PREF_STATE_KEY[kind]
           const wire = imp.applied[kind] ?? server[kind]
@@ -235,6 +254,10 @@ export function SettingsProvider({ children }) {
   // y se envía el documento completo en orden. Si falla, vuelve al último valor
   // que aceptó el servidor y se avisa.
   function commit(kind, next) {
+    if (unreadableRef.current.kinds.includes(kind)) {
+      notify(unreadableMsg(KIND_UNREAD[kind]))
+      return
+    }
     const sk = PREF_STATE_KEY[kind]
     const gen = genRef.current
     setPrefsLocal({ [sk]: next })
@@ -247,6 +270,13 @@ export function SettingsProvider({ children }) {
         if (gen === genRef.current) confirmed.current[kind] = sent
       } catch (e) {
         if (gen !== genRef.current || e?.status === 401) return
+        if (e?.status === 409 && e?.message === 'dato_ilegible') {
+          // El servidor tiene un dato que no puede leer: jamás se fuerza.
+          if (kind in confirmed.current) setPrefsLocal({ [sk]: confirmed.current[kind] })
+          setUnread({ ...unreadableRef.current, kinds: [...new Set([...unreadableRef.current.kinds, kind])] })
+          notify(unreadableMsg(KIND_UNREAD[kind]))
+          return
+        }
         if (seq === seqs.current[kind]) {
           if (kind in confirmed.current) setPrefsLocal({ [sk]: confirmed.current[kind] })
           notify(`No se pudo guardar ${KIND_LABEL[kind]} en el servidor. Se ha deshecho el cambio.`)
@@ -344,6 +374,10 @@ export function SettingsProvider({ children }) {
 
   const customCategories = useMemo(() => groupByTipo(cats), [cats])
   const settings = prefs.settings
+  const syncWarnings = useMemo(() => [
+    ...unreadable.kinds.map(k => unreadableMsg(KIND_UNREAD[k])),
+    ...(unreadable.cats > 0 ? [unreadableMsg('algunas de tus categorías')] : []),
+  ], [unreadable])
 
   // Apply theme class on <html>
   useEffect(() => {
@@ -390,7 +424,9 @@ export function SettingsProvider({ children }) {
       hiddenCategories: prefs.hidden,
       budgetItems: prefs.budgets, updateBudgets,
       tourSeen: !!prefs.tour, prefsLoaded: loaded, markTourSeen,
-      syncNotice: notice,
+      syncNotice: notice, syncWarnings,
+      budgetsLocked: unreadable.kinds.includes('budgets'),
+      settingsLocked: unreadable.kinds.includes('settings'),
     }}>
       {children}
     </Ctx.Provider>

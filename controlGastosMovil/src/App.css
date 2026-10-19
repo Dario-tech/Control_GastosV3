@@ -3845,3 +3845,15 @@ img.fm-goal-hero-icon { width: 64px; height: 64px; border-radius: 20px; object-f
 .skel-back  { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0; }
 .skel-title { width: 60%; height: 34px; border-radius: var(--radius-xs); flex-shrink: 0; }
 @media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+
+/* Aviso: datos del servidor que no se han podido leer (solo lectura) */
+.sync-warning {
+  margin: 8px 16px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+}
