@@ -9,7 +9,8 @@ from datetime import date as date_type
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, Response
+from typing import Any
 from pydantic import BaseModel
 from dotenv import load_dotenv
 # Carga backend/.env si existe (no pisa variables ya definidas, así que en Render/Docker no cambia nada).
@@ -31,7 +32,8 @@ from services.users import (
     get_user, ensure_user, get_email_by_shortcut_token,
     ensure_password_column, get_password_hash, create_user_with_password,
 )
-from services.db import init_pool
+from services.db import init_pool, run_in_thread
+from services import user_data
 from services.ratelimit import enforce, reset as ratelimit_reset, client_ip
 from services.pending import (
     create_pending, get_pending, categorize_pending, delete_pending,
@@ -64,6 +66,7 @@ async def lifespan(app: FastAPI):
     ensure_annual_expenses_table()  # migración aditiva idempotente (gastos fijos anuales)
     ensure_search_index()  # migración aditiva idempotente (índice para paginar la búsqueda)
     ensure_wallet_schema()  # migración aditiva idempotente (Atajo de Cartera: comercio, reglas)
+    user_data.ensure_user_data_schema()  # migración aditiva idempotente (categorías y prefs por usuario)
     yield
 
 
@@ -802,6 +805,90 @@ async def update_annual_expense_endpoint(expense_id: int, body: AnnualExpenseIn,
 async def delete_annual_expense_endpoint(expense_id: int, email: str = Depends(get_current_user)):
     await delete_annual_expense(email, expense_id)
     return {"status": "ok"}
+
+
+# ── Categorías y preferencias propias del usuario ─────────────────────────────
+# El usuario sale siempre del JWT. Nombres y JSON van cifrados en la BD; no se
+# registra ningún contenido en logs.
+
+class CategoryIn(BaseModel):
+    tipo: str
+    concepto: str
+    emoji: str | None = None
+
+
+class CategoryPatchIn(BaseModel):
+    concepto: str | None = None
+    emoji: str | None = None
+
+
+class CategoryImportIn(BaseModel):
+    items: list[Any]
+
+
+def _limit_user_writes(email: str):
+    enforce("userdata-min", [email], limit=60, window=60, block=300)
+    enforce("userdata-day", [email], limit=2000, window=86400, block=3600)
+
+
+@app.get("/api/categories")
+async def list_categories_endpoint(email: str = Depends(get_current_user)):
+    return await run_in_thread(lambda: user_data.list_categories(email))
+
+
+@app.post("/api/categories", status_code=201)
+async def create_category_endpoint(body: CategoryIn, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    return await run_in_thread(lambda: user_data.create_category(email, body.tipo, body.concepto, body.emoji))
+
+
+@app.post("/api/categories/import")
+async def import_categories_endpoint(body: CategoryImportIn, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    return await run_in_thread(lambda: user_data.import_categories(email, body.items))
+
+
+@app.patch("/api/categories/{category_id}")
+async def update_category_endpoint(category_id: int, body: CategoryPatchIn, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    return await run_in_thread(lambda: user_data.update_category(email, category_id, body.concepto, body.emoji))
+
+
+@app.delete("/api/categories/{category_id}", status_code=204)
+async def delete_category_endpoint(category_id: int, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    await run_in_thread(lambda: user_data.delete_category(email, category_id))
+    return Response(status_code=204)
+
+
+@app.get("/api/prefs")
+async def get_prefs_endpoint(email: str = Depends(get_current_user)):
+    return await run_in_thread(lambda: user_data.get_prefs(email))
+
+
+@app.put("/api/prefs/{kind}")
+async def put_pref_endpoint(kind: str, request: Request, email: str = Depends(get_current_user)):
+    if kind not in user_data.PREF_KINDS:
+        raise HTTPException(status_code=422, detail="kind no permitido")
+    _limit_user_writes(email)
+    too_big = HTTPException(status_code=413, detail="Datos demasiado grandes (máx. 64 KB)")
+    # Corta cuerpos enormes antes de leerlos (el tope exacto, 64 KB de JSON, se valida en el servicio).
+    try:
+        declared = int(request.headers.get("content-length") or 0)
+    except ValueError:
+        declared = 0
+    if declared > user_data.PREFS_MAX_BYTES + 1024:
+        raise too_big
+    raw = await request.body()
+    if len(raw) > user_data.PREFS_MAX_BYTES + 1024:
+        raise too_big
+    try:
+        payload = json_lib.loads(raw)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="JSON inválido")
+    if not isinstance(payload, dict) or "data" not in payload:
+        raise HTTPException(status_code=422, detail='Falta el campo "data"')
+    return await run_in_thread(lambda: user_data.put_pref(email, kind, payload["data"]))
 
 
 # ── Inversiones ───────────────────────────────────────────────────────────────
