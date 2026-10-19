@@ -9,6 +9,7 @@
 //    se reintenta en la siguiente carga. Es idempotente.
 import {
   BUDGET_KEY, BUDGET_KEY_V2, BUDGET_KEY_V1, CUSTOM_CATS_KEY, SETTINGS_KEY, TOUR_KEY,
+  LEGACY_KEYS, LEGACY_OWNER_KEY,
 } from './storageKeys'
 import { autoColor } from './budget'
 import { DEFAULT_CATEGORIES } from '../data/categories'
@@ -82,6 +83,37 @@ export function hasLegacyTour(storage = localStorage) {
   try { return storage.getItem(TOUR_KEY) != null } catch { return false }
 }
 
+export function hasLegacyData(storage = localStorage) {
+  try { return LEGACY_KEYS.some(k => storage.getItem(k) != null) } catch { return false }
+}
+
+const norm = email => (typeof email === 'string' ? email.trim().toLowerCase() : '')
+
+/**
+ * ¿Son de este usuario las claves antiguas del dispositivo? Las claves antiguas
+ * no llevan usuario: la primera vez que se ven tras un login se anota su dueño.
+ * Para cualquier otro usuario devuelve false (no se muestran ni se importan, y
+ * se conservan para su dueño).
+ */
+export function claimLegacy(email, storage = localStorage) {
+  const me = norm(email)
+  if (!me) return false
+  try {
+    if (!hasLegacyData(storage)) {
+      storage.removeItem(LEGACY_OWNER_KEY) // nada pendiente: el dueño ya no importa
+      return true
+    }
+    const owner = storage.getItem(LEGACY_OWNER_KEY)
+    if (!owner) {
+      storage.setItem(LEGACY_OWNER_KEY, me)
+      return true
+    }
+    return owner === me
+  } catch {
+    return false
+  }
+}
+
 function drop(storage, ...keys) {
   for (const k of keys) { try { storage.removeItem(k) } catch { /* no-op */ } }
 }
@@ -96,13 +128,22 @@ function drop(storage, ...keys) {
  *   applied:    { kind: dato } lo que se acaba de subir (ya es del servidor)
  *   failed:     nombres de lo que quedó pendiente para el siguiente intento
  */
-export async function importLegacy({ user, prefs, api, storage = localStorage }) {
-  const out = { categories: null, applied: {}, failed: [] }
+export async function importLegacy({ user, prefs, api, storage = localStorage, catsUnreadable = 0 }) {
+  const out = { categories: null, applied: {}, failed: [], unreadable: [] }
+  // Solo el dueño de las claves antiguas puede importarlas.
+  const mine = claimLegacy(user?.email, storage)
+  // Lo que el servidor tiene pero no ha podido descifrar: ni se sube ni se
+  // borra nada local sobre ello (se sobrescribiría un dato que existe).
+  const unread = new Set(Array.isArray(prefs?.unreadable) ? prefs.unreadable : [])
+  out.unreadable = [...unread]
+  const finish = () => { if (!hasLegacyData(storage)) { try { storage.removeItem(LEGACY_OWNER_KEY) } catch { /* no-op */ } } return out }
 
   // 1. Categorías propias
   try {
-    const items = readLegacyCats(storage)
-    if (items === null) {
+    const items = mine ? readLegacyCats(storage) : undefined
+    if (catsUnreadable > 0 && Array.isArray(items) && items.length > 0) {
+      out.failed.push('categories') // el servidor tiene categorías ilegibles: no se marca completa
+    } else if (items === null) {
       out.failed.push('categories') // ilegible: no se toca
     } else if (Array.isArray(items)) {
       if (items.length === 0) {
@@ -122,7 +163,7 @@ export async function importLegacy({ user, prefs, api, storage = localStorage })
     out.failed.push('categories')
   }
 
-  if (!prefs) return out
+  if (!prefs) return finish()
 
   async function upload(kind, data) {
     const res = await api.putPref(kind, data)
@@ -132,7 +173,7 @@ export async function importLegacy({ user, prefs, api, storage = localStorage })
 
   // 2. Ajustes
   try {
-    const raw = storage.getItem(SETTINGS_KEY)
+    const raw = mine && !unread.has('settings') ? storage.getItem(SETTINGS_KEY) : null
     if (raw != null) {
       if (prefs.settings != null) {
         drop(storage, SETTINGS_KEY) // el servidor gana
@@ -146,7 +187,7 @@ export async function importLegacy({ user, prefs, api, storage = localStorage })
 
   // 3. Presupuestos
   try {
-    const items = readLegacyBudgets(storage)
+    const items = mine && !unread.has('budgets') ? readLegacyBudgets(storage) : undefined
     if (items === null) {
       out.failed.push('budgets')
     } else if (items !== undefined) {
@@ -161,14 +202,14 @@ export async function importLegacy({ user, prefs, api, storage = localStorage })
 
   // 4. Categorías ocultas (regla antigua por nombre, una sola vez)
   try {
-    if (prefs.hidden_categories == null) {
+    if (prefs.hidden_categories == null && !unread.has('hidden_categories')) {
       await upload('hidden_categories', legacyHiddenFor(user?.name))
     }
   } catch { out.failed.push('hidden_categories') }
 
   // 5. Tour visto
   try {
-    const raw = storage.getItem(TOUR_KEY)
+    const raw = mine && !unread.has('tour') ? storage.getItem(TOUR_KEY) : null
     if (raw != null) {
       if (prefs.tour != null) {
         drop(storage, TOUR_KEY)
@@ -179,5 +220,23 @@ export async function importLegacy({ user, prefs, api, storage = localStorage })
     }
   } catch { out.failed.push('tour') }
 
-  return out
+  return finish()
+}
+
+/**
+ * Último intento, rápido, de importar lo pendiente justo antes de cerrar sesión
+ * manualmente (aún hay token). Mejor esfuerzo: con timeout corto; si no se
+ * completa, las claves antiguas se quedan ligadas a su dueño. Nunca lanza.
+ */
+export async function finalImportBestEffort({ user, api, fetchPrefs, fetchCategories, timeoutMs = 3000, storage = localStorage }) {
+  if (!user?.email || !hasLegacyData(storage) || !claimLegacy(user.email, storage)) return null
+  const run = (async () => {
+    const [pr, cr] = await Promise.allSettled([fetchPrefs(), fetchCategories()])
+    const prefs = pr.status === 'fulfilled' && pr.value && typeof pr.value === 'object' ? pr.value : null
+    const catsUnreadable = cr.status === 'fulfilled' ? Number(cr.value?.unreadable) || 0 : 0
+    return importLegacy({ user, prefs, api, storage, catsUnreadable })
+  })()
+  let timer
+  const timeout = new Promise(resolve => { timer = setTimeout(() => resolve(null), timeoutMs) })
+  try { return await Promise.race([run, timeout]) } catch { return null } finally { clearTimeout(timer) }
 }

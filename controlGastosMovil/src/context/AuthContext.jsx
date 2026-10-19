@@ -1,6 +1,9 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { SESSION_EXPIRED_EVENT } from '../services/api'
 import { AUTH_KEY as LS_KEY, clearUserData, clearExpiredSession } from '../utils/storageKeys'
+import { hasLegacyData, finalImportBestEffort } from '../utils/legacyImport'
+import { fetchPrefs, putPref } from '../services/prefsApi'
+import { fetchCategories, importCategories } from '../services/categoriesApi'
 
 const BASE   = import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com'
 
@@ -102,10 +105,17 @@ export function AuthProvider({ children }) {
   }
 
   // Borra la sesión y las cachés del usuario (finanzas, categorías, ajustes,
-  // avisos ya enviados). No toca claves antiguas pendientes de importar.
+  // avisos ya enviados). No toca claves antiguas pendientes de importar: si las
+  // hay, antes se intenta un último import de mejor esfuerzo (timeout corto, aún
+  // con token). Si no se completa, siguen ligadas a su dueño y no se borran.
   function logout() {
-    clearUserData()
-    setUser(null)
+    const finish = () => { clearUserData(); setUser(null) }
+    if (!user || !hasLegacyData()) { finish(); return }
+    return finalImportBestEffort({
+      user,
+      api: { importCategories, putPref },
+      fetchPrefs, fetchCategories,
+    }).catch(() => null).finally(finish)
   }
 
   function clearSessionExpiredMsg() {

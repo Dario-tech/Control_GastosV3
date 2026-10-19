@@ -38,7 +38,7 @@ export default function BudgetTab() {
   const { itemsForMonth, addItem, updateItem, removeItem } = useBudget()
   const { data } = useFinanceData()
   const { selectedMonth: globalMonth } = useApp()
-  const { settings } = useSettings()
+  const { settings, budgetsLocked } = useSettings()
 
   // Mes local — independiente del selector global
   const [budgetMonth, setBudgetMonth]         = useState(globalMonth)
@@ -67,8 +67,8 @@ export default function BudgetTab() {
   const totalLimit     = items.reduce((s, i) => s + (i.limit || 0), 0)
   const totalSpent     = itemsWithSpent.reduce((s, i) => s + i.realSpent, 0)
 
-  function openAdd()      { setEditItem(null);  setShowModal(true) }
-  function openEdit(item) { setEditItem(item);  setShowModal(true) }
+  function openAdd()      { if (budgetsLocked) return; setEditItem(null);  setShowModal(true) }
+  function openEdit(item) { if (budgetsLocked) return; setEditItem(item);  setShowModal(true) }
   function closeModal()   { setShowModal(false); setEditItem(null) }
 
   function handleSave(formData) {
@@ -130,7 +130,7 @@ export default function BudgetTab() {
             ))}
           </div>
 
-          <button className="budget-fab" onClick={openAdd}>
+          <button className="budget-fab" onClick={openAdd} disabled={budgetsLocked}>
             Crear Nuevo Presupuesto
           </button>
         </>

@@ -44,6 +44,8 @@ describe('useBudget', () => {
   let putBodies
   beforeEach(() => {
     localStorage.clear()
+    // Los datos antiguos solo se muestran a su dueño: hay un usuario con sesión
+    localStorage.setItem('mi-economia-auth-v1', JSON.stringify({ email: 'm@m.es', name: 'Mario', sessionToken: 't' }))
     putBodies = []
     vi.stubGlobal('fetch', vi.fn(async (url, opts = {}) => {
       if (opts.method === 'PUT') { putBodies.push(JSON.parse(opts.body).data); return { status: 200, ok: true, json: async () => ({ updated_at: 'x' }) } }
