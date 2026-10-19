@@ -76,6 +76,13 @@ TRANSACTIONS = [
     ("2026-07-09", "Gasto Variable","Ropa",      75.00),
 ]
 
+# (tipo, concepto, emoji) — categorías propias de muestra
+CATEGORIES = [
+    ("Gasto Variable", "Gimnasio", "🏋️"),
+    ("Gasto Variable", "Mascotas", "🐶"),
+    ("Ingreso",        "Freelance", "💻"),
+]
+
 
 def main():
     password_hash, shortcut_token = build_credentials()  # falla antes de tocar la BD
@@ -100,6 +107,18 @@ def main():
                 (EMAIL, fecha, tipo, encrypt_str(concepto), encrypt_float(importe)),
             )
 
+        # Categorías propias (nombre cifrado + HMAC para la unicidad). Se borran y
+        # se reinsertan para que el script siga siendo re-ejecutable. Requiere que
+        # el backend haya arrancado antes al menos una vez (crea las tablas).
+        from services.crypto import hmac_tag  # noqa: E402
+        cur.execute("DELETE FROM user_categories WHERE user_email = %s", (EMAIL,))
+        for tipo, concepto, emoji in CATEGORIES:
+            cur.execute(
+                """INSERT INTO user_categories (user_email, tipo, concepto_enc, concepto_hmac, emoji)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (EMAIL, tipo, encrypt_str(concepto), hmac_tag(f"{EMAIL}|{tipo}|{concepto.casefold()}"), emoji),
+            )
+
         # Pago pendiente de categorizar (≈34,50€) → la app sugerirá "Comida".
         cur.execute(
             "INSERT INTO pending_transactions (user_email, importe, fecha) VALUES (%s, %s, %s::date)",
@@ -107,7 +126,7 @@ def main():
         )
 
         conn.commit()
-        print(f"✅ Semilla aplicada: usuario {EMAIL} + {len(TRANSACTIONS)} transacciones cifradas + 1 pendiente")
+        print(f"✅ Semilla aplicada: usuario {EMAIL} + {len(TRANSACTIONS)} transacciones cifradas + {len(CATEGORIES)} categorías + 1 pendiente")
     except Exception:
         conn.rollback()
         raise

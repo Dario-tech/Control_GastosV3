@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, waitFor } from '@testing-library/react'
+import { AuthProvider } from '../src/context/AuthContext'
+import { SettingsProvider } from '../src/context/SettingsContext'
 import { statusOf, budgetProgress, daysLeftInMonth } from '../src/utils/budget'
 import { useBudget, BUDGET_COLORS } from '../src/hooks/useBudget'
 import { createNotifCache } from '../src/utils/notifCache'
@@ -39,10 +41,23 @@ describe('notifCache', () => {
 })
 
 describe('useBudget', () => {
-  beforeEach(() => localStorage.clear())
-  afterEach(() => vi.useRealTimers())
-  it('añade, filtra por mes, edita y elimina; persiste en localStorage', () => {
-    const { result } = renderHook(() => useBudget())
+  let putBodies
+  beforeEach(() => {
+    localStorage.clear()
+    // Los datos antiguos solo se muestran a su dueño: hay un usuario con sesión
+    localStorage.setItem('mi-economia-auth-v1', JSON.stringify({ email: 'm@m.es', name: 'Mario', sessionToken: 't' }))
+    putBodies = []
+    vi.stubGlobal('fetch', vi.fn(async (url, opts = {}) => {
+      if (opts.method === 'PUT') { putBodies.push(JSON.parse(opts.body).data); return { status: 200, ok: true, json: async () => ({ updated_at: 'x' }) } }
+      return { status: 404, ok: false, json: async () => ({}) }
+    }))
+  })
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
+  const wrapper = ({ children }) => <AuthProvider><SettingsProvider>{children}</SettingsProvider></AuthProvider>
+  const hook = () => renderHook(() => useBudget(), { wrapper })
+
+  it('añade, filtra por mes, edita y elimina; cada cambio se guarda en el servidor', async () => {
+    const { result } = hook()
     act(() => { result.current.addItem({ name: 'Ocio', limit: 50 }, 2) })
     act(() => { result.current.addItem({ name: 'Comida', limit: 200 }, 2) })
     act(() => { result.current.addItem({ name: 'Otro', limit: 10 }, 3) })
@@ -54,11 +69,14 @@ describe('useBudget', () => {
     expect(result.current.itemsForMonth(3)[0].limit).toBe(99)
     act(() => { result.current.removeItem(id) })
     expect(result.current.itemsForMonth(3)).toHaveLength(0)
-    expect(JSON.parse(localStorage.getItem('mi-economia-budget-v3'))).toHaveLength(2)
+    await waitFor(() => expect(putBodies.at(-1)?.items).toHaveLength(2))
+    expect(putBodies.at(-1).version).toBe(3)
+    // la clave antigua NO se vuelve a escribir: es solo de importación
+    expect(localStorage.getItem('mi-economia-budget-v3')).toBeNull()
   })
   it('dos altas en el mismo instante tienen ids distintos y borrar una no borra la otra', () => {
-    vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 1, 10)) // reloj congelado: mismo ms
-    const { result } = renderHook(() => useBudget())
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 1, 10)) // reloj congelado: mismo ms
+    const { result } = hook()
     act(() => {
       result.current.addItem({ name: 'A', limit: 1 }, 2)
       result.current.addItem({ name: 'B', limit: 2 }, 2)
@@ -73,21 +91,21 @@ describe('useBudget', () => {
   })
   it('conserva ids antiguos (Date.now) y sigue operando sobre ellos', () => {
     localStorage.setItem('mi-economia-budget-v3', JSON.stringify([{ id: '1700000000000', name: 'Old', limit: 5, month: 2, color: '#fff' }]))
-    const { result } = renderHook(() => useBudget())
+    const { result } = hook()
     act(() => { result.current.addItem({ name: 'New', limit: 6 }, 2) })
     expect(result.current.itemsForMonth(2).map(i => i.id)[0]).toBe('1700000000000')
     act(() => { result.current.removeItem('1700000000000') })
     expect(result.current.itemsForMonth(2)).toHaveLength(1)
     expect(result.current.itemsForMonth(2)[0].name).toBe('New')
   })
-  it('migra v2 a v3 asignando mes y color', () => {
+  it('pinta la clave v2 antigua migrada en memoria (mes y color) sin tocar la clave', () => {
     localStorage.setItem('mi-economia-budget-v2', JSON.stringify([{ id: '1', name: 'X', limit: 5 }]))
-    const { result } = renderHook(() => useBudget())
+    const { result } = hook()
     expect(result.current.allItems[0]).toMatchObject({ month: new Date().getMonth(), color: BUDGET_COLORS[0] })
-    expect(localStorage.getItem('mi-economia-budget-v3')).not.toBeNull()
+    expect(localStorage.getItem('mi-economia-budget-v2')).not.toBeNull()
   })
   it('datos corruptos -> lista vacía', () => {
     localStorage.setItem('mi-economia-budget-v3', 'no-json')
-    expect(renderHook(() => useBudget()).result.current.allItems).toEqual([])
+    expect(hook().result.current.allItems).toEqual([])
   })
 })

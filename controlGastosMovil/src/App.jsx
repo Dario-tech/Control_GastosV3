@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useEffect, useState } from 'react'
+import { Component, lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { wakeBackend } from './services/api'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppProvider, useApp } from './context/AppContext'
@@ -9,7 +9,6 @@ import BottomNav from './components/layout/BottomNav'
 import ProfilePanel from './components/layout/ProfilePanel'
 import Toast from './components/ui/Toast'
 import { TabSkeleton, FormSkeleton } from './components/ui/Skeleton'
-import { shouldShowTour } from './utils/tour'
 import { usePendingTransaction } from './hooks/usePendingTransaction'
 import { useShortcutIntake } from './hooks/useShortcutIntake'
 import LoginScreen from './components/auth/LoginScreen'
@@ -65,12 +64,12 @@ class ErrorBoundary extends Component {
 }
 
 function AppContent() {
-  const { activeTab } = useApp()
-  const { settings }  = useSettings()
+  const { activeTab, showToast } = useApp()
+  const { settings, tourSeen, prefsLoaded, syncNotice, syncWarnings } = useSettings()
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [categorizeOpen, setCategorizeOpen] = useState(false)
   const [addOpen,        setAddOpen]        = useState(false)
-  const [guideOpen,      setGuideOpen]      = useState(shouldShowTour)
+  const [guideOpen,      setGuideOpen]      = useState(false)
   const { queue, fetchQueue, categorizePending, discardPending } = usePendingTransaction()
   // Pagos de Apple Pay que llegan por URL desde el Atajo de iOS (?atajo=1…)
   const intake = useShortcutIntake({ onChange: fetchQueue })
@@ -78,6 +77,18 @@ function AppContent() {
   const current = queue[0] ?? null
 
   useEffect(prefetchTabs, [])
+
+  // La guía se enseña una sola vez por usuario: el servidor dice si ya la vio.
+  const tourAsked = useRef(false)
+  useEffect(() => {
+    if (prefsLoaded && !tourSeen && !tourAsked.current) {
+      tourAsked.current = true
+      setGuideOpen(true)
+    }
+  }, [prefsLoaded, tourSeen])
+
+  // Avisos de error al guardar cambios en el servidor (con reversión)
+  useEffect(() => { if (syncNotice) showToast(syncNotice.msg) }, [syncNotice, showToast])
 
   return (
     <div className={`app${settings.hideAmounts ? ' hide-amounts' : ''}`}>
@@ -88,6 +99,9 @@ function AppContent() {
         onAddClick={() => setAddOpen(true)}
       />
       <main className="main">
+        {syncWarnings?.map(msg => (
+          <div key={msg} className="sync-warning" role="alert">⚠️ {msg}</div>
+        ))}
         <ErrorBoundary>
           <Suspense fallback={<TabSkeleton />}>
             {activeTab === 'year'        && <YearTab />}

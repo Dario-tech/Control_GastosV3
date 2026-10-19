@@ -7,10 +7,12 @@ import logging
 import re
 from datetime import date as date_type
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request, Depends, Query
+from fastapi import FastAPI, HTTPException, Request, Depends, Query, Path
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel
+from fastapi.responses import StreamingResponse, JSONResponse, Response
+from typing import Any, Annotated
+from pydantic import BaseModel, Field, field_validator
 from dotenv import load_dotenv
 # Carga backend/.env si existe (no pisa variables ya definidas, así que en Render/Docker no cambia nada).
 # Debe ejecutarse antes de importar los servicios, que leen el entorno al importarse.
@@ -31,7 +33,8 @@ from services.users import (
     get_user, ensure_user, get_email_by_shortcut_token,
     ensure_password_column, get_password_hash, create_user_with_password,
 )
-from services.db import init_pool
+from services.db import init_pool, run_in_thread
+from services import user_data
 from services.ratelimit import enforce, reset as ratelimit_reset, client_ip
 from services.pending import (
     create_pending, get_pending, categorize_pending, delete_pending,
@@ -64,6 +67,7 @@ async def lifespan(app: FastAPI):
     ensure_annual_expenses_table()  # migración aditiva idempotente (gastos fijos anuales)
     ensure_search_index()  # migración aditiva idempotente (índice para paginar la búsqueda)
     ensure_wallet_schema()  # migración aditiva idempotente (Atajo de Cartera: comercio, reglas)
+    user_data.ensure_user_data_schema()  # migración aditiva idempotente (categorías y prefs por usuario)
     yield
 
 
@@ -104,10 +108,88 @@ def _parse_origins(raw: str) -> list[str]:
 origins = _parse_origins(_raw_origins)
 _log.info("CORS: orígenes permitidos = %s", origins)
 
+@app.exception_handler(RequestValidationError)
+async def _validation_handler(request: Request, exc: RequestValidationError):
+    """422 sin devolver el valor enviado (puede ser un nombre o importe del usuario
+    o contener caracteres que no se pueden serializar, p. ej. sustitutos sueltos)."""
+    errors = [{"loc": list(e.get("loc", ())), "msg": str(e.get("msg", "")), "type": e.get("type", "")}
+              for e in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": errors})
+
+
+@app.exception_handler(RecursionError)
+async def _recursion_handler(request: Request, exc: RecursionError):
+    """JSON con anidado extremo: entrada inválida del cliente, no un fallo del servidor."""
+    return JSONResponse(status_code=422, content={"detail": "JSON inválido"})
+
+
+USERDATA_MAX_BODY = 128 * 1024
+_USERDATA_PREFIXES = ("/api/categories", "/api/prefs")
+
+
+class _BodyTooLarge(Exception):
+    pass
+
+
+class BodySizeLimitMiddleware:
+    """Tope de tamaño de cuerpo en /api/categories* y /api/prefs*. Mira Content-Length
+    y además cuenta los bytes según llegan (cubre `Transfer-Encoding: chunked`),
+    cortando en cuanto se supera el límite, sin acumular el cuerpo en memoria."""
+
+    def __init__(self, app, max_bytes: int = USERDATA_MAX_BODY):
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not scope["path"].startswith(_USERDATA_PREFIXES):
+            return await self.app(scope, receive, send)
+        too_big = JSONResponse(status_code=413, content={"detail": "Cuerpo demasiado grande (máx. 128 KB)"})
+        try:
+            declared = int(dict(scope["headers"]).get(b"content-length") or 0)
+        except ValueError:
+            declared = 0
+        if declared > self.max_bytes:
+            return await too_big(scope, receive, send)
+
+        seen = 0
+        started = False   # ya se envió alguna respuesta (la nuestra o la de la app)
+        rejected = False  # enviamos el 413 nosotros; se descarta lo que la app intente enviar después
+
+        async def limited_receive():
+            nonlocal seen, started, rejected
+            msg = await receive()
+            if msg["type"] == "http.request":
+                seen += len(msg.get("body", b""))
+                if seen > self.max_bytes:
+                    # Se responde 413 aquí mismo: FastAPI convierte cualquier fallo al leer
+                    # el cuerpo en un 400, así que no se puede confiar en que la excepción llegue.
+                    if not started:
+                        started = rejected = True
+                        await too_big(scope, receive, send)
+                    raise _BodyTooLarge()
+            return msg
+
+        async def tracking_send(msg):
+            nonlocal started
+            if rejected:
+                return
+            started = True
+            await send(msg)
+
+        try:
+            await self.app(scope, limited_receive, tracking_send)
+        except _BodyTooLarge:
+            if not rejected:
+                raise
+
+
+# Va antes que CORS para quedar por dentro: así el 413 también lleva cabeceras CORS.
+app.add_middleware(BodySizeLimitMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_methods=["GET", "DELETE", "POST", "PATCH"],
+    allow_methods=["GET", "DELETE", "POST", "PATCH", "PUT"],
     allow_headers=["*"],
 )
 
@@ -802,6 +884,106 @@ async def update_annual_expense_endpoint(expense_id: int, body: AnnualExpenseIn,
 async def delete_annual_expense_endpoint(expense_id: int, email: str = Depends(get_current_user)):
     await delete_annual_expense(email, expense_id)
     return {"status": "ok"}
+
+
+# ── Categorías y preferencias propias del usuario ─────────────────────────────
+# El usuario sale siempre del JWT. Nombres y JSON van cifrados en la BD; no se
+# registra ningún contenido en logs.
+
+CategoryId = Annotated[int, Path(ge=1, le=2**63 - 1)]  # rango bigint de la BD
+
+
+class CategoryIn(BaseModel):
+    tipo: str = Field(max_length=32)
+    concepto: str = Field(max_length=200)   # antes de normalizar; el tope real (40) lo aplica el servicio
+    emoji: str | None = Field(default=None, max_length=64)
+
+
+class CategoryPatchIn(BaseModel):
+    concepto: str | None = Field(default=None, max_length=200)
+    emoji: str | None = Field(default=None, max_length=64)
+
+
+class CategoryImportItem(BaseModel):
+    tipo: str | None = Field(default=None, max_length=32)
+    concepto: str | None = Field(default=None, max_length=200)
+    emoji: str | None = Field(default=None, max_length=64)
+
+    @field_validator("tipo", "concepto", "emoji", mode="before")
+    @classmethod
+    def _solo_texto(cls, v):
+        return v if isinstance(v, str) else None   # tipos raros: el servicio lo cuenta como omitido
+
+
+class CategoryImportIn(BaseModel):
+    items: list[CategoryImportItem | None] = Field(max_length=200)
+
+    @field_validator("items", mode="before")
+    @classmethod
+    def _items_no_objeto(cls, v):
+        # Elementos que no son objetos (cadenas, números...) se omiten, no tumban el lote.
+        if isinstance(v, list):
+            return [x if isinstance(x, dict) else None for x in v]
+        return v
+
+
+def _limit_user_writes(email: str):
+    enforce("userdata-min", [email], limit=60, window=60, block=300)
+    enforce("userdata-day", [email], limit=2000, window=86400, block=3600)
+
+
+@app.get("/api/categories")
+async def list_categories_endpoint(email: str = Depends(get_current_user)):
+    return await run_in_thread(lambda: user_data.list_categories(email))
+
+
+@app.post("/api/categories", status_code=201)
+async def create_category_endpoint(body: CategoryIn, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    return await run_in_thread(lambda: user_data.create_category(email, body.tipo, body.concepto, body.emoji))
+
+
+@app.post("/api/categories/import")
+async def import_categories_endpoint(body: CategoryImportIn, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    return await run_in_thread(lambda: user_data.import_categories(
+        email, [i.model_dump() if i else None for i in body.items]))
+
+
+@app.patch("/api/categories/{category_id}")
+async def update_category_endpoint(category_id: CategoryId, body: CategoryPatchIn, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    return await run_in_thread(lambda: user_data.update_category(email, category_id, body.concepto, body.emoji))
+
+
+@app.delete("/api/categories/{category_id}", status_code=204)
+async def delete_category_endpoint(category_id: CategoryId, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    await run_in_thread(lambda: user_data.delete_category(email, category_id))
+    return Response(status_code=204)
+
+
+@app.get("/api/prefs")
+async def get_prefs_endpoint(email: str = Depends(get_current_user)):
+    return await run_in_thread(lambda: user_data.get_prefs(email))
+
+
+@app.put("/api/prefs/{kind}")
+async def put_pref_endpoint(kind: str, request: Request, force: bool = False,
+                            email: str = Depends(get_current_user)):
+    if kind not in user_data.PREF_KINDS:
+        raise HTTPException(status_code=422, detail="kind no permitido")
+    _limit_user_writes(email)
+    # El tope de cuerpo (128 KB, también chunked) lo aplica BodySizeLimitMiddleware;
+    # el tope exacto de 64 KB de JSON se valida en el servicio.
+    raw = await request.body()
+    try:
+        payload = json_lib.loads(raw)
+    except (ValueError, RecursionError):
+        raise HTTPException(status_code=422, detail="JSON inválido")
+    if not isinstance(payload, dict) or "data" not in payload:
+        raise HTTPException(status_code=422, detail='Falta el campo "data"')
+    return await run_in_thread(lambda: user_data.put_pref(email, kind, payload["data"], force))
 
 
 # ── Inversiones ───────────────────────────────────────────────────────────────
