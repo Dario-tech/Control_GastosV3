@@ -34,3 +34,13 @@ export function daysLeftInMonth(monthIndex) {
   const lastDay = new Date(now.getFullYear(), monthIndex + 1, 0).getDate()
   return lastDay - now.getDate()
 }
+
+export const BUDGET_COLORS = [
+  '#6366f1', '#3b82f6', '#a855f7', '#22c55e',
+  '#f59e0b', '#fb923c', '#f43f5e', '#06b6d4',
+  '#ec4899', '#84cc16', '#14b8a6', '#8b5cf6',
+]
+
+export function autoColor(index) {
+  return BUDGET_COLORS[index % BUDGET_COLORS.length]
+}

@@ -1,36 +1,56 @@
-// Claves de localStorage con datos del usuario. Al cerrar sesión (o caducar)
-// se borran todas, para que la siguiente persona que use el dispositivo no vea
-// importes, presupuestos ni categorías de la anterior.
+// Claves de localStorage.
 //
-// No van aquí las preferencias de interfaz que no son personales (tema, acento,
-// moneda en 'mi-economia-settings-v1', tour visto, calendario abierto): esas se
-// conservan entre sesiones.
+// Los datos del usuario (categorías propias, presupuestos, ajustes, categorías
+// ocultas, tour visto) viven en el SERVIDOR. En el móvil solo hay:
+//  - la sesión (AUTH_KEY) y la cola del Atajo (SHORTCUT_QUEUE_KEY);
+//  - cachés desechables para pintar rápido (FINANCE_CACHE_KEY, CATS_CACHE_KEY,
+//    PREFS_CACHE_KEY, avisos ya enviados);
+//  - claves ANTIGUAS (LEGACY_*) con datos que aún pueden no estar en el
+//    servidor. Solo se borran tras confirmar que el servidor los ha recibido
+//    (utils/legacyImport.js). Nunca las borra el cierre de sesión ni el 401.
 export const AUTH_KEY          = 'mi-economia-auth-v1'
 export const FINANCE_CACHE_KEY = 'mi-economia-finance-cache-v1'
-export const BUDGET_KEY        = 'mi-economia-budget-v3'
-export const BUDGET_KEY_V2     = 'mi-economia-budget-v2'
-export const BUDGET_KEY_V1     = 'mi-economia-budget-v1'
-export const CUSTOM_CATS_KEY   = 'mi-economia-custom-cats-v1'
+export const CATS_CACHE_KEY    = 'mi-economia-cats-cache-v2'
+export const PREFS_CACHE_KEY   = 'mi-economia-prefs-cache-v2'
 export const BUDGET_NOTIF_KEY  = 'mi-economia-notif-v1'
 export const ANNUAL_NOTIF_KEY  = 'mi-economia-annual-notif-v1'
 // Gastos recibidos del Atajo de iOS (Apple Pay) que aún no se han podido
 // enviar al backend (sin conexión, servidor dormido o sin sesión iniciada).
 export const SHORTCUT_QUEUE_KEY = 'mi-economia-shortcut-queue-v1'
 
+// Claves antiguas pendientes de importar al servidor.
+export const BUDGET_KEY        = 'mi-economia-budget-v3'
+export const BUDGET_KEY_V2     = 'mi-economia-budget-v2'
+export const BUDGET_KEY_V1     = 'mi-economia-budget-v1'
+export const CUSTOM_CATS_KEY   = 'mi-economia-custom-cats-v1'
+export const SETTINGS_KEY      = 'mi-economia-settings-v1'
+export const TOUR_KEY          = 'mi-economia-tour-v1'
+
+export const LEGACY_KEYS = [
+  BUDGET_KEY, BUDGET_KEY_V2, BUDGET_KEY_V1, CUSTOM_CATS_KEY, SETTINGS_KEY, TOUR_KEY,
+]
+
+// Cierre de sesión: se borran la sesión y las cachés del usuario para que la
+// siguiente persona del dispositivo no vea nada. NO toca las claves antiguas
+// pendientes de importar (LEGACY_KEYS).
 export const USER_DATA_KEYS = [
   AUTH_KEY,
   FINANCE_CACHE_KEY,
-  BUDGET_KEY,
-  BUDGET_KEY_V2,
-  BUDGET_KEY_V1,
-  CUSTOM_CATS_KEY,
+  CATS_CACHE_KEY,
+  PREFS_CACHE_KEY,
   BUDGET_NOTIF_KEY,
   ANNUAL_NOTIF_KEY,
   SHORTCUT_QUEUE_KEY,
 ]
 
-export function clearUserData() {
-  for (const key of USER_DATA_KEYS) {
+// Sesión caducada (401): solo se pierde el token y la caché de finanzas.
+export const SESSION_EXPIRED_KEYS = [AUTH_KEY, FINANCE_CACHE_KEY]
+
+function removeAll(keys) {
+  for (const key of keys) {
     try { localStorage.removeItem(key) } catch { /* no-op */ }
   }
 }
+
+export function clearUserData() { removeAll(USER_DATA_KEYS) }
+export function clearExpiredSession() { removeAll(SESSION_EXPIRED_KEYS) }

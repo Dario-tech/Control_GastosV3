@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { SESSION_EXPIRED_EVENT } from '../services/api'
-import { AUTH_KEY as LS_KEY, clearUserData } from '../utils/storageKeys'
+import { AUTH_KEY as LS_KEY, clearUserData, clearExpiredSession } from '../utils/storageKeys'
 
 const BASE   = import.meta.env.VITE_API_URL || 'https://control-gastos-api-jflv.onrender.com'
 
@@ -32,9 +32,9 @@ export function AuthProvider({ children }) {
   // en vez de que cada sitio de la app muestre su propio error genérico.
   useEffect(() => {
     function handleExpired() {
-      // Misma limpieza que logout(): no dejar datos financieros en el
-      // dispositivo para quien inicie sesión después.
-      clearUserData()
+      // Solo se pierde el token y la caché de finanzas: nunca categorías ni
+      // presupuestos antiguos que aún no se hayan importado al servidor.
+      clearExpiredSession()
       setUser(null)
       setSessionExpiredMsg('Tu sesión ha caducado. Vuelve a iniciar sesión.')
     }
@@ -101,9 +101,8 @@ export function AuthProvider({ children }) {
     return authWithEmail('/api/auth/login-email', { email, password })
   }
 
-  // Borra la sesión y todas las cachés con datos del usuario (finanzas,
-  // presupuestos, categorías propias, avisos ya enviados). Las preferencias de
-  // interfaz (tema, acento...) se conservan.
+  // Borra la sesión y las cachés del usuario (finanzas, categorías, ajustes,
+  // avisos ya enviados). No toca claves antiguas pendientes de importar.
   function logout() {
     clearUserData()
     setUser(null)
