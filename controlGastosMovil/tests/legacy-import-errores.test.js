@@ -52,7 +52,7 @@ describe('importación única: errores del servidor', () => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({ theme: 'light' }))
     const { api, st } = statefulApi()
     api.importCategories.mockImplementation(async () => { throw httpErr(status) })
-    const out = await importLegacy({ user: { name: 'M' }, prefs: NO_PREFS, api })
+    const out = await importLegacy({ user: { name: 'M', email: 'm@mail.es' }, prefs: NO_PREFS, api })
     expect(out.failed).toContain('categories')
     expect(out.categories).toBeNull()
     expect(localStorage.getItem(CUSTOM_CATS_KEY)).not.toBeNull()
@@ -67,7 +67,7 @@ describe('importación única: errores del servidor', () => {
     localStorage.setItem(BUDGET_KEY_V1, JSON.stringify([{ id: 'c', name: 'Y', limit: 5 }]))
     localStorage.setItem(TOUR_KEY, '2026-01-01T00:00:00.000Z')
     const { api, st } = statefulApi({ putError: kind => (kind === 'budgets' ? httpErr(422) : null) })
-    const out = await importLegacy({ user: { name: 'M' }, prefs: NO_PREFS, api })
+    const out = await importLegacy({ user: { name: 'M', email: 'm@mail.es' }, prefs: NO_PREFS, api })
     expect(out.failed).toEqual(['budgets'])
     for (const k of [BUDGET_KEY, BUDGET_KEY_V2, BUDGET_KEY_V1]) expect(localStorage.getItem(k), k).not.toBeNull()
     expect(localStorage.getItem(TOUR_KEY)).toBeNull()
@@ -77,18 +77,18 @@ describe('importación única: errores del servidor', () => {
   it('un fallo de red en el 2.º lote y un reintento no duplican categorías', async () => {
     seedCats(450)
     const { api, st } = statefulApi({ failImportOnCall: [2] })
-    const first = await importLegacy({ user: { name: 'M' }, prefs: null, api })
+    const first = await importLegacy({ user: { name: 'M', email: 'm@mail.es' }, prefs: null, api })
     expect(first.failed).toContain('categories')
     expect(st.cats).toHaveLength(200)                       // solo el 1.er lote llegó
     expect(localStorage.getItem(CUSTOM_CATS_KEY)).not.toBeNull()
 
-    const second = await importLegacy({ user: { name: 'M' }, prefs: null, api })
+    const second = await importLegacy({ user: { name: 'M', email: 'm@mail.es' }, prefs: null, api })
     expect(second.failed).toEqual([])
     expect(st.cats).toHaveLength(450)                       // sin duplicados
     expect(new Set(st.cats.map(c => c.concepto)).size).toBe(450)
     expect(localStorage.getItem(CUSTOM_CATS_KEY)).toBeNull()
 
-    const third = await importLegacy({ user: { name: 'M' }, prefs: null, api })  // ya no hay nada que subir
+    const third = await importLegacy({ user: { name: 'M', email: 'm@mail.es' }, prefs: null, api })  // ya no hay nada que subir
     expect(third.categories).toBeNull()
     expect(api.importCategories).toHaveBeenCalledTimes(2 + 3)
   })
@@ -103,10 +103,10 @@ describe('importación única: errores del servidor', () => {
     const realImport = api.importCategories.getMockImplementation()
     api.importCategories.mockImplementation(async items => { if (down) throw new TypeError('Failed to fetch'); return realImport(items) })
     const before = remaining()
-    await importLegacy({ user: { name: 'M' }, prefs: NO_PREFS, api })
+    await importLegacy({ user: { name: 'M', email: 'm@mail.es' }, prefs: NO_PREFS, api })
     expect(remaining()).toEqual(before)
     down = false
-    const out = await importLegacy({ user: { name: 'M' }, prefs: NO_PREFS, api })
+    const out = await importLegacy({ user: { name: 'M', email: 'm@mail.es' }, prefs: NO_PREFS, api })
     expect(out.failed).toEqual([])
     expect(st.cats).toHaveLength(4)
     expect(remaining()).toEqual([])
@@ -121,7 +121,7 @@ describe('importación única: errores del servidor', () => {
     const { api, st } = statefulApi({
       putError: kind => (kind === 'settings' ? null : new Error('Tu sesión ha caducado. Vuelve a iniciar sesión.')),
     })
-    const out = await importLegacy({ user: { name: 'M' }, prefs: NO_PREFS, api })
+    const out = await importLegacy({ user: { name: 'M', email: 'm@mail.es' }, prefs: NO_PREFS, api })
     expect(st.cats).toHaveLength(2)
     expect(st.prefs.settings).toEqual({ theme: 'light' })
     expect(out.failed).toEqual(expect.arrayContaining(['budgets', 'tour']))
@@ -137,14 +137,14 @@ describe('importación única: errores del servidor', () => {
     const { api } = statefulApi({ putError: expired })
     api.importCategories.mockImplementation(async () => { throw expired() })
     const before = remaining()
-    await importLegacy({ user: { name: 'M' }, prefs: NO_PREFS, api })
+    await importLegacy({ user: { name: 'M', email: 'm@mail.es' }, prefs: NO_PREFS, api })
     expect(remaining()).toEqual(before)
   })
 
   it('clave de categorías ilegible: no se toca ni se llama al servidor para ella', async () => {
     localStorage.setItem(CUSTOM_CATS_KEY, '{no es json')
     const { api } = statefulApi()
-    const out = await importLegacy({ user: { name: 'M' }, prefs: null, api })
+    const out = await importLegacy({ user: { name: 'M', email: 'm@mail.es' }, prefs: null, api })
     expect(out.failed).toContain('categories')
     expect(api.importCategories).not.toHaveBeenCalled()
     expect(localStorage.getItem(CUSTOM_CATS_KEY)).toBe('{no es json')
