@@ -116,7 +116,7 @@ def main():
             cur.execute(
                 """INSERT INTO user_categories (user_email, tipo, concepto_enc, concepto_hmac, emoji)
                    VALUES (%s, %s, %s, %s, %s)""",
-                (EMAIL, tipo, encrypt_str(concepto), hmac_tag(concepto.casefold()), emoji),
+                (EMAIL, tipo, encrypt_str(concepto), hmac_tag(f"{EMAIL}|{tipo}|{concepto.casefold()}"), emoji),
             )
 
         # Pago pendiente de categorizar (≈34,50€) → la app sugerirá "Comida".
