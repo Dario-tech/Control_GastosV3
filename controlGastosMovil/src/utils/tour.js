@@ -1,11 +1,3 @@
-// Estado del tour guiado (si ya se ha visto), separado de SpotlightTour para
-// poder decidir si mostrarlo sin cargar el componente.
-export const TOUR_LS_KEY = 'mi-economia-tour-v1'
-
-export function shouldShowTour() {
-  try { return !localStorage.getItem(TOUR_LS_KEY) } catch { return false }
-}
-
-export function markTourSeen() {
-  try { localStorage.setItem(TOUR_LS_KEY, new Date().toISOString()) } catch {}
-}
+// Clave antigua del tour visto (ahora es una preferencia del servidor; ver
+// SettingsContext y utils/legacyImport.js).
+export { TOUR_KEY as TOUR_LS_KEY } from './storageKeys'

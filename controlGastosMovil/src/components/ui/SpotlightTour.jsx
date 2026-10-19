@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { markTourSeen } from '../../utils/tour'
+import { useSettings } from '../../context/SettingsContext'
 
 // Tour interactivo tipo "spotlight". Dos formas de avanzar:
 //  - "click": la pantalla se oscurece salvo un círculo/óvalo alrededor del
@@ -56,6 +56,7 @@ const STEPS = [
 const PAD = 10 // aire entre el elemento y el borde del círculo
 
 export default function SpotlightTour({ onFinish, modalOpen }) {
+  const { markTourSeen } = useSettings()
   const [stepIdx, setStepIdx]           = useState(0)
   const [rect, setRect]                 = useState(null)
   const [waitingModal, setWaitingModal] = useState(false)

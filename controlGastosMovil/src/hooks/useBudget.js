@@ -1,61 +1,14 @@
-import { useState, useCallback } from 'react'
+import { useCallback } from 'react'
 import { newId } from '../utils/id'
-import { BUDGET_KEY as LS_KEY, BUDGET_KEY_V2, BUDGET_KEY_V1 } from '../utils/storageKeys'
+import { BUDGET_COLORS, autoColor } from '../utils/budget'
+import { useSettings } from '../context/SettingsContext'
 
-export const BUDGET_COLORS = [
-  '#6366f1', '#3b82f6', '#a855f7', '#22c55e',
-  '#f59e0b', '#fb923c', '#f43f5e', '#06b6d4',
-  '#ec4899', '#84cc16', '#14b8a6', '#8b5cf6',
-]
+export { BUDGET_COLORS }
 
-function autoColor(index) {
-  return BUDGET_COLORS[index % BUDGET_COLORS.length]
-}
-
-function load() {
-  try {
-    // v3: items con campo month
-    const v3 = localStorage.getItem(LS_KEY)
-    if (v3) return JSON.parse(v3)
-
-    // Migrar v2 → v3: asignar mes actual a items existentes
-    const v2 = localStorage.getItem(BUDGET_KEY_V2)
-    if (v2) {
-      const currentMonth = new Date().getMonth()
-      const items = JSON.parse(v2).map((item, i) => ({
-        ...item,
-        color: item.color || autoColor(i),
-        month: currentMonth,
-      }))
-      localStorage.setItem(LS_KEY, JSON.stringify(items))
-      return items
-    }
-
-    // Migrar v1 → v3
-    const v1 = localStorage.getItem(BUDGET_KEY_V1)
-    if (v1) {
-      const currentMonth = new Date().getMonth()
-      const items = JSON.parse(v1).map((item, i) => ({
-        ...item,
-        color: autoColor(i),
-        month: currentMonth,
-      }))
-      localStorage.setItem(LS_KEY, JSON.stringify(items))
-      return items
-    }
-
-    return []
-  } catch {
-    return []
-  }
-}
-
-function persist(items) {
-  localStorage.setItem(LS_KEY, JSON.stringify(items))
-}
-
+// Los presupuestos son una preferencia del servidor (por usuario); viven en
+// SettingsContext con caché local para pintar rápido y escritura optimista.
 export function useBudget() {
-  const [allItems, setAllItems] = useState(load)
+  const { budgetItems: allItems, updateBudgets } = useSettings()
 
   // Solo los items del mes seleccionado
   function itemsForMonth(month) {
@@ -64,30 +17,20 @@ export function useBudget() {
 
   const addItem = useCallback((data, month) => {
     const id = newId()
-    setAllItems(prev => {
+    updateBudgets(prev => {
       const monthItems = prev.filter(i => i.month === month)
       const color = data.color || autoColor(monthItems.length)
-      const next  = [...prev, { ...data, color, month, id }]
-      persist(next)
-      return next
+      return [...prev, { ...data, color, month, id }]
     })
-  }, [])
+  }, [updateBudgets])
 
   const updateItem = useCallback((id, data) => {
-    setAllItems(prev => {
-      const next = prev.map(i => i.id === id ? { ...i, ...data } : i)
-      persist(next)
-      return next
-    })
-  }, [])
+    updateBudgets(prev => prev.map(i => i.id === id ? { ...i, ...data } : i))
+  }, [updateBudgets])
 
   const removeItem = useCallback((id) => {
-    setAllItems(prev => {
-      const next = prev.filter(i => i.id !== id)
-      persist(next)
-      return next
-    })
-  }, [])
+    updateBudgets(prev => prev.filter(i => i.id !== id))
+  }, [updateBudgets])
 
   return { allItems, itemsForMonth, addItem, updateItem, removeItem }
 }

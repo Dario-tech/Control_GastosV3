@@ -19,9 +19,9 @@ export function wakeBackend() {
 // Render (plan gratuito) puede dormir el backend tras inactividad y tardar
 // 30-60s en despertar. 45s da margen sin que la app se quede colgada para
 // siempre si el backend está realmente caído.
-const WRITE_TIMEOUT_MS = 45000
+export const WRITE_TIMEOUT_MS = 45000
 
-function authHeaders() {
+export function authHeaders() {
   try {
     const stored = JSON.parse(localStorage.getItem(LS_KEY))
     if (stored?.sessionToken) {
@@ -34,14 +34,18 @@ function authHeaders() {
 // Único punto por el que pasan todas las respuestas autenticadas: si el
 // backend dice 401, la sesión ya no vale — se limpia y se avisa al resto de
 // la app en vez de dejar que cada llamada falle con un error genérico.
-async function apiJson(res) {
+export async function apiJson(res) {
   if (res.status === 401) {
     try { localStorage.removeItem(LS_KEY) } catch { /* no-op */ }
     window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
     throw new Error('Tu sesión ha caducado. Vuelve a iniciar sesión.')
   }
   const body = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(body.detail || `API ${res.status}`)
+  if (!res.ok) {
+    const err = new Error(typeof body.detail === 'string' && body.detail ? body.detail : `API ${res.status}`)
+    err.status = res.status
+    throw err
+  }
   return body
 }
 

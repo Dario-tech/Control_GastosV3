@@ -30,13 +30,21 @@ export const DEFAULT_CATEGORIES = {
   ],
 }
 
-// Categorías ocultas por usuario (comparación por nombre, insensible a mayúsculas)
-export const HIDDEN_CATEGORIES_BY_USER = [
-  {
-    match: name => name?.toLowerCase().startsWith('julia'),
-    hide:  ['Inversiones', 'Cripto'],
-  },
-]
+// Categorías por defecto (comunes) + propias del usuario (vienen del servidor),
+// sin las que el usuario tiene ocultas. `hidden` es una lista de
+// { tipo, concepto }. Las propias que repiten el nombre de una por defecto
+// no se duplican.
+export function mergeCategories(custom = {}, hidden = []) {
+  const hide = new Set((hidden || []).map(h => `${h.tipo}|${h.concepto}`))
+  const result = {}
+  for (const [tipo, defaults] of Object.entries(DEFAULT_CATEGORIES)) {
+    const base = defaults.filter(c => !hide.has(`${tipo}|${c.concepto}`))
+    const names = new Set(base.map(c => c.concepto))
+    const extra = (custom[tipo] || []).filter(c => !names.has(c.concepto))
+    result[tipo] = [...base, ...extra]
+  }
+  return result
+}
 
 export const EMOJI_SUGGESTIONS = [
   '💶','🎉','🍽️','👗','✈️','💪','📺','🏠','⚡','🔥',
