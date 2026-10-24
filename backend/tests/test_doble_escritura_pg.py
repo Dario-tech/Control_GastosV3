@@ -116,3 +116,51 @@ def test_alta_edicion_y_categorizar(pg):
     fin = asyncio.run(sheets.get_finance_data(email))
     assert fin["unreadable"] == 0
     assert sorted(x["concepto"] for x in fin["transactions"]) == sorted(["Cena", "Café", "Supermercado"])
+
+
+def test_doble_escritura_apagada_conserva_lo_antiguo(pg, monkeypatch):
+    """Estructura de PROD + DROP NOT NULL + LEGACY_PLAIN_WRITE=0: lo antiguo en
+    claro se conserva intacto y lo nuevo/editado solo se escribe cifrado."""
+    if pg.estructura != "prod":
+        pytest.skip("solo tiene sentido con las columnas en claro")
+    from services import legacy_plain, sheets, pending
+    email = f"{uuid.uuid4().hex[:8]}@pg-test.invalid"
+
+    # un movimiento antiguo, con la doble escritura todavía activa
+    monkeypatch.delenv("LEGACY_PLAIN_WRITE", raising=False)
+    assert legacy_plain.detect_plain_columns() is True
+    viejo = asyncio.run(sheets.post_transaction(10.0, "Gasto Variable", "Antiguo", email))["id"]
+
+    # sin el ALTER previo, apagarla se ignora (sería un 500 en cada alta)
+    monkeypatch.setenv("LEGACY_PLAIN_WRITE", "0")
+    assert legacy_plain.detect_plain_columns() is True
+
+    with pg.db.db_cursor() as cur:
+        cur.execute("ALTER TABLE transactions ALTER COLUMN concepto DROP NOT NULL")
+        cur.execute("ALTER TABLE transactions ALTER COLUMN importe DROP NOT NULL")
+    assert legacy_plain.detect_plain_columns() is False
+
+    nuevo = asyncio.run(sheets.post_transaction(7.5, "Gasto Variable", "Nuevo", email))["id"]
+    row = _row(pg, nuevo)
+    assert row["concepto"] is None and row["importe"] is None
+    assert crypto.decrypt_str(bytes(row["concepto_enc"])) == "Nuevo"
+    assert crypto.decrypt_float(bytes(row["importe_enc"])) == 7.5
+
+    # editar un movimiento antiguo: lo cifrado cambia, lo en claro NO se toca
+    asyncio.run(sheets.update_transaction(viejo, email, {"concepto": "Editado", "importe": 12.0}))
+    row = _row(pg, viejo)
+    assert crypto.decrypt_str(bytes(row["concepto_enc"])) == "Editado"
+    assert row["concepto"] == "Antiguo" and float(row["importe"]) == 10.0
+
+    with pg.db.db_cursor() as cur:
+        cur.execute("INSERT INTO pending_transactions (user_email, importe, fecha) "
+                    "VALUES (%s, 3.25, '2026-07-10') RETURNING id", (email,))
+        pid = cur.fetchone()["id"]
+    t = asyncio.run(pending.categorize_pending(pid, email, "Gasto Variable", "Pendiente"))
+    row = _row(pg, t["id"])
+    assert row["concepto"] is None and row["importe"] is None
+    assert crypto.decrypt_str(bytes(row["concepto_enc"])) == "Pendiente"
+
+    fin = asyncio.run(sheets.get_finance_data(email))
+    assert fin["unreadable"] == 0
+    assert sorted(x["concepto"] for x in fin["transactions"]) == ["Editado", "Nuevo", "Pendiente"]
