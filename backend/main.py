@@ -29,7 +29,7 @@ from services.auth import (
     hash_password, verify_password,
 )
 from services.users import (
-    get_user, ensure_user, get_email_by_shortcut_token,
+    get_user, ensure_user, get_email_by_shortcut_token, get_or_create_shortcut_token,
     ensure_password_column, get_password_hash, create_user_with_password,
 )
 from services.db import init_pool, run_in_thread
@@ -673,16 +673,37 @@ async def delete_pending_tx(pending_id: int, email: str = Depends(get_current_us
 
 SHORTCUT_MAX_IMPORTE = IMPORTE_MAX  # services/importes.py
 
+@app.get("/api/shortcut/token")
+async def shortcut_get_token(email: str = Depends(get_current_user)):
+    """Devuelve el shortcut_token permanente del usuario autenticado (JWT) para
+    configurar el Atajo de iOS en segundo plano. Si aún no tiene (copia antigua con
+    NULL) se genera uno seguro y se guarda sin pisar uno concurrente. Respuesta:
+    {"shortcut_token": "..."} con Cache-Control: no-store. El token nunca se registra."""
+    enforce("shortcut-token", [email], limit=20, window=3600, block=3600)
+    token = await get_or_create_shortcut_token(email)
+    if not token:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return JSONResponse({"shortcut_token": token}, headers={"Cache-Control": "no-store"})
+
+
 @app.post("/api/shortcut/pending")
 async def shortcut_create_pending(request: Request):
     """Atajo iOS: guarda un gasto pendiente usando el token permanente del usuario.
     No requiere abrir la app — el usuario categoriza después desde la campana.
 
-    Idempotencia (opcional): si el Atajo envía `id_externo` (texto <= 128 caracteres, p. ej.
-    un UUID o la fecha-hora del disparo), los reintentos con el mismo id_externo en 24 h no
-    crean otro pendiente: se responde 200 con el existente y "duplicada": true (misma lógica
-    que /api/pending, create_pending_dedup). Con id_externo la respuesta añade a
-    {id, importe, fecha} los campos comercio, duplicada y sugerencia. Sin él, nada cambia."""
+    Body: {shortcut_token (o token), importe, fecha?, comercio?, id_externo?}.
+    - importe: número o texto de Cartera ("12,40 €", "12,4", "1.234,56 €"); mismo
+      parser que /api/pending. 422 "importe inválido" si no se entiende, es <= 0 o
+      supera el tope.
+    - fecha: AAAA-MM-DD; si falta o no se entiende, hoy en Europe/Madrid.
+    - comercio (opcional): texto; se recorta y se limita a 120 caracteres; si no es
+      texto o queda vacío se ignora. Se guarda cifrado en el pendiente.
+    - id_externo (opcional): texto <= 128 caracteres (UUID o fecha-hora del disparo).
+    Con comercio y/o id_externo se deduplican reintentos (mismo id_externo en 24 h, o
+    mismo importe+comercio en < 2 min) con create_pending_dedup: 200 con el existente
+    y "duplicada": true. Respuesta en ese caso: {id, importe, fecha, comercio,
+    duplicada, sugerencia}. Sin comercio ni id_externo (Atajos antiguos) la respuesta
+    es la de siempre: {id, importe, fecha}. Nunca se registra comercio ni importe."""
     try:
         data = await request.json()
         if not isinstance(data, dict):
@@ -703,22 +724,22 @@ async def shortcut_create_pending(request: Request):
     if not email:
         raise HTTPException(status_code=401, detail="Token inválido")
 
+    raw = data.get("importe") or data.get("amount") or data.get("Importe")
     try:
-        raw = data.get("importe") or data.get("amount") or data.get("Importe")
-        importe = float(str(raw).replace(",", ".").replace(" ", ""))
-    except (KeyError, TypeError, ValueError):
-        raise HTTPException(status_code=422, detail="importe inválido")
-
-    if not math.isfinite(importe):
-        raise HTTPException(status_code=422, detail="importe inválido")
-    try:
-        importe = redondear_importe(importe)  # céntimos, ROUND_HALF_UP
-    except ValueError:  # p. ej. 1e300
-        raise HTTPException(status_code=422, detail="importe inválido")
-    if importe <= 0:
-        raise HTTPException(status_code=422, detail="importe debe ser mayor que 0")
-    if importe > SHORTCUT_MAX_IMPORTE:
-        raise HTTPException(status_code=422, detail="importe demasiado alto")
+        importe = parse_importe(raw, SHORTCUT_MAX_IMPORTE)  # céntimos, ROUND_HALF_UP, > 0 y <= tope
+    except ValueError:
+        # Mensajes antiguos para importes numéricos (compatibilidad); texto: genérico.
+        detail = "importe inválido"
+        if isinstance(raw, (int, float)) and not isinstance(raw, bool) and math.isfinite(raw):
+            if raw > SHORTCUT_MAX_IMPORTE:
+                detail = "importe demasiado alto"
+            else:
+                try:
+                    if redondear_importe(raw) <= 0:
+                        detail = "importe debe ser mayor que 0"
+                except ValueError:
+                    pass
+        raise HTTPException(status_code=422, detail=detail)
 
     # Fecha recibida si es válida; si falta o no se entiende, HOY en Europe/Madrid
     # (no CURRENT_DATE de la BD, que va en UTC). Se tolera un formato desconocido
@@ -728,15 +749,20 @@ async def shortcut_create_pending(request: Request):
     except ValueError:
         fecha = today_madrid()
 
+    comercio = clean_comercio(data.get("comercio"))
     id_externo = data.get("id_externo")
     if id_externo is not None:
         if not isinstance(id_externo, str) or not id_externo.strip() or len(id_externo) > _ID_EXTERNO_MAX:
             raise HTTPException(status_code=422, detail="id_externo inválido")
-        result = await create_pending_dedup(email, importe, fecha.isoformat(), None,
-                                            id_externo.strip(), fuente="atajo")
+        id_externo = id_externo.strip()
+
+    if comercio is not None or id_externo is not None:
+        result = await create_pending_dedup(email, importe, fecha.isoformat(), comercio,
+                                            id_externo, fuente="atajo")
     else:
         result = await create_pending(email, importe, fecha.isoformat(), fuente="atajo")
-    await _broadcast()  # la PWA recibe SSE y actualiza la campana en tiempo real
+    if not (isinstance(result, dict) and result.get("duplicada")):
+        await _broadcast()  # la PWA recibe SSE y actualiza la campana en tiempo real
     return result
 
 

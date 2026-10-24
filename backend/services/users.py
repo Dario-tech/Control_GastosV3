@@ -78,3 +78,29 @@ async def get_email_by_shortcut_token(token: str) -> str | None:
             return cur.fetchone()
     row = await run_in_thread(_q)
     return row["email"] if row else None
+
+
+async def get_or_create_shortcut_token(email: str) -> str | None:
+    """Devuelve el shortcut_token del usuario; si es NULL (copia antigua) genera uno y
+    lo guarda con UPDATE ... WHERE shortcut_token IS NULL (no pisa uno concurrente).
+    None si el usuario no existe. Nunca se registra el token."""
+    def _q():
+        with db_cursor() as cur:
+            cur.execute("SELECT shortcut_token FROM users WHERE email = %s", (email,))
+            row = cur.fetchone()
+            if not row:
+                return None
+            if row["shortcut_token"]:
+                return row["shortcut_token"]
+            cur.execute(
+                "UPDATE users SET shortcut_token = %s WHERE email = %s AND shortcut_token IS NULL "
+                "RETURNING shortcut_token",
+                (secrets.token_urlsafe(32), email),
+            )
+            upd = cur.fetchone()
+            if upd:
+                return upd["shortcut_token"]
+            cur.execute("SELECT shortcut_token FROM users WHERE email = %s", (email,))
+            again = cur.fetchone()
+            return again["shortcut_token"] if again else None
+    return await run_in_thread(_q)

@@ -237,6 +237,16 @@ class FakeCursor:
         if q.startswith("SELECT email FROM users WHERE shortcut_token"):
             self._res = [{"email": e} for e, t in db.users.items() if t == params[0]]
             return
+        if q.startswith("SELECT shortcut_token FROM users WHERE email"):
+            if params[0] in db.users:
+                self._res = [{"shortcut_token": db.users[params[0]]}]
+            return
+        if q.startswith("UPDATE users SET shortcut_token"):
+            tok, email = params
+            if email in db.users and db.users[email] is None:
+                db.users[email] = tok
+                self._res = [{"shortcut_token": tok}]
+            return
         raise AssertionError(f"SQL no emulado: {q[:80]}")
 
 
@@ -606,3 +616,89 @@ def test_delete_pending_ajeno_404(client, post, db, broadcasts, auth_headers, ot
 
 def test_delete_pending_requiere_jwt(client, db):
     assert client.delete("/api/pending/1").status_code == 401
+
+
+# ── Atajo en segundo plano: /api/shortcut/pending (comercio, importe de Cartera) ──
+
+def _atajo(client, **body):
+    return client.post("/api/shortcut/pending", json={"shortcut_token": TOKEN, **body})
+
+
+def test_atajo_comercio_cifrado_y_importe_de_cartera(client, db, broadcasts):
+    r = _atajo(client, importe="12,40 €", comercio="  Mercadona  ", fecha="2026-10-01")
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["importe"] == 12.4 and j["comercio"] == "Mercadona" and j["duplicada"] is False
+    row = db.pending[0]
+    assert row["user_email"] == EMAIL and row["fuente"] == "atajo"
+    assert b"Mercadona" not in row["comercio_enc"] and crypto.decrypt_str(row["comercio_enc"]) == "Mercadona"
+    assert broadcasts == [1]
+
+
+def test_atajo_comercio_llega_a_create_pending_dedup(client, monkeypatch, broadcasts):
+    import main
+    vistos = []
+
+    async def fake(email, importe, fecha, comercio, id_externo, fuente="manual"):
+        vistos.append((email, importe, comercio, id_externo, fuente))
+        return {"id": 1, "importe": importe, "fecha": fecha, "comercio": comercio,
+                "duplicada": False, "sugerencia": None}
+    monkeypatch.setattr(main, "create_pending_dedup", fake)
+
+    async def email_by_token(t):
+        return EMAIL
+    monkeypatch.setattr(main, "get_email_by_shortcut_token", email_by_token)
+    assert _atajo(client, importe="12,4", comercio="x" * 300).status_code == 200
+    assert vistos == [(EMAIL, 12.4, "x" * 120, None, "atajo")]
+    vistos.clear()
+    assert _atajo(client, importe=5, comercio=123, id_externo="abc").status_code == 200  # comercio no texto: se ignora
+    assert vistos == [(EMAIL, 5.0, None, "abc", "atajo")]
+
+
+def test_atajo_sin_comercio_ni_id_externo_igual_que_antes(client, db, broadcasts):
+    r = _atajo(client, importe="7,5", fecha="2026-10-01")
+    assert r.status_code == 200
+    assert r.json() == {"id": db.pending[0]["id"], "importe": 7.5, "fecha": "2026-10-01"}
+    assert db.pending[0]["comercio_enc"] is None
+
+
+@pytest.mark.parametrize("importe,detail", [
+    ("abc", "importe inválido"), ("0", "importe inválido"), (0.004, "importe debe ser mayor que 0"),
+    (-3, "importe debe ser mayor que 0"), (2_000_000, "importe demasiado alto"),
+])
+def test_atajo_importe_invalido_422(client, db, broadcasts, importe, detail):
+    r = _atajo(client, importe=importe)
+    assert r.status_code == 422 and r.json() == {"detail": detail}
+    assert db.pending == []
+
+
+def test_atajo_reintento_mismo_id_externo_duplicada(client, db, broadcasts):
+    a = _atajo(client, importe="3,20 €", id_externo="disp-1").json()
+    b = _atajo(client, importe="3,20 €", id_externo="disp-1").json()
+    assert a["duplicada"] is False and b["duplicada"] is True and a["id"] == b["id"]
+    assert len(db.pending) == 1 and broadcasts == [1]
+
+
+# ── GET /api/shortcut/token ───────────────────────────────────────────────────
+
+def test_get_token_existente(client, db, auth_headers):
+    r = client.get("/api/shortcut/token", headers=auth_headers)
+    assert r.status_code == 200 and r.json() == {"shortcut_token": TOKEN}
+    assert r.headers["cache-control"] == "no-store"
+
+
+def test_get_token_genera_si_falta_y_es_estable(client, db, auth_headers):
+    db.users[EMAIL] = None
+    t = client.get("/api/shortcut/token", headers=auth_headers).json()["shortcut_token"]
+    assert len(t) >= 40 and db.users[EMAIL] == t
+    assert client.get("/api/shortcut/token", headers=auth_headers).json()["shortcut_token"] == t
+
+
+def test_get_token_exige_jwt(client, db):
+    assert client.get("/api/shortcut/token").status_code == 401
+    assert client.get("/api/shortcut/token", headers={"Authorization": f"Bearer {TOKEN}"}).status_code == 401
+
+
+def test_get_token_rate_limit(client, db, auth_headers):
+    codes = [client.get("/api/shortcut/token", headers=auth_headers).status_code for _ in range(21)]
+    assert codes[:20] == [200] * 20 and codes[20] == 429

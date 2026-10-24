@@ -85,11 +85,11 @@ _SPACE_THOUSANDS_RE = re.compile(r"(?<=\d)[\s    ]+(\d+)")
 _NUM_RE = re.compile(r"^\d[\d.,]*$")
 
 
-def _validate(v: float) -> float:
+def _validate(v: float, maximo: float = IMPORTE_MAX) -> float:
     if not math.isfinite(v):
         raise ValueError("importe inválido")
     v = redondear_importe(v)  # céntimos, ROUND_HALF_UP (mismo helper que el resto)
-    if v <= 0 or v > IMPORTE_MAX:
+    if v <= 0 or v > maximo:
         raise ValueError("importe inválido")
     return v
 
@@ -129,7 +129,7 @@ def _parse_number_text(s: str) -> float:
     return float(int_part + "." + frac)
 
 
-def parse_importe(raw) -> float:
+def parse_importe(raw, maximo: float = IMPORTE_MAX) -> float:
     """Convierte el importe de Wallet en float finito, > 0 y ≤ IMPORTE_MAX.
 
     Acepta número (int/float, no bool) o texto: "12,30 €", "€12.30",
@@ -141,7 +141,7 @@ def parse_importe(raw) -> float:
         raise ValueError("importe inválido")
     if isinstance(raw, (int, float)):
         try:
-            return _validate(float(raw))
+            return _validate(float(raw), maximo)
         except OverflowError:
             raise ValueError("importe inválido")
     if not isinstance(raw, str) or len(raw) > _IMPORTE_RAW_MAX:
@@ -156,7 +156,7 @@ def parse_importe(raw) -> float:
         s = s[1:]
     if not s:
         raise ValueError("importe inválido")
-    return _validate(_parse_number_text(s))
+    return _validate(_parse_number_text(s), maximo)
 
 
 # ── Comercio ──────────────────────────────────────────────────────────────────
