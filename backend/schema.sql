@@ -29,6 +29,12 @@ CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_email);
 -- Paginación de la búsqueda por (usuario, fecha, id) sin escanear toda la tabla.
 CREATE INDEX IF NOT EXISTS idx_transactions_search ON transactions(user_email, fecha DESC, id DESC);
 
+-- Idempotencia del alta: id opcional generado por el cliente (UUID). Un reintento con
+-- el mismo (usuario, id_cliente) no duplica el movimiento. Índice único PARCIAL.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS id_cliente TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_transactions_user_id_cliente
+    ON transactions(user_email, id_cliente) WHERE id_cliente IS NOT NULL;
+
 -- Pagos pendientes de categorizar (llegan del Atajo iOS con importe + fecha,
 -- y desde el Atajo de Cartera/Apple Pay también con comercio).
 -- comercio_enc: comercio cifrado (AES-GCM); comercio_hmac / id_externo_hmac:

@@ -20,6 +20,18 @@ def ensure_encrypted_columns():
         cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS importe_enc BYTEA")
 
 
+def ensure_id_cliente():
+    """Migración aditiva e idempotente: identificador de idempotencia opcional que
+    envía el cliente al crear un movimiento (ver post_transaction). Índice único
+    PARCIAL: los movimientos sin id_cliente (todos los anteriores) no se ven afectados."""
+    with db_cursor() as cur:
+        cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS id_cliente TEXT")
+        cur.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_transactions_user_id_cliente "
+            "ON transactions(user_email, id_cliente) WHERE id_cliente IS NOT NULL"
+        )
+
+
 def ensure_search_index():
     """Índice para paginar por (usuario, fecha, id) sin escanear toda la tabla
     en cada página de búsqueda — ver search_transactions más abajo."""
@@ -379,7 +391,11 @@ async def delete_transaction(row_index: int, email: str = "") -> dict:
 async def post_transaction(
     importe: float, tipo: str, concepto: str, email: str = "", source: str = "shortcut",
     fecha: str | None = None, comentario: str | None = None,
+    id_cliente: str | None = None,
 ) -> dict:
+    """Crea un movimiento. Si se pasa `id_cliente` el alta es idempotente por
+    (usuario, id_cliente): un reintento devuelve el movimiento ya creado, con
+    {"status": "ok", "id", "fecha", "duplicada": True}, sin insertar otra fila."""
     # Céntimos (ROUND_HALF_UP) ANTES de cifrar: lo cifrado y lo escrito en claro
     # (B2) son el mismo valor. El tope lo valida main.py.
     importe      = redondear_importe(importe)
@@ -393,6 +409,10 @@ async def post_transaction(
         cols.append("fecha")
         vals.append("%s::date")
         params.append(fecha)
+    if id_cliente:
+        cols.append("id_cliente")
+        vals.append("%s")
+        params.append(id_cliente)
     if legacy_plain.enabled():
         # TEMPORAL (B2, hasta la fase 3 de MIGRACION_QA_A_PROD.md): en PROD las
         # columnas en claro son NOT NULL sin default. Mismo valor que lo cifrado.
@@ -400,17 +420,29 @@ async def post_transaction(
         vals += ["%s", "%s"]
         params += [concepto, importe]
 
+    conflict = " ON CONFLICT (user_email, id_cliente) WHERE id_cliente IS NOT NULL DO NOTHING" if id_cliente else ""
+
     def _q():
         with db_cursor() as cur:
             cur.execute(
                 f"""INSERT INTO transactions ({', '.join(cols)})
-                    VALUES ({', '.join(vals)}) RETURNING id, fecha::text""",
+                    VALUES ({', '.join(vals)}){conflict} RETURNING id, fecha::text""",
                 params,
             )
-            return cur.fetchone()
+            row = cur.fetchone()
+            if row is None and id_cliente:  # reintento: ya existía
+                cur.execute(
+                    "SELECT id, fecha::text FROM transactions WHERE user_email = %s AND id_cliente = %s",
+                    (email, id_cliente),
+                )
+                return cur.fetchone(), True
+            return row, False
 
-    row = await run_in_thread(_q)
-    return {"status": "ok", "id": row["id"], "fecha": row["fecha"]}
+    row, duplicada = await run_in_thread(_q)
+    out = {"status": "ok", "id": row["id"], "fecha": row["fecha"]}
+    if duplicada:
+        out["duplicada"] = True
+    return out
 
 
 # Columnas editables vía PATCH /api/transactions/{id}. Lista blanca: los nombres

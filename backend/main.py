@@ -18,12 +18,11 @@ from dotenv import load_dotenv
 # Debe ejecutarse antes de importar los servicios, que leen el entorno al importarse.
 load_dotenv()
 
-from services.prices import get_all_prices
 from services.sheets import (
     get_finance_data, delete_transaction, post_transaction,
     ensure_comentario_column, update_transaction_comment, ensure_encrypted_columns,
     update_transaction,
-    ensure_search_index, search_transactions,
+    ensure_search_index, search_transactions, ensure_id_cliente,
 )
 from services.auth import (
     verify_google_token, create_jwt, get_current_user,
@@ -67,6 +66,7 @@ async def lifespan(app: FastAPI):
     ensure_comentario_column()  # migración aditiva idempotente (comentario libre en transacciones)
     ensure_encrypted_columns()  # migración aditiva idempotente (concepto/importe cifrados)
     ensure_annual_expenses_table()  # migración aditiva idempotente (gastos fijos anuales)
+    ensure_id_cliente()  # migración aditiva idempotente (id_cliente: idempotencia del alta)
     ensure_search_index()  # migración aditiva idempotente (índice para paginar la búsqueda)
     ensure_wallet_schema()  # migración aditiva idempotente (Atajo de Cartera: comercio, reglas)
     user_data.ensure_user_data_schema()  # migración aditiva idempotente (categorías y prefs por usuario)
@@ -279,7 +279,8 @@ async def auth_register(body: RegisterIn, request: Request):
     if len(body.password) < 10:
         raise HTTPException(status_code=422, detail="La contraseña debe tener al menos 10 caracteres")
 
-    created = await create_user_with_password(email, name, hash_password(body.password))
+    pw_hash = await asyncio.to_thread(hash_password, body.password)  # bcrypt fuera del event loop
+    created = await create_user_with_password(email, name, pw_hash)
     if created is None:
         raise HTTPException(status_code=409, detail="Ya existe una cuenta con este email")
 
@@ -303,9 +304,9 @@ async def auth_login_email(body: EmailLoginIn, request: Request):
     if not pw_hash:
         # Sin hash (email inexistente o cuenta solo-Google): se ejecuta igualmente
         # un bcrypt de relleno para que el tiempo de respuesta no delate qué emails existen.
-        verify_password(body.password, _DUMMY_PASSWORD_HASH)
+        await asyncio.to_thread(verify_password, body.password, _DUMMY_PASSWORD_HASH)
         raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
-    if not verify_password(body.password, pw_hash):
+    if not await asyncio.to_thread(verify_password, body.password, pw_hash):
         raise HTTPException(status_code=401, detail="Email o contraseña incorrectos")
     # Login correcto: los aciertos no cuentan para el límite por email (el de IP se mantiene)
     ratelimit_reset("login-email", email)
@@ -400,10 +401,24 @@ class TransactionIn(BaseModel):
     fecha:      str | None = None  # YYYY-MM-DD; si no se pasa, usa CURRENT_DATE
     source:     str = "shortcut"
     comentario: str | None = None
+    id_cliente: str | None = None  # opcional, idempotencia (ver add_transaction)
+
+
+_ID_CLIENTE_RE = re.compile(r"^[A-Za-z0-9_.:-]{8,64}$")
+_ID_EXTERNO_MAX = 128
 
 
 @app.post("/api/transaction")
 async def add_transaction(request: Request, email: str = Depends(get_current_user)):
+    """Crea un movimiento. Body: {importe, tipo, concepto, fecha?, source?, comentario?, id_cliente?}.
+
+    Idempotencia (opcional): el cliente genera un `id_cliente` (p. ej. un UUID, 8-64
+    caracteres de [A-Za-z0-9_.:-]) al abrir el formulario y lo reenvía idéntico en cada
+    reintento del mismo alta. Si ya existe un movimiento del usuario con ese id, NO se
+    crea otro: se responde 200 con el existente {"status":"ok","id","fecha","duplicada":true}.
+    En el primer envío la respuesta es la de siempre (sin "duplicada"). Sin id_cliente el
+    comportamiento no cambia. Un id_cliente con formato inválido responde 422.
+    """
     raw = await request.body()
     try:
         data = json_lib.loads(raw)
@@ -420,11 +435,13 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
         importe = validar_importe(tx.importe)
     except ValueError:
         _err422("El importe debe ser mayor que 0 y no superar 1.000.000")
+    if tx.id_cliente is not None and not _ID_CLIENTE_RE.match(tx.id_cliente):
+        _err422("id_cliente inválido")
 
     try:
         result = await post_transaction(
             importe, tx.tipo, tx.concepto, email, tx.source, tx.fecha,
-            (tx.comentario or "").strip() or None,
+            (tx.comentario or "").strip() or None, id_cliente=tx.id_cliente,
         )
     except HTTPException:
         raise
@@ -659,7 +676,13 @@ SHORTCUT_MAX_IMPORTE = IMPORTE_MAX  # services/importes.py
 @app.post("/api/shortcut/pending")
 async def shortcut_create_pending(request: Request):
     """Atajo iOS: guarda un gasto pendiente usando el token permanente del usuario.
-    No requiere abrir la app — el usuario categoriza después desde la campana."""
+    No requiere abrir la app — el usuario categoriza después desde la campana.
+
+    Idempotencia (opcional): si el Atajo envía `id_externo` (texto <= 128 caracteres, p. ej.
+    un UUID o la fecha-hora del disparo), los reintentos con el mismo id_externo en 24 h no
+    crean otro pendiente: se responde 200 con el existente y "duplicada": true (misma lógica
+    que /api/pending, create_pending_dedup). Con id_externo la respuesta añade a
+    {id, importe, fecha} los campos comercio, duplicada y sugerencia. Sin él, nada cambia."""
     try:
         data = await request.json()
         if not isinstance(data, dict):
@@ -670,7 +693,10 @@ async def shortcut_create_pending(request: Request):
     token = data.get("shortcut_token") or data.get("token")
     if not token:
         raise HTTPException(status_code=401, detail="shortcut_token requerido")
-    # 30 peticiones/min por token (también frena el tanteo de tokens inválidos)
+    # Se cuenta ANTES de consultar la BD: por IP del cliente (frena el tanteo de tokens
+    # distintos desde un mismo origen) y por token (30/min; frena un Atajo en bucle).
+    # Con token inválido también cuenta, porque el límite se aplica antes de validarlo.
+    enforce("shortcut-ip", [client_ip(request)], limit=60, window=60, block=300)
     enforce("shortcut", [str(token)], limit=30, window=60, block=300)
 
     email = await get_email_by_shortcut_token(token)
@@ -702,7 +728,14 @@ async def shortcut_create_pending(request: Request):
     except ValueError:
         fecha = today_madrid()
 
-    result = await create_pending(email, importe, fecha.isoformat(), fuente="atajo")
+    id_externo = data.get("id_externo")
+    if id_externo is not None:
+        if not isinstance(id_externo, str) or not id_externo.strip() or len(id_externo) > _ID_EXTERNO_MAX:
+            raise HTTPException(status_code=422, detail="id_externo inválido")
+        result = await create_pending_dedup(email, importe, fecha.isoformat(), None,
+                                            id_externo.strip(), fuente="atajo")
+    else:
+        result = await create_pending(email, importe, fecha.isoformat(), fuente="atajo")
     await _broadcast()  # la PWA recibe SSE y actualiza la campana en tiempo real
     return result
 
@@ -721,12 +754,14 @@ async def recurring_expenses(email: str = Depends(get_current_user)):
 # ── Categorización con IA ───────────────────────────────────────────────────
 
 class EmojiSuggestIn(BaseModel):
-    nombre: str
+    nombre: str = Field(max_length=60)  # >60 caracteres: 422 (acota el coste del prompt)
 
 
 @app.post("/api/categorize/suggest-emoji")
 async def suggest_emoji_endpoint(body: EmojiSuggestIn, email: str = Depends(get_current_user)):
     """Sugiere un emoji para una categoría nueva a partir de su nombre (Claude API)."""
+    # Cada llamada cuesta dinero: 20/hora por usuario (bloqueo 1 h al superarlo).
+    enforce("emoji-user", [email], limit=20, window=3600, block=3600)
     emoji = await suggest_emoji(body.nombre.strip())
     return {"emoji": emoji}
 
@@ -1007,14 +1042,3 @@ async def put_pref_endpoint(kind: str, request: Request, force: bool = False,
     if not isinstance(payload, dict) or "data" not in payload:
         raise HTTPException(status_code=422, detail='Falta el campo "data"')
     return await run_in_thread(lambda: user_data.put_pref(email, kind, payload["data"], force))
-
-
-# ── Inversiones ───────────────────────────────────────────────────────────────
-
-@app.get("/api/investments/prices")
-async def investment_prices():
-    try:
-        return await get_all_prices()
-    except Exception:
-        raise  # lo gestiona el handler global (log en servidor, mensaje genérico)
-

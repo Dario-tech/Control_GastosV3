@@ -15,6 +15,9 @@ from pydantic import BaseModel
 from .db import run_in_thread
 
 DEFAULT_EMOJI = "💶"
+# Nota de coste: para una tarea tan simple (un emoji por nombre de categoría) un modelo
+# más pequeño (familia Haiku) sería bastante más barato. No se cambia aquí sin confirmar
+# el identificador exacto disponible en la cuenta; el endpoint ya está limitado por usuario.
 _MODEL = "claude-opus-4-8"
 
 _client = None
