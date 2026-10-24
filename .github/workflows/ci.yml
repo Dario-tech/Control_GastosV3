@@ -1,0 +1,70 @@
+name: CI
+
+# Pruebas automáticas en cada cambio. No despliega nada ni usa secretos:
+# todo corre con datos y claves de prueba (las del propio conftest.py).
+on:
+  pull_request:
+  push:
+    branches: [qa, test, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend (build + tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: controlGastosMovil
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: controlGastosMovil/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+  backend:
+    name: Backend (pytest + Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: t
+          POSTGRES_PASSWORD: t
+          POSTGRES_DB: t
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U t"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Postgres desechable del propio job, solo accesible desde localhost.
+      PG_TEST_URL: postgresql://t:t@127.0.0.1:5432/t
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Aplicar schema.sql al Postgres de prueba
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          PGPASSWORD=t psql -h 127.0.0.1 -U t -d t -v ON_ERROR_STOP=1 -f schema.sql
+      - run: python -m pytest -q
