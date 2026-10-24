@@ -18,7 +18,7 @@ const EMPTY = {
 function loadCache() {
   try {
     const raw = localStorage.getItem(LS_KEY)
-    return raw ? JSON.parse(raw) : null
+    return raw ? splitUnreadable(JSON.parse(raw)).data : null
   } catch {
     return null
   }
@@ -30,6 +30,23 @@ function saveCache(data) {
   } catch {}
 }
 
+// Aviso para N movimientos que el servidor no pudo descifrar (null si no hay).
+export function unreadableTxMsg(n) {
+  const count = Number.isFinite(Number(n)) ? Math.max(0, Math.floor(Number(n))) : 0
+  if (count === 0) return null
+  return count === 1
+    ? 'No se ha podido leer 1 movimiento del servidor. Los totales pueden estar incompletos.'
+    : `No se han podido leer ${count} movimientos del servidor. Los totales pueden estar incompletos.`
+}
+
+// Separa el recuento de ilegibles (estado del servidor, no dato del usuario:
+// no se guarda en la caché). Un backend antiguo no lo envía: cuenta como 0.
+export function splitUnreadable(result) {
+  const { unreadable, ...rest } = result || {}
+  const n = Number(unreadable)
+  return { data: rest, unreadable: Number.isFinite(n) && n > 0 ? Math.floor(n) : 0 }
+}
+
 const Ctx = createContext(null)
 
 export function FinanceDataProvider({ children }) {
@@ -38,6 +55,7 @@ export function FinanceDataProvider({ children }) {
   const [status, setStatus]           = useState('idle')
   const [lastUpdated, setLastUpdated] = useState(null)
   const [errorMsg, setErrorMsg]       = useState('')
+  const [unreadable, setUnreadable]   = useState(0)
 
   // Al cerrar sesión el provider se desmonta; si había una petición en vuelo,
   // su respuesta no debe volver a escribir la caché que logout() acaba de borrar.
@@ -57,12 +75,14 @@ export function FinanceDataProvider({ children }) {
         setErrorMsg(result.error || '')
         return
       }
-      setData(result)
-      setTransactions(result.transactions ?? [])
+      const { data: clean, unreadable: n } = splitUnreadable(result)
+      setData(clean)
+      setTransactions(clean.transactions ?? [])
+      setUnreadable(n)
       setLastUpdated(new Date())
       setStatus('live')
       setErrorMsg('')
-      saveCache(result)
+      saveCache(clean)
     } catch (err) {
       if (!aliveRef.current) return
       // Mantiene los últimos datos guardados — no borra ni pone datos de ejemplo
@@ -123,7 +143,7 @@ export function FinanceDataProvider({ children }) {
   }, [refresh])
 
   return (
-    <Ctx.Provider value={{ data, transactions, status, lastUpdated, errorMsg, refresh }}>
+    <Ctx.Provider value={{ data, transactions, status, lastUpdated, errorMsg, refresh, unreadableTx: unreadable }}>
       {children}
     </Ctx.Provider>
   )
