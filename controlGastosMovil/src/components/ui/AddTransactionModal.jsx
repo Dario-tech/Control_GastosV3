@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
 import { postTransaction, suggestEmoji } from '../../services/api'
-import { TYPES, EMOJI_SUGGESTIONS } from '../../data/categories'
+import { TYPES, EMOJI_SUGGESTIONS, combineCategories, categoryExists, categoryKey } from '../../data/categories'
 import { isUnusualAmount, fmt } from '../../utils'
 import { FormScreen, Field, Section, AmountInput, Chips, PrimaryButton, Icon } from './FormKit'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
@@ -11,6 +11,8 @@ import { useCategories } from '../../hooks/useCategories'
 function today() {
   return new Date().toISOString().slice(0, 10)
 }
+
+export const DUPLICATE_CAT_MSG = 'Ya existe una categoría con ese nombre'
 
 export default function AddTransactionModal({ onClose }) {
   useLockBodyScroll()
@@ -73,14 +75,17 @@ export default function AddTransactionModal({ onClose }) {
   function handleAddNewCat() {
     const name = newName.trim()
     if (!name) { setNewCatErr('Escribe un nombre'); return }
-    addCategory(tipo, { concepto: name, emoji: newEmoji })
+    if (categoryExists(allCats, name) || addCategory(tipo, { concepto: name, emoji: newEmoji }) === false) {
+      setNewCatErr(DUPLICATE_CAT_MSG)
+      return
+    }
     setShowNewCat(false)
     setNewName('')
     setNewCatErr('')
     handleSubmit(name)
   }
 
-  const allCats = tipo ? [...DEFAULT_CATEGORIES[tipo], ...(customCategories[tipo] || [])] : []
+  const allCats = tipo ? combineCategories(DEFAULT_CATEGORIES[tipo], customCategories[tipo]) : []
   const amtNum = parseFloat(String(importe).replace(',', '.'))
   const amtOk  = amtNum > 0
   const hoy    = today()
@@ -168,7 +173,7 @@ export default function AddTransactionModal({ onClose }) {
                 const unusual = amtOk ? isUnusualAmount(data, c.concepto, amtNum) : null
                 const sel = selected === c.concepto
                 return (
-                  <button key={c.concepto} type="button" role="radio" aria-checked={sel}
+                  <button key={categoryKey(tipo, c.concepto)} type="button" role="radio" aria-checked={sel}
                     className={`fm-tile${sel ? ' selected' : ''}`}
                     disabled={loading}
                     onClick={() => { setSelected(c.concepto); setShowNewCat(false); setError(null) }}>

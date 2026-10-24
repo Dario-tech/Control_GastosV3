@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
-import { TYPES } from '../../data/categories'
+import { TYPES, combineCategories, categoryKey } from '../../data/categories'
 import { useCategories } from '../../hooks/useCategories'
 import { isUnusualAmount, fmt } from '../../utils'
 import { useFocusTrap, ConfirmSheet } from './FormKit'
@@ -80,12 +80,12 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip, 
     }
   }
 
-  const allCats = tipo ? [...DEFAULT_CATEGORIES[tipo], ...(customCategories[tipo] || [])] : []
+  const allCats = tipo ? combineCategories(DEFAULT_CATEGORIES[tipo], customCategories[tipo]) : []
 
   // Emoji de la categoría sugerida, buscándolo en las categorías del usuario
   const suggested = pending.suggested
   const suggestedEmoji = suggested
-    ? ([...(DEFAULT_CATEGORIES[suggested.tipo] || []), ...(customCategories[suggested.tipo] || [])]
+    ? (combineCategories(DEFAULT_CATEGORIES[suggested.tipo], customCategories[suggested.tipo])
         .find(c => c.concepto === suggested.concepto)?.emoji || '✨')
     : null
   const quick = received && suggested && !changing && step === 1
@@ -160,7 +160,7 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip, 
             {allCats.map(c => {
               const unusual = isUnusualAmount(data, c.concepto, pending.importe)
               return (
-                <button key={c.concepto} className={`catmodal-cat-card${unusual ? ' unusual' : ''}`}
+                <button key={categoryKey(tipo, c.concepto)} className={`catmodal-cat-card${unusual ? ' unusual' : ''}`}
                   onClick={() => handleConcepto(c.concepto)} disabled={loading}
                   title={unusual ? `${unusual.ratio}× tu gasto medio en ${c.concepto}` : undefined}>
                   {unusual && <span className="catmodal-cat-warn">⚠️</span>}

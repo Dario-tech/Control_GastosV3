@@ -16,9 +16,14 @@ import unicodedata
 from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
+from .importes import redondear_importe, IMPORTE_MAX as _IMPORTE_MAX_COMUN
+
 MADRID = ZoneInfo("Europe/Madrid")
 
+# Más estricto que el tope común (importes.IMPORTE_MAX = 1.000.000): un pago de
+# Wallet nunca es tan alto. Al categorizar se vuelve a validar con el común.
 IMPORTE_MAX = 100_000
+assert IMPORTE_MAX <= _IMPORTE_MAX_COMUN
 COMERCIO_MAX = 120
 ID_EXTERNO_MAX = 200
 _IMPORTE_RAW_MAX = 64  # caracteres: el texto de Wallet nunca es más largo
@@ -83,7 +88,7 @@ _NUM_RE = re.compile(r"^\d[\d.,]*$")
 def _validate(v: float) -> float:
     if not math.isfinite(v):
         raise ValueError("importe inválido")
-    v = round(v, 2)
+    v = redondear_importe(v)  # céntimos, ROUND_HALF_UP (mismo helper que el resto)
     if v <= 0 or v > IMPORTE_MAX:
         raise ValueError("importe inválido")
     return v

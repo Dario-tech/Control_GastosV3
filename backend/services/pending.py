@@ -3,6 +3,8 @@ from .db import db_cursor, run_in_thread
 from .suggest import suggest_category
 from .crypto import encrypt_str, encrypt_float, decrypt_str, decrypt_transaction, hmac_tag
 from .wallet import normalize_merchant
+from . import legacy_plain
+from .importes import validar_importe
 
 
 def ensure_wallet_schema():
@@ -247,12 +249,31 @@ async def categorize_pending(pending_id: int, email: str, tipo: str, concepto: s
             row = cur.fetchone()
             if not row:
                 return None
-            importe_enc = encrypt_float(float(row["importe"]))
-            cur.execute(
-                "INSERT INTO transactions (user_email, fecha, tipo, concepto_enc, importe_enc, comentario) "
-                "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, fecha::text",
-                (email, row["fecha"], tipo, concepto_enc, importe_enc, comentario),
-            )
+            # Mismo tope y redondeo que el alta directa: un pendiente antiguo
+            # (anterior al tope) podría desbordar `importe NUMERIC(10,2)` de PROD.
+            try:
+                importe = validar_importe(row["importe"])
+            except ValueError:
+                raise HTTPException(status_code=422,
+                                    detail="El importe debe ser mayor que 0 y no superar 1.000.000")
+            importe_enc = encrypt_float(importe)
+            if legacy_plain.enabled():
+                # TEMPORAL (B2, hasta la fase 3 de MIGRACION_QA_A_PROD.md): en PROD
+                # concepto/importe en claro son NOT NULL sin default. Mismo valor
+                # que lo cifrado; nunca se leen.
+                cur.execute(
+                    "INSERT INTO transactions (user_email, fecha, tipo, concepto_enc, importe_enc, comentario, "
+                    "concepto, importe) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, fecha::text",
+                    (email, row["fecha"], tipo, concepto_enc, importe_enc, comentario,
+                     concepto, importe),
+                )
+            else:
+                cur.execute(
+                    "INSERT INTO transactions (user_email, fecha, tipo, concepto_enc, importe_enc, comentario) "
+                    "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, fecha::text",
+                    (email, row["fecha"], tipo, concepto_enc, importe_enc, comentario),
+                )
             tx = cur.fetchone()
             c_hmac = row.get("comercio_hmac")
             if recordar and c_hmac:

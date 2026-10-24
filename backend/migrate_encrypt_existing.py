@@ -17,6 +17,7 @@ from psycopg2.extras import RealDictCursor
 
 sys.path.insert(0, os.path.dirname(__file__))
 from services.crypto import encrypt_str, decrypt_str, encrypt_float, decrypt_float  # noqa: E402
+from services.importes import redondear_importe  # noqa: E402
 
 
 def main():
@@ -35,7 +36,7 @@ def main():
 
         for row in rows:
             concepto_enc = encrypt_str(row["concepto"])
-            importe_enc = encrypt_float(float(row["importe"]))
+            importe_enc = encrypt_float(redondear_importe(row["importe"]))  # céntimos, como el resto
             cur.execute(
                 "UPDATE transactions SET concepto_enc = %s, importe_enc = %s WHERE id = %s",
                 (concepto_enc, importe_enc, row["id"]),
@@ -51,10 +52,15 @@ def main():
             if row["concepto_enc"] is None or row["importe_enc"] is None:
                 mismatches.append((row["id"], "sin migrar"))
                 continue
-            dec_concepto = decrypt_str(bytes(row["concepto_enc"]))
-            dec_importe = decrypt_float(bytes(row["importe_enc"]))
+            try:
+                dec_concepto = decrypt_str(bytes(row["concepto_enc"]))
+                dec_importe = decrypt_float(bytes(row["importe_enc"]))
+            except Exception:
+                mismatches.append((row["id"], "no se pudo descifrar"))
+                continue
             if dec_concepto != row["concepto"] or abs(dec_importe - float(row["importe"])) > 0.001:
-                mismatches.append((row["id"], f"esperado ({row['concepto']}, {row['importe']}) obtenido ({dec_concepto}, {dec_importe})"))
+                # Solo el id: nunca se imprime concepto ni importe (ni en claro ni descifrado).
+                mismatches.append((row["id"], "no coincide tras descifrar"))
 
         if mismatches:
             print(f"❌ {len(mismatches)} filas no coinciden tras descifrar:")

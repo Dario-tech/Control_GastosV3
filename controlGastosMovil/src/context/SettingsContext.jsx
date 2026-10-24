@@ -5,6 +5,7 @@ import { fetchPrefs, putPref } from '../services/prefsApi'
 import { fetchCategories, createCategory, deleteCategory, importCategories } from '../services/categoriesApi'
 import { importLegacy, claimLegacy, legacyHiddenFor, readLegacyCats, readLegacyBudgets, readLegacySettings, hasLegacyTour } from '../utils/legacyImport'
 import { newId } from '../utils/id'
+import { mergeCategories, categoryExists, categoryKey, normalizeCategoryName } from '../data/categories'
 
 export const ACCENTS = [
   { id: 'indigo',   color: '#6366f1', label: 'Índigo'   },
@@ -53,21 +54,43 @@ const KIND_LABEL = {
 }
 const TMP = 'tmp-'
 
-const unreadableMsg = (what) =>
-  `No se han podido leer ${what} del servidor; no se guardarán cambios hasta que se resuelva.`
+// `plural` concuerda el verbo con lo que no se pudo leer.
+export const unreadableMsg = (what, plural = true) =>
+  `No se ${plural ? 'han' : 'ha'} podido leer ${what} del servidor; no se guardarán cambios hasta que se resuelva.`
 const KIND_UNREAD = {
-  settings: 'tus ajustes', budgets: 'tus presupuestos', hidden_categories: 'tus categorías ocultas', tour: 'el estado de la guía',
+  settings: ['tus ajustes', true], budgets: ['tus presupuestos', true],
+  hidden_categories: ['tus categorías ocultas', true], tour: ['el estado de la guía', false],
 }
+const kindUnreadMsg = kind => unreadableMsg(...KIND_UNREAD[kind])
+export const unreadableCatsMsg = n =>
+  n === 1 ? unreadableMsg('una de tus categorías', false) : unreadableMsg('algunas de tus categorías')
 
 // Un usuario nuevo en el dispositivo parte de los ajustes por defecto; si hay
 // ajustes antiguos del móvil (aún sin importar) se usan solo para pintar.
 // Los datos antiguos solo se usan si son de este usuario (claimLegacy).
+// Si la caché de este usuario está "vacía" (por defecto) y aún hay datos
+// antiguos suyos sin importar, se pintan los antiguos: la caché vacía no
+// significa que el servidor ya los tenga.
+function emptyValue(v) {
+  if (v == null) return true
+  if (Array.isArray(v)) return v.length === 0
+  return false
+}
+function isDefaultSettings(s) {
+  if (s == null) return true
+  if (typeof s !== 'object') return false
+  return Object.keys(s).every(k => s[k] === DEFAULT[k])
+}
+
 function initialPrefs(email) {
   const cache = readPrefsCache(email)
   const mine = claimLegacy(email)
-  const budgets = cache.budgets ?? (mine ? readLegacyBudgets() : undefined) ?? []
+  const legacyBudgets = mine ? readLegacyBudgets() : undefined
+  const legacySettings = mine ? readLegacySettings() : undefined
+  const budgets = (emptyValue(cache.budgets) && Array.isArray(legacyBudgets) ? legacyBudgets : cache.budgets) ?? []
+  const settings = isDefaultSettings(cache.settings) && legacySettings ? legacySettings : (cache.settings ?? {})
   return {
-    settings: { ...DEFAULT, ...(cache.settings ?? (mine ? readLegacySettings() : undefined) ?? {}) },
+    settings: { ...DEFAULT, ...settings },
     budgets:  Array.isArray(budgets) ? budgets : [],
     hidden:   Array.isArray(cache.hidden) ? cache.hidden : [],
     tour:     cache.tour ?? (mine && hasLegacyTour() ? 'legacy' : null),
@@ -90,10 +113,13 @@ function readCatsCache(email) {
   } catch { return null }
 }
 
+// Caché de categorías + las antiguas de este usuario aún sin importar (si el
+// servidor no responde se siguen viendo, aunque la caché exista y esté vacía).
 function initialCats(email) {
-  const cached = readCatsCache(email)
-  if (cached) return cached
-  return email && claimLegacy(email) ? (readLegacyCats() || []) : []
+  const cached = readCatsCache(email) || []
+  const old = email && claimLegacy(email) ? (readLegacyCats() || []) : []
+  const have = new Set(cached.map(c => categoryKey(c.tipo, c.concepto)))
+  return [...cached, ...old.filter(c => !have.has(categoryKey(c.tipo, c.concepto)))]
 }
 
 // Forma que viaja al servidor (budgets es un objeto; el resto, tal cual)
@@ -217,11 +243,11 @@ export function SettingsProvider({ children }) {
         if (imp.failed.includes('categories') && claimLegacy(userRef.current?.email)) {
           // Importación pendiente: las antiguas siguen visibles hasta que suba.
           const old = readLegacyCats() || []
-          const have = new Set(list.map(c => `${c.tipo}|${c.concepto}`))
-          list = [...list, ...old.filter(c => !have.has(`${c.tipo}|${c.concepto}`))]
+          const have = new Set(list.map(c => categoryKey(c.tipo, c.concepto)))
+          list = [...list, ...old.filter(c => !have.has(categoryKey(c.tipo, c.concepto)))]
         }
         // Altas en curso durante la carga: se conservan encima de la lista.
-        const inFlight = catsRef.current.filter(c => String(c.id).startsWith(TMP) && !list.some(x => x.tipo === c.tipo && x.concepto === c.concepto))
+        const inFlight = catsRef.current.filter(c => String(c.id).startsWith(TMP) && !list.some(x => categoryKey(x.tipo, x.concepto) === categoryKey(c.tipo, c.concepto)))
         setCats([...list, ...inFlight])
       }
 
@@ -255,7 +281,7 @@ export function SettingsProvider({ children }) {
   // que aceptó el servidor y se avisa.
   function commit(kind, next) {
     if (unreadableRef.current.kinds.includes(kind)) {
-      notify(unreadableMsg(KIND_UNREAD[kind]))
+      notify(kindUnreadMsg(kind))
       return
     }
     const sk = PREF_STATE_KEY[kind]
@@ -274,7 +300,7 @@ export function SettingsProvider({ children }) {
           // El servidor tiene un dato que no puede leer: jamás se fuerza.
           if (kind in confirmed.current) setPrefsLocal({ [sk]: confirmed.current[kind] })
           setUnread({ ...unreadableRef.current, kinds: [...new Set([...unreadableRef.current.kinds, kind])] })
-          notify(unreadableMsg(KIND_UNREAD[kind]))
+          notify(kindUnreadMsg(kind))
           return
         }
         if (seq === seqs.current[kind]) {
@@ -300,10 +326,16 @@ export function SettingsProvider({ children }) {
   }, [])
 
   // ── Categorías propias ────────────────────────────────────────────────────
+  // Devuelve false si no se crea (vacía o ya existe una con ese nombre,
+  // por defecto o propia, del mismo tipo).
   const addCategory = useCallback((tipo, item) => {
-    const concepto = String(item.concepto || '').trim()
-    if (!concepto) return
-    if (catsRef.current.some(c => c.tipo === tipo && c.concepto === concepto)) return
+    const concepto = String(item.concepto || '').replace(/\s+/g, ' ').trim()
+    if (!concepto) return false
+    const visible = [
+      ...(mergeCategories({}, prefsRef.current.hidden)[tipo] || []),
+      ...catsRef.current.filter(c => c.tipo === tipo),
+    ]
+    if (categoryExists(visible, concepto)) return false
     const gen = genRef.current
     const tmp = { id: `${TMP}${newId()}`, tipo, concepto, emoji: item.emoji }
     setCats([...catsRef.current, tmp])
@@ -320,7 +352,7 @@ export function SettingsProvider({ children }) {
           try {
             const { categories } = await fetchCategories()
             if (gen === genRef.current && Array.isArray(categories)) {
-              const mine = categories.find(c => c.tipo === tipo && c.concepto === concepto)
+              const mine = categories.find(c => c.tipo === tipo && normalizeCategoryName(c.concepto) === normalizeCategoryName(concepto))
               setCats(mine ? catsRef.current.map(c => c.id === tmp.id ? mine : c) : catsRef.current.filter(c => c.id !== tmp.id))
             }
           } catch { /* se queda como está */ }
@@ -332,6 +364,7 @@ export function SettingsProvider({ children }) {
       })
       .finally(() => pendingAdds.current.delete(tmp.id))
     pendingAdds.current.set(tmp.id, p)
+    return true
   }, [notify])
 
   const removeCategory = useCallback(async (tipo, concepto) => {
@@ -375,8 +408,8 @@ export function SettingsProvider({ children }) {
   const customCategories = useMemo(() => groupByTipo(cats), [cats])
   const settings = prefs.settings
   const syncWarnings = useMemo(() => [
-    ...unreadable.kinds.map(k => unreadableMsg(KIND_UNREAD[k])),
-    ...(unreadable.cats > 0 ? [unreadableMsg('algunas de tus categorías')] : []),
+    ...unreadable.kinds.map(kindUnreadMsg),
+    ...(unreadable.cats > 0 ? [unreadableCatsMsg(unreadable.cats)] : []),
   ], [unreadable])
 
   // Apply theme class on <html>

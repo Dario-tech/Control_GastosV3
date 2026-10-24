@@ -35,6 +35,7 @@ from services.users import (
 )
 from services.db import init_pool, run_in_thread
 from services import user_data
+from services import legacy_plain
 from services.ratelimit import enforce, reset as ratelimit_reset, client_ip
 from services.pending import (
     create_pending, get_pending, categorize_pending, delete_pending,
@@ -44,6 +45,7 @@ from services.wallet import (
     parse_importe, parse_fecha, today_madrid, clean_comercio, clean_id_externo,
 )
 from services.recurring import get_recurring
+from services.importes import IMPORTE_MAX, redondear_importe, validar_importe
 from services.ai_categorize import suggest_emoji
 from services.email_report import send_monthly_report, send_monthly_reports_to_all
 from services.goals import (
@@ -68,6 +70,9 @@ async def lifespan(app: FastAPI):
     ensure_search_index()  # migración aditiva idempotente (índice para paginar la búsqueda)
     ensure_wallet_schema()  # migración aditiva idempotente (Atajo de Cartera: comercio, reglas)
     user_data.ensure_user_data_schema()  # migración aditiva idempotente (categorías y prefs por usuario)
+    # TEMPORAL (B2, hasta la fase 3 de MIGRACION_QA_A_PROD.md): si la tabla aún
+    # tiene concepto/importe en claro (PROD), las escrituras los rellenan también.
+    legacy_plain.detect_plain_columns()
     yield
 
 
@@ -407,10 +412,18 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
         tx = TransactionIn(**data)
     except Exception:
         raise HTTPException(status_code=422, detail="Body inválido")
+    # Mismo tope y redondeo que el PATCH: ≥ 1e8 desbordaría `importe NUMERIC(10,2)`
+    # en PROD (doble escritura B2) y daría 502. Sin eco del valor en el 422.
+    try:
+        if isinstance(data.get("importe"), bool):
+            raise ValueError
+        importe = validar_importe(tx.importe)
+    except ValueError:
+        _err422("El importe debe ser mayor que 0 y no superar 1.000.000")
 
     try:
         result = await post_transaction(
-            tx.importe, tx.tipo, tx.concepto, email, tx.source, tx.fecha,
+            importe, tx.tipo, tx.concepto, email, tx.source, tx.fecha,
             (tx.comentario or "").strip() or None,
         )
     except HTTPException:
@@ -446,7 +459,7 @@ async def update_transaction_comment_endpoint(
 TIPOS_VALIDOS = ("Ingreso", "Gasto Fijo", "Gasto Variable")  # = TYPES del frontend
 _CONCEPTO_MAX   = 60
 _COMENTARIO_MAX = 500
-_IMPORTE_MAX    = 1_000_000
+_IMPORTE_MAX    = IMPORTE_MAX  # services/importes.py
 _FECHA_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _CAMPOS_EDITABLES = ("fecha", "importe", "tipo", "concepto", "comentario")
 
@@ -484,11 +497,15 @@ def _validate_tx_patch(data) -> dict:
             _err422("El importe no puede superar 1.000.000")
         if not math.isfinite(v):
             _err422("El importe debe ser un número finito")
+        try:
+            v = redondear_importe(v)  # céntimos, ROUND_HALF_UP (antes de cifrar)
+        except ValueError:  # finito pero enorme (≥ 1e26): no se puede cuantizar
+            _err422("El importe no puede superar 1.000.000")
         if v <= 0:
             _err422("El importe debe ser mayor que 0")
         if v > _IMPORTE_MAX:
             _err422("El importe no puede superar 1.000.000")
-        changes["importe"] = float(v)
+        changes["importe"] = v
 
     if "tipo" in data:
         t = data["tipo"]
@@ -637,7 +654,7 @@ async def delete_pending_tx(pending_id: int, email: str = Depends(get_current_us
 
 # ── Atajo iOS (token permanente, sin JWT) ────────────────────────────────────
 
-SHORTCUT_MAX_IMPORTE = 1_000_000
+SHORTCUT_MAX_IMPORTE = IMPORTE_MAX  # services/importes.py
 
 @app.post("/api/shortcut/pending")
 async def shortcut_create_pending(request: Request):
@@ -667,6 +684,10 @@ async def shortcut_create_pending(request: Request):
         raise HTTPException(status_code=422, detail="importe inválido")
 
     if not math.isfinite(importe):
+        raise HTTPException(status_code=422, detail="importe inválido")
+    try:
+        importe = redondear_importe(importe)  # céntimos, ROUND_HALF_UP
+    except ValueError:  # p. ej. 1e300
         raise HTTPException(status_code=422, detail="importe inválido")
     if importe <= 0:
         raise HTTPException(status_code=422, detail="importe debe ser mayor que 0")
@@ -842,8 +863,10 @@ class AnnualExpenseIn(BaseModel):
 def _validate_annual_expense(body: "AnnualExpenseIn"):
     if not body.nombre.strip():
         raise HTTPException(status_code=422, detail="Escribe un nombre")
-    if body.importe <= 0:
-        raise HTTPException(status_code=422, detail="El importe debe ser mayor que 0")
+    try:
+        body.importe = validar_importe(body.importe)  # > 0, ≤ 1.000.000, céntimos
+    except ValueError:
+        raise HTTPException(status_code=422, detail="El importe debe ser mayor que 0 y no superar 1.000.000")
     if not (1 <= body.mes <= 12):
         raise HTTPException(status_code=422, detail="El mes debe estar entre 1 y 12")
     if not (1 <= body.dia <= 31):

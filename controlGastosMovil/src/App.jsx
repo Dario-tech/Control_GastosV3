@@ -3,7 +3,7 @@ import { wakeBackend } from './services/api'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppProvider, useApp } from './context/AppContext'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
-import { FinanceDataProvider } from './context/FinanceDataContext'
+import { FinanceDataProvider, useFinanceData, unreadableTxMsg } from './context/FinanceDataContext'
 import Header from './components/layout/Header'
 import BottomNav from './components/layout/BottomNav'
 import ProfilePanel from './components/layout/ProfilePanel'
@@ -66,6 +66,7 @@ class ErrorBoundary extends Component {
 function AppContent() {
   const { activeTab, showToast } = useApp()
   const { settings, tourSeen, prefsLoaded, syncNotice, syncWarnings } = useSettings()
+  const txWarning = unreadableTxMsg(useFinanceData()?.unreadableTx)
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [categorizeOpen, setCategorizeOpen] = useState(false)
   const [addOpen,        setAddOpen]        = useState(false)
@@ -102,6 +103,7 @@ function AppContent() {
         {syncWarnings?.map(msg => (
           <div key={msg} className="sync-warning" role="alert">⚠️ {msg}</div>
         ))}
+        {txWarning && <div className="sync-warning" role="alert">⚠️ {txWarning}</div>}
         <ErrorBoundary>
           <Suspense fallback={<TabSkeleton />}>
             {activeTab === 'year'        && <YearTab />}

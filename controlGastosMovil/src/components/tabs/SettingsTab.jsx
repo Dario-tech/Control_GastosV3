@@ -85,7 +85,7 @@ function Segmented({ options, value, onChange }) {
 }
 
 
-const TIPO_LABEL = { 'Gasto Variable': 'Variable', 'Gasto Fijo': 'Fijo' }
+const TIPO_LABEL = { 'Gasto Variable': 'Variable', 'Gasto Fijo': 'Fijo', 'Ingreso': 'Ingreso' }
 
 export default function SettingsTab() {
   const { settings, update, customCategories, removeCategory } = useSettings()
@@ -93,7 +93,7 @@ export default function SettingsTab() {
   const { showToast } = useApp()
   const [sendingReport, setSendingReport] = useState(false)
 
-  const customList = ['Gasto Variable', 'Gasto Fijo']
+  const customList = ['Gasto Variable', 'Gasto Fijo', 'Ingreso']
     .flatMap(tipo => (customCategories[tipo] || []).map(c => ({ ...c, tipo })))
 
   function handleRemoveCategory(tipo, concepto) {
@@ -211,7 +211,7 @@ export default function SettingsTab() {
         ) : (
           customList.map((c, i) => (
             <Row
-              key={`${c.tipo}-${c.concepto}`}
+              key={`${c.tipo}|${c.concepto}|${i}`}
               icon={c.emoji}
               label={c.concepto}
               last={i === customList.length - 1}
