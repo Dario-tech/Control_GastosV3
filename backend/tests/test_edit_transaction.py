@@ -231,11 +231,9 @@ def test_endpoint_comment_sigue_existiendo(client):
 # ── Regresión (QA local con estructura de PROD, rama fix/qa-mejoras) ────────
 # Un importe finito pero enorme (≥ 1e26: 1e26, 1e300, 10**26) no da OverflowError
 # en float(), así que llega a redondear_importe(), que lanza ValueError al
-# cuantizar (InvalidOperation) y _validate_tx_patch no la captura → 500 en vez
-# de 422. El POST /api/transaction sí la captura (validar_importe en try).
-# Fallo de la app pendiente de arreglo (backend): quitar el xfail al arreglarlo.
+# cuantizar (InvalidOperation). _validate_tx_patch la captura y responde 422,
+# igual que el POST /api/transaction.
 
-@pytest.mark.xfail(strict=True, reason="PATCH con importe ≥ 1e26 da 500 en vez de 422 (pendiente de arreglo)")
 @pytest.mark.parametrize("raw", ["1e26", "1e300", "100000000000000000000000000"])
 def test_importe_enorme_finito_422_no_500(client, auth_headers, db, broadcasts, raw):
     r = client.patch("/api/transactions/7", headers={**auth_headers, "Content-Type": "application/json"},

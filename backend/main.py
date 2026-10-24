@@ -497,7 +497,10 @@ def _validate_tx_patch(data) -> dict:
             _err422("El importe no puede superar 1.000.000")
         if not math.isfinite(v):
             _err422("El importe debe ser un número finito")
-        v = redondear_importe(v)  # céntimos, ROUND_HALF_UP (antes de cifrar)
+        try:
+            v = redondear_importe(v)  # céntimos, ROUND_HALF_UP (antes de cifrar)
+        except ValueError:  # finito pero enorme (≥ 1e26): no se puede cuantizar
+            _err422("El importe no puede superar 1.000.000")
         if v <= 0:
             _err422("El importe debe ser mayor que 0")
         if v > _IMPORTE_MAX:
