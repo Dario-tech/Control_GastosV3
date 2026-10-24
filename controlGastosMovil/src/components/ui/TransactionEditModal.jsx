@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useSettings } from '../../context/SettingsContext'
 import { useCategories } from '../../hooks/useCategories'
 import { updateTransaction, deleteTransaction } from '../../services/api'
-import { TYPES } from '../../data/categories'
+import { TYPES, combineCategories, categoryKey, normalizeCategoryName } from '../../data/categories'
 import { fmt } from '../../utils'
 import {
   draftFromTx, validateDraft, buildTransactionPatch, parseAmount, dayLabel, localISODate,
@@ -27,6 +27,9 @@ function apiErrorMessage(err, fallback) {
   return msg && !/^API \d+$/.test(msg) && !/fetch/i.test(msg) ? msg : fallback
 }
 
+// Misma categoría aunque cambien mayúsculas, acentos o espacios.
+const sameName = (a, b) => a != null && b != null && normalizeCategoryName(a) === normalizeCategoryName(b)
+
 /**
  * Editor de un movimiento existente (se abre al tocar una fila del detalle de
  * categoría). Reutiliza las piezas de FormKit de AddTransactionModal. Hace la
@@ -45,10 +48,10 @@ export default function TransactionEditModal({ tx, emoji, onClose, onSaved, onDe
   const DEFAULT_CATEGORIES = useCategories()
 
   const cats = useMemo(() => {
-    const list = [...(DEFAULT_CATEGORIES[draft.tipo] || []), ...(customCategories[draft.tipo] || [])]
+    const list = combineCategories(DEFAULT_CATEGORIES[draft.tipo], customCategories[draft.tipo])
     // Categoría original que ya no está en la lista (antigua o "Sin categoría"):
     // se ofrece igualmente para no obligar a cambiarla al editar otra cosa.
-    if (draft.tipo === initial.tipo && !list.some(c => c.concepto === initial.concepto)) {
+    if (draft.tipo === initial.tipo && !list.some(c => sameName(c.concepto, initial.concepto))) {
       list.unshift({ concepto: initial.concepto, emoji: emoji || '💶' })
     }
     return list
@@ -73,8 +76,8 @@ export default function TransactionEditModal({ tx, emoji, onClose, onSaved, onDe
 
   function pickTipo(tipo) {
     setDraft(d => {
-      const list = [...(DEFAULT_CATEGORIES[tipo] || []), ...(customCategories[tipo] || [])]
-      const keep = list.some(c => c.concepto === d.concepto) || (tipo === initial.tipo && d.concepto === initial.concepto)
+      const list = combineCategories(DEFAULT_CATEGORIES[tipo], customCategories[tipo])
+      const keep = list.some(c => sameName(c.concepto, d.concepto)) || (tipo === initial.tipo && d.concepto === initial.concepto)
       return { ...d, tipo, concepto: keep ? d.concepto : (tipo === initial.tipo ? initial.concepto : null) }
     })
     setError(null)
@@ -163,9 +166,9 @@ export default function TransactionEditModal({ tx, emoji, onClose, onSaved, onDe
         <Section title="Categoría">
           <div className="fm-grid fm-grid--3" role="radiogroup" aria-label="Categoría">
             {cats.map(c => {
-              const sel = draft.concepto === c.concepto
+              const sel = sameName(draft.concepto, c.concepto)
               return (
-                <button key={c.concepto} type="button" role="radio" aria-checked={sel}
+                <button key={categoryKey(draft.tipo, c.concepto)} type="button" role="radio" aria-checked={sel}
                   className={`fm-tile${sel ? ' selected' : ''}`} disabled={saving}
                   onClick={() => set('concepto', c.concepto)}>
                   <span className="fm-tile-icon">{c.emoji}</span>

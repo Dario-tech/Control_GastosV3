@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import { BUDGET_COLORS } from '../../hooks/useBudget'
-import { DEFAULT_CATEGORIES } from '../../data/categories'
+import { DEFAULT_CATEGORIES, combineCategories, categoryKey } from '../../data/categories'
 import { useCategories } from '../../hooks/useCategories'
 import { useSettings } from '../../context/SettingsContext'
 import { fmt } from '../../utils'
@@ -39,7 +39,7 @@ export default function BudgetModal({ item, onSave, onClose, onDelete }) {
   const [error, setError]     = useState('')
   const [confirmDel, setConfirmDel] = useState(false)
 
-  const allCats = [...filteredCategories[tipo], ...(customCategories[tipo] || [])]
+  const allCats = combineCategories(filteredCategories[tipo], customCategories[tipo])
   const limitNum = parseFloat(String(limit).replace(',', '.'))
   const limitOk  = limitNum > 0
   const canSave = !!selectedCat && limitOk && !saving
@@ -117,7 +117,7 @@ export default function BudgetModal({ item, onSave, onClose, onDelete }) {
           <TileGrid
             label="Categoría"
             columns={3}
-            items={allCats.map(c => ({ key: c.concepto, icon: c.emoji, label: c.concepto, cat: c }))}
+            items={allCats.map(c => ({ key: categoryKey(tipo, c.concepto), icon: c.emoji, label: c.concepto, cat: c }))}
             isSelected={it => selectedCat?.concepto === it.cat.concepto}
             onSelect={it => setSelectedCat(it.cat)}
           />
