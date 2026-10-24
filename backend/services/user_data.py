@@ -348,9 +348,29 @@ def get_prefs(email):
     return {**out, "updated_at": updated, "unreadable": unreadable}
 
 
+PREFS_MAX_DEPTH = 32
+
+
+def _demasiado_hondo(data, limit=PREFS_MAX_DEPTH) -> bool:
+    """True si `data` anida listas/dicts más de `limit` niveles. Iterativo a propósito:
+    no depende del límite de recursión de Python, que cambia entre versiones
+    (con 3.12 json.dumps ya no falla con 5000 niveles)."""
+    stack = [(data, 1)]
+    while stack:
+        item, depth = stack.pop()
+        if isinstance(item, (list, dict)):
+            if depth > limit:
+                return True
+            children = item.values() if isinstance(item, dict) else item
+            stack.extend((c, depth + 1) for c in children)
+    return False
+
+
 def put_pref(email, kind, data, force=False):
     if kind not in PREF_KINDS:
         raise _unprocessable("kind no permitido")
+    if _demasiado_hondo(data):
+        raise _unprocessable("JSON inválido")
     try:
         raw = json.dumps(data, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         raw_bytes = raw.encode("utf-8")
