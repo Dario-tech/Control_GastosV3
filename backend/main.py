@@ -35,6 +35,7 @@ from services.users import (
 )
 from services.db import init_pool, run_in_thread
 from services import user_data
+from services import legacy_plain
 from services.ratelimit import enforce, reset as ratelimit_reset, client_ip
 from services.pending import (
     create_pending, get_pending, categorize_pending, delete_pending,
@@ -68,6 +69,9 @@ async def lifespan(app: FastAPI):
     ensure_search_index()  # migración aditiva idempotente (índice para paginar la búsqueda)
     ensure_wallet_schema()  # migración aditiva idempotente (Atajo de Cartera: comercio, reglas)
     user_data.ensure_user_data_schema()  # migración aditiva idempotente (categorías y prefs por usuario)
+    # TEMPORAL (B2, hasta la fase 3 de MIGRACION_QA_A_PROD.md): si la tabla aún
+    # tiene concepto/importe en claro (PROD), las escrituras los rellenan también.
+    legacy_plain.detect_plain_columns()
     yield
 
 

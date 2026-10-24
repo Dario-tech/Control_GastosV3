@@ -124,7 +124,32 @@ def test_finance_omite_filas_indescifrables(monkeypatch, caplog_warn, client, au
     body = r.json()
     assert [t["rowIndex"] for t in body["transactions"]] == [1, 3]
     assert body["availableYears"] == [2026]
+    assert body["unreadable"] == 2  # contrato: nº de filas omitidas por no descifrarse
     _assert_logged_ids(caplog_warn, [2, 4])
+
+
+def test_finance_sin_year_cuenta_ilegibles_de_todos_los_anos(monkeypatch, caplog_warn, client, auth_headers):
+    rows = [
+        _ok_row(1, "2025-03-01", "Ingreso", "Nómina", 3000.0),
+        _bad_row(2, "2025-04-02"),
+        _bad_row(3, "2026-05-02"),
+        _ok_row(4, "2026-05-06", "Gasto Variable", "Comida", 32.4),
+    ]
+    fake_db(monkeypatch, sheets_mod, [[{"y": 2025}, {"y": 2026}], rows])
+    r = client.get("/api/finance", headers=auth_headers)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["unreadable"] == 2
+    assert [t["rowIndex"] for t in body["transactions"]] == [1, 4]
+    assert CONCEPTO_SECRETO not in r.text
+
+
+def test_finance_sin_transacciones_unreadable_cero(monkeypatch, client, auth_headers):
+    fake_db(monkeypatch, sheets_mod, [[], []])
+    r = client.get("/api/finance", headers=auth_headers)
+    assert r.status_code == 200
+    assert r.json()["configured"] is False
+    assert r.json()["unreadable"] == 0
 
 
 def test_finance_todo_ok_sin_warnings(monkeypatch, caplog_warn, client, auth_headers):
@@ -134,6 +159,7 @@ def test_finance_todo_ok_sin_warnings(monkeypatch, caplog_warn, client, auth_hea
     r = client.get("/api/finance?year=2026", headers=auth_headers)
     assert r.status_code == 200
     assert [(t["concepto"], t["importe"]) for t in r.json()["transactions"]] == [("Nómina", 3200.0), ("Comida", 32.4)]
+    assert r.json()["unreadable"] == 0
     assert "No se pudo descifrar" not in caplog_warn.text
 
 
@@ -186,4 +212,13 @@ def test_search_omite_filas_indescifrables(monkeypatch, caplog_warn, client, aut
     r = client.get("/api/transactions/search?q=netflix", headers=auth_headers)
     assert r.status_code == 200
     assert [x["rowIndex"] for x in r.json()["results"]] == [3, 1]
+    assert r.json()["unreadable"] == 1
     _assert_logged_ids(caplog_warn, [2])
+
+
+def test_search_sin_ilegibles_unreadable_cero(monkeypatch, client, auth_headers):
+    rows = [_ok_row(1, "2026-05-03", "Gasto Fijo", "Netflix", 12.99)]
+    fake_db(monkeypatch, sheets_mod, [rows])
+    r = client.get("/api/transactions/search", headers=auth_headers)
+    assert r.status_code == 200
+    assert r.json()["unreadable"] == 0 and r.json()["next_cursor"] is None

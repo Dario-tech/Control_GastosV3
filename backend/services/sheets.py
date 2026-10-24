@@ -2,6 +2,7 @@ from datetime import date as date_type
 from fastapi import HTTPException
 from .db import db_cursor, run_in_thread
 from .crypto import encrypt_str, encrypt_float, decrypt_transaction
+from . import legacy_plain
 
 
 def ensure_comentario_column():
@@ -212,6 +213,7 @@ async def get_finance_data(email: str, year: int | None = None) -> dict:
     if not available_years:
         return {
             "configured":       False,
+            "unreadable":       0,
             "error":            "No hay transacciones registradas.",
             "year":             year or date_type.today().year,
             "availableYears":   [],
@@ -223,21 +225,29 @@ async def get_finance_data(email: str, year: int | None = None) -> dict:
         }
 
     # Descifrado en Python — el backend es el único que tiene la clave.
-    # Las filas que no se puedan descifrar se omiten (ver decrypt_transaction).
+    # Las filas que no se puedan descifrar se omiten (ver decrypt_transaction),
+    # pero se cuentan en `unreadable` para que el cliente avise en vez de
+    # mostrar en silencio un total incompleto.
     result = _decrypt_and_build(rows, year)
     result["availableYears"] = available_years
     return result
 
 
 def _decrypt_and_build(rows, year: int | None = None) -> dict:
+    """Descifra y agrega. Añade `unreadable` = nº de filas leídas (todas, o las
+    del año pedido) que se omitieron por no poder descifrarse."""
     data_rows = []
+    unreadable = 0
     for r in rows:
         dec = decrypt_transaction(r["concepto_enc"], r["importe_enc"], r["id"])
         if dec is None:
-            continue  # fila indescifrable: se omite (ya registrada en el log)
+            unreadable += 1
+            continue  # fila indescifrable: se omite (ya registrada en el log, solo id)
         data_rows.append({"_rowIndex": r["id"], "fecha": r["fecha"], "tipo": r["tipo"],
                           "concepto": dec[0], "importe": dec[1], "comentario": r["comentario"]})
-    return _build_finance(data_rows, year)
+    result = _build_finance(data_rows, year)
+    result["unreadable"] = unreadable
+    return result
 
 
 # Filtro SQL aproximado por tipo — barato porque `tipo` no está cifrado, así
@@ -304,11 +314,12 @@ async def search_transactions(
 
     results: list[dict] = []
     scanned = 0
+    unreadable = 0  # filas escaneadas en ESTA página omitidas por no descifrarse
     last_fecha = after[0] if after else None
     last_id    = after[1] if after else None
     exhausted  = False
 
-    while len(results) < limit and scanned < SEARCH_MAX_SCAN:
+    while not exhausted and len(results) < limit and scanned < SEARCH_MAX_SCAN:
         batch = await run_in_thread(lambda: _fetch_batch(last_fecha, last_id))
         if not batch:
             exhausted = True
@@ -323,7 +334,8 @@ async def search_transactions(
             last_fecha, last_id = row["fecha"], row["id"]
             dec = decrypt_transaction(row["concepto_enc"], row["importe_enc"], row["id"])
             if dec is None:
-                continue  # fila indescifrable: se omite (ya registrada en el log)
+                unreadable += 1
+                continue  # fila indescifrable: se omite (ya registrada en el log, solo id)
             concepto, importe = dec[0], abs(dec[1])
             if q_norm and q_norm not in concepto.lower():
                 continue
@@ -345,7 +357,7 @@ async def search_transactions(
     if not exhausted and (len(results) >= limit or scanned >= SEARCH_MAX_SCAN):
         next_cursor = f"{last_fecha}_{last_id}"
 
-    return {"results": results, "next_cursor": next_cursor}
+    return {"results": results, "next_cursor": next_cursor, "unreadable": unreadable}
 
 
 async def delete_transaction(row_index: int, email: str = "") -> dict:
@@ -370,20 +382,27 @@ async def post_transaction(
     concepto_enc = encrypt_str(concepto)
     importe_enc  = encrypt_float(importe)
 
+    cols = ["user_email", "tipo", "concepto_enc", "importe_enc", "comentario"]
+    vals = ["%s"] * 5
+    params: list = [email, tipo, concepto_enc, importe_enc, comentario]
+    if fecha:
+        cols.append("fecha")
+        vals.append("%s::date")
+        params.append(fecha)
+    if legacy_plain.enabled():
+        # TEMPORAL (B2, hasta la fase 3 de MIGRACION_QA_A_PROD.md): en PROD las
+        # columnas en claro son NOT NULL sin default. Mismo valor que lo cifrado.
+        cols += ["concepto", "importe"]
+        vals += ["%s", "%s"]
+        params += [concepto, importe]
+
     def _q():
         with db_cursor() as cur:
-            if fecha:
-                cur.execute(
-                    """INSERT INTO transactions (user_email, tipo, concepto_enc, importe_enc, fecha, comentario)
-                       VALUES (%s, %s, %s, %s, %s::date, %s) RETURNING id, fecha::text""",
-                    (email, tipo, concepto_enc, importe_enc, fecha, comentario),
-                )
-            else:
-                cur.execute(
-                    """INSERT INTO transactions (user_email, tipo, concepto_enc, importe_enc, comentario)
-                       VALUES (%s, %s, %s, %s, %s) RETURNING id, fecha::text""",
-                    (email, tipo, concepto_enc, importe_enc, comentario),
-                )
+            cur.execute(
+                f"""INSERT INTO transactions ({', '.join(cols)})
+                    VALUES ({', '.join(vals)}) RETURNING id, fecha::text""",
+                params,
+            )
             return cur.fetchone()
 
     row = await run_in_thread(_q)
@@ -392,7 +411,10 @@ async def post_transaction(
 
 # Columnas editables vía PATCH /api/transactions/{id}. Lista blanca: los nombres
 # de columna nunca salen del cliente, solo los valores (que van parametrizados).
-_EDITABLE_COLUMNS = ("fecha", "tipo", "concepto_enc", "importe_enc", "comentario")
+_EDITABLE_COLUMNS = ("fecha", "tipo", "concepto_enc", "importe_enc", "comentario",
+                     # TEMPORAL (B2): columnas en claro de PROD; solo se escriben
+                     # si legacy_plain.enabled(). Nunca se leen.
+                     "concepto", "importe")
 
 
 async def update_transaction(tx_id: int, email: str, changes: dict) -> dict:
@@ -400,7 +422,8 @@ async def update_transaction(tx_id: int, email: str, changes: dict) -> dict:
 
     `changes` llega ya validado (ver main._validate_tx_patch) con claves de
     entre: fecha, tipo, concepto, importe, comentario. concepto e importe se
-    cifran aquí antes de guardarse; nunca se escriben en claro.
+    cifran aquí antes de guardarse. Solo si la tabla aún tiene las columnas en
+    claro de PROD (legacy_plain, TEMPORAL) se copian también ahí.
     Lanza 404 si el id no existe o es de otro usuario (sin distinguir).
     Devuelve los valores ya guardados, con concepto/importe descifrados.
     """
@@ -415,6 +438,13 @@ async def update_transaction(tx_id: int, email: str, changes: dict) -> dict:
         values["importe_enc"] = encrypt_float(changes["importe"])
     if "comentario" in changes:
         values["comentario"] = changes["comentario"] or None
+    if legacy_plain.enabled():
+        # TEMPORAL (B2, hasta la fase 3 de MIGRACION_QA_A_PROD.md): mantener al
+        # día las columnas en claro de PROD con el mismo valor que lo cifrado.
+        if "concepto" in changes:
+            values["concepto"] = changes["concepto"]
+        if "importe" in changes:
+            values["importe"] = changes["importe"]
     if not values:
         raise HTTPException(status_code=422, detail="No hay ningún campo que actualizar")
 
