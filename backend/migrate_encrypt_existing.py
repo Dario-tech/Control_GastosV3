@@ -51,10 +51,15 @@ def main():
             if row["concepto_enc"] is None or row["importe_enc"] is None:
                 mismatches.append((row["id"], "sin migrar"))
                 continue
-            dec_concepto = decrypt_str(bytes(row["concepto_enc"]))
-            dec_importe = decrypt_float(bytes(row["importe_enc"]))
+            try:
+                dec_concepto = decrypt_str(bytes(row["concepto_enc"]))
+                dec_importe = decrypt_float(bytes(row["importe_enc"]))
+            except Exception:
+                mismatches.append((row["id"], "no se pudo descifrar"))
+                continue
             if dec_concepto != row["concepto"] or abs(dec_importe - float(row["importe"])) > 0.001:
-                mismatches.append((row["id"], f"esperado ({row['concepto']}, {row['importe']}) obtenido ({dec_concepto}, {dec_importe})"))
+                # Solo el id: nunca se imprime concepto ni importe (ni en claro ni descifrado).
+                mismatches.append((row["id"], "no coincide tras descifrar"))
 
         if mismatches:
             print(f"❌ {len(mismatches)} filas no coinciden tras descifrar:")
