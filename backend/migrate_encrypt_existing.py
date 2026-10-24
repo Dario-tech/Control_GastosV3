@@ -17,6 +17,7 @@ from psycopg2.extras import RealDictCursor
 
 sys.path.insert(0, os.path.dirname(__file__))
 from services.crypto import encrypt_str, decrypt_str, encrypt_float, decrypt_float  # noqa: E402
+from services.importes import redondear_importe  # noqa: E402
 
 
 def main():
@@ -35,7 +36,7 @@ def main():
 
         for row in rows:
             concepto_enc = encrypt_str(row["concepto"])
-            importe_enc = encrypt_float(float(row["importe"]))
+            importe_enc = encrypt_float(redondear_importe(row["importe"]))  # céntimos, como el resto
             cur.execute(
                 "UPDATE transactions SET concepto_enc = %s, importe_enc = %s WHERE id = %s",
                 (concepto_enc, importe_enc, row["id"]),

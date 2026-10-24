@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from .db import db_cursor, run_in_thread
 from .crypto import encrypt_str, encrypt_float, decrypt_transaction
 from . import legacy_plain
+from .importes import redondear_importe
 
 
 def ensure_comentario_column():
@@ -379,6 +380,9 @@ async def post_transaction(
     importe: float, tipo: str, concepto: str, email: str = "", source: str = "shortcut",
     fecha: str | None = None, comentario: str | None = None,
 ) -> dict:
+    # Céntimos (ROUND_HALF_UP) ANTES de cifrar: lo cifrado y lo escrito en claro
+    # (B2) son el mismo valor. El tope lo valida main.py.
+    importe      = redondear_importe(importe)
     concepto_enc = encrypt_str(concepto)
     importe_enc  = encrypt_float(importe)
 
@@ -428,6 +432,9 @@ async def update_transaction(tx_id: int, email: str, changes: dict) -> dict:
     Devuelve los valores ya guardados, con concepto/importe descifrados.
     """
     values: dict = {}
+    if "importe" in changes:
+        # Céntimos antes de cifrar (idempotente si main.py ya lo redondeó).
+        changes = {**changes, "importe": redondear_importe(changes["importe"])}
     if "fecha" in changes:
         values["fecha"] = changes["fecha"]
     if "tipo" in changes:
