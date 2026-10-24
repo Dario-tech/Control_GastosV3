@@ -8,6 +8,10 @@ export const BASE = import.meta.env.VITE_API_URL || 'https://control-gastos-api-
 // viendo un "Error al guardar" genérico sin saber que tiene que reentrar.
 export const SESSION_EXPIRED_EVENT = 'session-expired'
 
+// Nombre del campo con el id de cliente (idempotencia) que se envía en el POST
+// de un movimiento. Si el backend usa otro nombre, se cambia SOLO aquí.
+export const CLIENT_ID_FIELD = 'id_cliente'
+
 // Render (plan gratuito) duerme el backend tras inactividad. Llamar a esto en
 // cuanto arranca la app "despierta" el servidor en segundo plano, para que
 // cuando el usuario llegue a guardar algo el backend ya no esté frío.
@@ -38,7 +42,9 @@ export async function apiJson(res) {
   if (res.status === 401) {
     try { localStorage.removeItem(LS_KEY) } catch { /* no-op */ }
     window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
-    throw new Error('Tu sesión ha caducado. Vuelve a iniciar sesión.')
+    const err = new Error('Tu sesión ha caducado. Vuelve a iniciar sesión.')
+    err.status = 401
+    throw err
   }
   const body = await res.json().catch(() => ({}))
   if (!res.ok) {
@@ -47,11 +53,6 @@ export async function apiJson(res) {
     throw err
   }
   return body
-}
-
-export async function fetchPrices() {
-  const res = await fetch(`${BASE}/api/investments/prices`, { signal: AbortSignal.timeout(15000) })
-  return apiJson(res)
 }
 
 export async function suggestEmoji(nombre) {
@@ -89,8 +90,11 @@ export async function fetchFinanceData() {
   return apiJson(res)
 }
 
-export async function postTransaction(importe, tipo, concepto, fecha = null, comentario = null) {
+// `idCliente` (UUID generado al abrir el formulario) permite al backend
+// reconocer un reenvío del mismo movimiento y no duplicarlo.
+export async function postTransaction(importe, tipo, concepto, fecha = null, comentario = null, idCliente = null) {
   const body = { importe, tipo, concepto, source: 'app' }
+  if (idCliente) body[CLIENT_ID_FIELD] = idCliente
   if (fecha) body.fecha = fecha
   if (comentario) body.comentario = comentario
   const res = await fetch(`${BASE}/api/transaction`, {

@@ -44,7 +44,7 @@
 .login-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
 .login-input {
   background: var(--surface2, var(--bg2)); border: 1px solid var(--border);
-  border-radius: 12px; padding: 12px 14px; color: var(--text); font-size: var(--fs-md);
+  border-radius: 12px; padding: 12px 14px; color: var(--text); font-size: max(16px, var(--fs-md));
   outline: none; width: 100%; box-sizing: border-box;
 }
 .login-input:focus { border-color: var(--accent); }
@@ -185,6 +185,17 @@ html, body, #root {
 .header-sub   { font-size: var(--fs-xs); color: var(--text3); font-weight: 500; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ===== ZONA TÁCTIL >= 44px ===== */
+/* Botones de 36px o menos: se amplía el área pulsable con un ::after
+   transparente, sin cambiar el aspecto visual ni el layout. */
+.avatar-btn, .profile-back-btn, .add-tx-btn, .pending-btn, .search-close, .s-action-btn { position: relative; }
+.avatar-btn::after, .profile-back-btn::after, .add-tx-btn::after,
+.pending-btn::after, .search-close::after, .s-action-btn::after {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  min-width: 44px; min-height: 44px; width: 100%; height: 100%;
+  transform: translate(-50%, -50%);
+}
+
 /* ===== AVATAR (header) ===== */
 .avatar-btn {
   width: 36px; height: 36px;
@@ -193,18 +204,18 @@ html, body, #root {
   background: var(--accent-dim);
   cursor: pointer;
   padding: 0;
-  overflow: hidden;
   flex-shrink: 0;
   transition: transform 0.15s, border-color 0.15s;
 }
 .avatar-btn:active { transform: scale(0.9); border-color: var(--accent); }
-.avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; }
 .avatar-initials {
   width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
   font-size: var(--fs-xs); font-weight: 700;
   color: var(--accent-fg);
   background: var(--accent-dim);
+  border-radius: 50%;
 }
 
 /* ===== PROFILE SCREEN (slide from right) ===== */
@@ -1073,104 +1084,10 @@ img.goal-square-emoji { width: 1.25rem; height: 1.25rem; border-radius: 6px; obj
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* Investment card */
-.inv-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 16px;
-  margin-bottom: 10px;
-}
-.inv-card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-.inv-card-left {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-}
-.inv-icon-circle {
-  width: 42px; height: 42px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: var(--fs-xl);
-  flex-shrink: 0;
-}
-.inv-name { display: block; font-size: var(--fs-md); font-weight: 700; color: var(--text); line-height: 1.3; }
-.inv-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
-.inv-ticker { font-size: var(--fs-xs); color: var(--text3); }
-.inv-type-badge {
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 20px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.inv-price-col {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  flex-shrink: 0;
-}
-.inv-price { font-size: var(--fs-md); font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
-.inv-price--sm { font-size: var(--fs-sm); }
-.inv-change { font-size: var(--fs-xs); font-weight: 700; }
-.inv-change.pos { color: var(--green); }
-.inv-change.neg { color: var(--red); }
-.inv-source-badge { font-size: var(--fs-xs); color: var(--orange); }
-
-.inv-price-skeleton {
-  width: 68px; height: 38px;
-  background: var(--surface2);
-  border-radius: 8px;
-  animation: pulse 1.4s ease-in-out infinite;
-}
 @keyframes pulse {
   0%, 100% { opacity: 0.35; }
   50%       { opacity: 0.85; }
 }
-
-.inv-desc { font-size: var(--fs-xs); color: var(--text3); margin-bottom: 12px; line-height: 1.45; }
-
-/* Return section */
-.inv-return-row { display: flex; flex-direction: column; gap: 7px; }
-.inv-values-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.inv-val-block { display: flex; flex-direction: column; gap: 2px; }
-.inv-val-label { font-size: var(--fs-xs); color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
-.inv-val-amount { font-size: var(--fs-md); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
-.inv-val-amount.pos { color: var(--green); }
-.inv-bar-bg { height: 5px; background: var(--surface2); border-radius: 20px; overflow: hidden; }
-.inv-bar-fill { height: 100%; border-radius: 20px; transition: width 0.6s ease; }
-.inv-return-pct-row { display: flex; justify-content: flex-end; }
-.inv-return-pct { font-size: var(--fs-xs); font-weight: 700; }
-.inv-return-pct.pos { color: var(--green); }
-.inv-return-pct.neg { color: var(--red); }
-
-/* Extra meta (PIAS / Letras) */
-.inv-extra-meta {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
-  font-size: var(--fs-xs);
-  color: var(--text3);
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.inv-extra-meta strong { color: var(--text2); font-weight: 600; }
 
 /* ===== PASTEL THEME ===== */
 html.pastel {
@@ -1377,7 +1294,7 @@ html.light .s-action-btn  { background: var(--surface2); color: var(--text2); bo
 .search-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .search-input {
   flex: 1; background: var(--surface2); border: 1px solid var(--border, transparent);
-  border-radius: 12px; padding: 12px 14px; color: var(--text); font-size: var(--fs-md); outline: none;
+  border-radius: 12px; padding: 12px 14px; color: var(--text); font-size: max(16px, var(--fs-md)); outline: none;
 }
 .search-input:focus { border-color: var(--accent); }
 .search-close { background: none; border: none; color: var(--text2); font-size: var(--fs-lg); cursor: pointer; padding: 4px 8px; flex-shrink: 0; }
@@ -1413,10 +1330,7 @@ html.light .s-action-btn  { background: var(--surface2); color: var(--text2); bo
 .hide-amounts .hero-stat-value,
 .hide-amounts .year-hero-balance,
 .hide-amounts .year-hero-stat-value,
-.hide-amounts .concept-amount,
-.hide-amounts .inv-val-amount,
-.hide-amounts .inv-price,
-.hide-amounts .inv-return-pct {
+.hide-amounts .concept-amount {
   filter: blur(7px);
   user-select: none;
 }
@@ -1625,195 +1539,6 @@ html.light .s-action-btn  { background: var(--surface2); color: var(--text2); bo
 @keyframes sheetUp {
   from { transform: translateY(100%); }
   to   { transform: translateY(0); }
-}
-
-/* ===== INV CARD CLICKABLE ===== */
-.inv-card--clickable {
-  cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-.inv-card--clickable:active {
-  transform: scale(0.98);
-  background: var(--surface2);
-}
-.inv-card--clickable::after {
-  content: '›';
-  position: absolute;
-  top: 16px; right: 16px;
-  font-size: var(--fs-lg);
-  color: var(--text3);
-  pointer-events: none;
-}
-.inv-card { position: relative; }
-
-/* ===== INVESTMENT DETAIL MODAL ===== */
-.detail-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.65);
-  z-index: 300;
-  display: flex;
-  align-items: flex-end;
-  animation: overlayIn 0.2s ease;
-}
-
-.detail-sheet {
-  width: 100%;
-  max-width: 430px;
-  margin: 0 auto;
-  background: var(--surface);
-  border-radius: 20px 20px 0 0;
-  border-top: 0.5px solid var(--border);
-  max-height: 92dvh;
-  overflow-y: auto;
-  padding-bottom: calc(24px + env(safe-area-inset-bottom));
-  animation: sheetUp 0.32s cubic-bezier(0.34,1.1,0.64,1);
-}
-.detail-sheet::-webkit-scrollbar { display: none; }
-
-.detail-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 16px 12px;
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  background: var(--bg2);
-  z-index: 1;
-}
-.detail-back-btn {
-  background: var(--surface2);
-  border: none;
-  border-radius: 50%;
-  width: 34px; height: 34px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  color: var(--text2);
-  flex-shrink: 0;
-  transition: all 0.15s;
-}
-.detail-back-btn:active { background: var(--accent); color: var(--on-accent); }
-.detail-back-btn svg { width: 16px; height: 16px; }
-
-.detail-header-center {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.detail-ticker { font-size: var(--fs-xs); color: var(--text3); font-weight: 600; }
-.detail-name   { font-size: var(--fs-md); font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.detail-header-badge {
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 20px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  flex-shrink: 0;
-}
-
-/* Price hero */
-.detail-price-hero {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 18px 20px 12px;
-}
-.detail-price {
-  font-size: var(--fs-2xl);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-}
-.detail-change-pill {
-  padding: 4px 12px;
-  border-radius: 100px;
-  font-size: var(--fs-sm);
-  font-weight: 700;
-}
-.detail-change-pill.pos { background: var(--green-dim); color: var(--green); }
-.detail-change-pill.neg { background: var(--red-dim);   color: var(--red); }
-
-/* Chart */
-.detail-chart-wrap { padding: 0 4px 4px; }
-
-/* Range selector */
-.detail-ranges {
-  display: flex;
-  gap: 6px;
-  padding: 10px 16px 14px;
-  justify-content: center;
-}
-.detail-range-btn {
-  flex: 1;
-  padding: 7px 4px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: none;
-  color: var(--text3);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s;
-  letter-spacing: 0.02em;
-}
-.detail-range-btn:active { transform: scale(0.93); }
-.detail-range-btn.active { border-color: transparent; }
-
-/* Synthetic note */
-.detail-synthetic-note {
-  margin: 0 16px 12px;
-  padding: 9px 14px;
-  background: var(--orange-dim);
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-xs);
-  color: var(--orange);
-  font-weight: 500;
-}
-
-/* Stats grid */
-.detail-stats-section {
-  padding: 0 16px 8px;
-}
-.detail-stats-title {
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  color: var(--text3);
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  margin-bottom: 10px;
-}
-.detail-stats-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  background: var(--border);
-  border-radius: 16px;
-  overflow: hidden;
-}
-.detail-stat {
-  background: var(--surface);
-  padding: 13px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.detail-stat-label {
-  font-size: var(--fs-xs);
-  color: var(--text3);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.detail-stat-value {
-  font-size: var(--fs-md);
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
 }
 
 /* ===== SETTINGS ===== */
@@ -2430,22 +2155,22 @@ html.light body, html.pastel body { background: var(--bg-grad); background-color
 .login-screen { background: transparent; }
 
 /* ---- Superficies de cristal (tarjetas grandes) ---- */
-.card, .hero-card, .year-hero, .bgt-hero, .bgt-item, .login-card, .inv-card,
+.card, .hero-card, .year-hero, .bgt-hero, .bgt-item, .login-card,
 .settings-card, .shortcut-token-section, .profile-guide-btn, .catmodal-type-card,
 .catmodal-cat-card, .budget-fab, .bgt-month-btn, .goal-square, .annual-item,
-.stats-summary-item, .detail-stat, .goals-empty {
+.stats-summary-item, .goals-empty {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--depth-2-shadow), inset 0 1px 0 var(--glass-highlight), inset 0 -1px 0 var(--glass-lowlight);
   transition: background 0.35s var(--ease-glass, ease), transform 0.35s var(--ease-glass, ease),
               box-shadow 0.35s var(--ease-glass, ease), border-color 0.25s ease;
 }
-.card, .hero-card, .year-hero, .bgt-hero, .bgt-item, .login-card, .inv-card, .settings-card {
+.card, .hero-card, .year-hero, .bgt-hero, .bgt-item, .login-card, .settings-card {
   border-radius: 26px;
   box-shadow: var(--depth-2-shadow), inset 0 1px 0 var(--glass-highlight), inset 0 -1px 0 var(--glass-lowlight);
 }
 .bgt-item, .catmodal-cat-card, .catmodal-type-card, .annual-item, .goal-square,
-.stats-summary-item, .detail-stat, .shortcut-token-section, .profile-guide-btn, .goals-empty {
+.stats-summary-item, .shortcut-token-section, .profile-guide-btn, .goals-empty {
   border-radius: 20px;
 }
 .bgt-item:active, .catmodal-cat-card:active, .catmodal-type-card:active {
@@ -2522,7 +2247,7 @@ html.light body, html.pastel body { background: var(--bg-grad); background-color
   backdrop-filter: blur(8px) saturate(120%);
 }
 @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
-.modal-sheet, .detail-sheet {
+.modal-sheet {
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
   border-bottom: none;
@@ -2572,7 +2297,7 @@ html.light body, html.pastel body { background: var(--bg-grad); background-color
 }
 
 /* ---- Botones circulares / secundarios ---- */
-.avatar-btn, .profile-back-btn, .add-tx-btn, .pending-btn, .hero-month-arrow, .detail-back-btn, .s-action-btn {
+.avatar-btn, .profile-back-btn, .add-tx-btn, .pending-btn, .hero-month-arrow, .s-action-btn {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow-sm), inset 0 1px 0 var(--glass-highlight);
@@ -2594,7 +2319,7 @@ html.light body, html.pastel body { background: var(--bg-grad); background-color
 .profile-logout-btn { border-radius: 18px; box-shadow: inset 0 1px 0 var(--glass-highlight); }
 
 /* ---- Chips, segmentados y toggles ---- */
-.search-filter-chip, .detail-range-btn, .s-segmented {
+.search-filter-chip, .s-segmented {
   background: var(--glass-bg-inner);
   border: 1px solid var(--glass-border);
   box-shadow: inset 0 1px 0 var(--glass-highlight);
@@ -2613,7 +2338,6 @@ html.light body, html.pastel body { background: var(--bg-grad); background-color
 .s-toggle { background: var(--glass-bg-inner); border: 1px solid var(--glass-border); box-shadow: inset 0 1px 2px var(--glass-lowlight); }
 .s-toggle.on { background: var(--accent); border-color: var(--accent); }
 .s-toggle-thumb { box-shadow: 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.8); }
-.detail-change-pill { border: 1px solid var(--glass-border); }
 html.pastel .s-seg-btn.active, html.light .s-seg-btn.active { background: var(--glass-bg-strong); }
 html.pastel .s-segmented, html.light .s-segmented { background: var(--glass-bg-inner); border-color: var(--glass-border); }
 html.pastel .s-toggle, html.light .s-toggle { background: var(--glass-bg-inner); }
@@ -2623,7 +2347,7 @@ html.pastel .concept-icon-wrap, html.light .concept-icon-wrap { background: var(
 
 /* ---- Fallback sin backdrop-filter: superficies casi opacas ---- */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .card, .hero-card, .year-hero, .bgt-hero, .bgt-item, .login-card, .inv-card, .settings-card, .shortcut-token-section, .profile-guide-btn, .catmodal-type-card, .catmodal-cat-card, .budget-fab, .bgt-month-btn, .goal-square, .annual-item, .stats-summary-item, .detail-stat, .goals-empty, .header, .bottom-nav, .profile-screen, .modal-sheet, .detail-sheet, .tour-tip, .toast, .chart-tooltip, .avatar-btn, .profile-back-btn, .add-tx-btn, .pending-btn, .hero-month-arrow, .detail-back-btn, .s-action-btn {
+  .card, .hero-card, .year-hero, .bgt-hero, .bgt-item, .login-card, .settings-card, .shortcut-token-section, .profile-guide-btn, .catmodal-type-card, .catmodal-cat-card, .budget-fab, .bgt-month-btn, .goal-square, .annual-item, .stats-summary-item, .goals-empty, .header, .bottom-nav, .profile-screen, .modal-sheet, .tour-tip, .toast, .chart-tooltip, .avatar-btn, .profile-back-btn, .add-tx-btn, .pending-btn, .hero-month-arrow, .s-action-btn {
     background: var(--glass-solid);
   }
   .modal-overlay { background: var(--glass-scrim); }
@@ -2631,7 +2355,7 @@ html.pastel .concept-icon-wrap, html.light .concept-icon-wrap { background: var(
 
 /* ---- Menos transparencia (preferencia del sistema) ---- */
 @media (prefers-reduced-transparency: reduce) {
-  .card, .hero-card, .year-hero, .bgt-hero, .bgt-item, .login-card, .inv-card, .settings-card, .shortcut-token-section, .profile-guide-btn, .catmodal-type-card, .catmodal-cat-card, .budget-fab, .bgt-month-btn, .goal-square, .annual-item, .stats-summary-item, .detail-stat, .goals-empty, .header, .bottom-nav, .profile-screen, .modal-sheet, .detail-sheet, .tour-tip, .toast, .chart-tooltip, .avatar-btn, .profile-back-btn, .add-tx-btn, .pending-btn, .hero-month-arrow, .detail-back-btn, .s-action-btn, .modal-overlay {
+  .card, .hero-card, .year-hero, .bgt-hero, .bgt-item, .login-card, .settings-card, .shortcut-token-section, .profile-guide-btn, .catmodal-type-card, .catmodal-cat-card, .budget-fab, .bgt-month-btn, .goal-square, .annual-item, .stats-summary-item, .goals-empty, .header, .bottom-nav, .profile-screen, .modal-sheet, .tour-tip, .toast, .chart-tooltip, .avatar-btn, .profile-back-btn, .add-tx-btn, .pending-btn, .hero-month-arrow, .s-action-btn, .modal-overlay {
     background: var(--glass-solid);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -2642,7 +2366,7 @@ html.pastel .concept-icon-wrap, html.light .concept-icon-wrap { background: var(
 /* ---- Menos movimiento ---- */
 @media (prefers-reduced-motion: reduce) {
   body::before { animation: none; }
-  .tab-panel, .modal-sheet, .detail-sheet, .modal-overlay, .tour-tip { animation: none; }
+  .tab-panel, .modal-sheet, .modal-overlay, .tour-tip { animation: none; }
   .profile-screen, .nav-icon-bg, .card, .bgt-item, .toast { transition-duration: 0.01ms; }
 }
 
@@ -2658,7 +2382,7 @@ html.pastel .concept-icon-wrap, html.light .concept-icon-wrap { background: var(
 
 /* Capas propias para las superficies con blur: aíslan el repintado */
 .header, .bottom-nav { isolation: isolate; transform: translateZ(0); }
-.modal-sheet, .detail-sheet, .tour-tip, .toast { isolation: isolate; }
+.modal-sheet, .tour-tip, .toast { isolation: isolate; }
 .modal-overlay, .profile-screen { contain: paint; }
 
 /* ---- Bordes con refracción: luz arriba-izquierda, sombra abajo-derecha ---- */
@@ -2962,7 +2686,7 @@ button, input, select, textarea { font-family: inherit; }
 input::placeholder, textarea::placeholder { color: var(--text3); opacity: 1; }
 
 /* Importes y cifras: tabulares, peso firme, tracking ligeramente negativo */
-.annual-item-amount, .breakdown-amount, .breakdown-pct, .catmodal-amount, .concept-amount, .detail-stat-value, .donut-value, .expense-amt, .income-amt, .forecast-stat-value, .forecast-value, .hero-balance-value, .hero-stat-value, .inv-return-pct, .inv-val-amount, .legend-amount, .legend-pct, .recur-amount, .report-stat-value, .saving-pct, .search-footer-total, .ss-value, .stats-forecast-value, .top-amount, .txlog-summary-total, .txlog-importe, .year-hero-balance, .year-hero-stat-value, .tour-progress, .bgt-pct-label {
+.annual-item-amount, .breakdown-amount, .breakdown-pct, .catmodal-amount, .concept-amount-value, .donut-value, .expense-amt, .income-amt, .forecast-stat-value, .forecast-value, .hero-balance-value, .hero-stat-value, .legend-amount, .legend-pct, .recur-amount, .report-stat-value, .saving-pct, .search-footer-total, .ss-value, .stats-forecast-value, .top-amount, .txlog-summary-total, .txlog-importe, .year-hero-balance, .year-hero-stat-value, .tour-progress, .bgt-pct-label {
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: 'tnum' 1, 'lnum' 1, 'cv11' 1;
@@ -2976,7 +2700,7 @@ input::placeholder, textarea::placeholder { color: var(--text3); opacity: 1; }
   font-weight: 700; letter-spacing: var(--ls-num);
 }
 .hero-stat-value, .year-hero-stat-value, .forecast-stat-value, .report-stat-value,
-.detail-stat-value, .stats-forecast-value, .ss-value, .forecast-value {
+.stats-forecast-value, .ss-value, .forecast-value {
   font-weight: var(--fw-num); letter-spacing: -0.02em;
 }
 /* Etiquetas pequeñas: peso medio, sin apagarse */

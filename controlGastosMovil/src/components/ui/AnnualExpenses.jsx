@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect } from 'react'
 import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
-import { fmt } from '../../utils'
+import { fmt, todayLocal } from '../../utils'
 import { MONTH_NAMES } from '../../data/mockData'
 import { ConfirmSheet } from './FormKit'
 import { FormSkeleton } from './Skeleton'
@@ -43,7 +43,7 @@ export default function AnnualExpenses() {
   // aviso esté activo — igual que las alertas de presupuesto ya existentes.
   useEffect(() => {
     if (notifPermission !== 'granted') return
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayLocal()
     const cache = notifCache.get()
     let changed = false
     expenses.forEach(exp => {

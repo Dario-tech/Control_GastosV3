@@ -11,6 +11,7 @@ import Toast from './components/ui/Toast'
 import { TabSkeleton, FormSkeleton } from './components/ui/Skeleton'
 import { usePendingTransaction } from './hooks/usePendingTransaction'
 import { useShortcutIntake } from './hooks/useShortcutIntake'
+import { useTxQueue } from './hooks/useTxQueue'
 import LoginScreen from './components/auth/LoginScreen'
 import IntakeLoginBanner from './components/auth/IntakeLoginBanner'
 import YearTab from './components/tabs/YearTab'
@@ -66,7 +67,8 @@ class ErrorBoundary extends Component {
 function AppContent() {
   const { activeTab, showToast } = useApp()
   const { settings, tourSeen, prefsLoaded, syncNotice, syncWarnings } = useSettings()
-  const txWarning = unreadableTxMsg(useFinanceData()?.unreadableTx)
+  const finance = useFinanceData()
+  const txWarning = unreadableTxMsg(finance?.unreadableTx)
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [categorizeOpen, setCategorizeOpen] = useState(false)
   const [addOpen,        setAddOpen]        = useState(false)
@@ -74,6 +76,8 @@ function AppContent() {
   const { queue, fetchQueue, categorizePending, discardPending } = usePendingTransaction()
   // Pagos de Apple Pay que llegan por URL desde el Atajo de iOS (?atajo=1…)
   const intake = useShortcutIntake({ onChange: fetchQueue })
+  // Movimientos guardados sin conexión: se reenvían al volver la red
+  useTxQueue({ onChange: finance?.refresh })
 
   const current = queue[0] ?? null
 

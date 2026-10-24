@@ -4,9 +4,9 @@ import { useSettings } from '../../context/SettingsContext'
 import { useCategories } from '../../hooks/useCategories'
 import { updateTransaction, deleteTransaction } from '../../services/api'
 import { TYPES, combineCategories, categoryKey, normalizeCategoryName } from '../../data/categories'
-import { fmt } from '../../utils'
+import { fmt, todayLocal, addDaysLocal } from '../../utils'
 import {
-  draftFromTx, validateDraft, buildTransactionPatch, parseAmount, dayLabel, localISODate,
+  draftFromTx, validateDraft, buildTransactionPatch, parseAmount, dayLabel,
 } from '../../utils/txlog'
 import {
   FormScreen, Field, Section, AmountInput, Chips, Segmented, PrimaryButton, DangerButton, ConfirmSheet, Icon,
@@ -64,9 +64,8 @@ export default function TransactionEditModal({ tx, emoji, onClose, onSaved, onDe
   const amtOk    = amtNum > 0
   const canSave  = changed && !invalid && !saving
 
-  const hoy  = localISODate()
-  const ayerD = new Date(); ayerD.setDate(ayerD.getDate() - 1)
-  const ayer = localISODate(ayerD)
+  const hoy  = todayLocal()
+  const ayer = addDaysLocal(-1)
   const dateMode = draft.fecha === hoy ? 'hoy' : draft.fecha === ayer ? 'ayer' : 'otra'
 
   function set(field, value) {

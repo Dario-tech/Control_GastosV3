@@ -1,3 +1,19 @@
+/** "YYYY-MM-DD" con la fecha LOCAL del dispositivo (no UTC: tras medianoche toISOString da otro día). */
+export function localISODate(d = new Date()) {
+  const p = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+/** Fecha local de hoy en "YYYY-MM-DD". */
+export function todayLocal(now = new Date()) {
+  return localISODate(now)
+}
+
+/** Fecha local desplazada `days` días (negativo = atrás), por calendario: seguro con cambios de hora. */
+export function addDaysLocal(days, from = new Date()) {
+  return localISODate(new Date(from.getFullYear(), from.getMonth(), from.getDate() + days))
+}
+
 export function fmt(n, decimals = 0) {
   return new Intl.NumberFormat('es-ES', {
     style: 'currency',

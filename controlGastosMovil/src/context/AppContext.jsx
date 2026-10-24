@@ -7,10 +7,13 @@ export function AppProvider({ children }) {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [activeTab, setActiveTab] = useState('year')
   const [toast, setToast] = useState(null)
+  const [toastIsError, setToastIsError] = useState(false)
 
-  const showToast = useCallback((msg) => {
+  // `opts.error` marca el aviso como error (role="alert" para lectores de pantalla).
+  const showToast = useCallback((msg, opts) => {
     setToast(msg)
-    setTimeout(() => setToast(null), 2500)
+    setToastIsError(!!opts?.error)
+    setTimeout(() => setToast(null), opts?.error ? 4500 : 2500)
   }, [])
 
   const goToMonth = useCallback((monthIndex, year) => {
@@ -24,7 +27,7 @@ export function AppProvider({ children }) {
       selectedMonth, setSelectedMonth,
       selectedYear, setSelectedYear,
       activeTab, setActiveTab,
-      toast, showToast,
+      toast, toastIsError, showToast,
       goToMonth,
     }}>
       {children}

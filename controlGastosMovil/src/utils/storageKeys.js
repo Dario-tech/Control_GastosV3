@@ -17,6 +17,9 @@ export const ANNUAL_NOTIF_KEY  = 'mi-economia-annual-notif-v1'
 // Gastos recibidos del Atajo de iOS (Apple Pay) que aún no se han podido
 // enviar al backend (sin conexión, servidor dormido o sin sesión iniciada).
 export const SHORTCUT_QUEUE_KEY = 'mi-economia-shortcut-queue-v1'
+// Movimientos de "Nuevo movimiento" que no se pudieron enviar por falta de
+// conexión (se reintentan con el mismo id de cliente para no duplicar).
+export const TX_QUEUE_KEY = 'mi-economia-tx-queue-v1'
 
 // Claves antiguas pendientes de importar al servidor.
 export const BUDGET_KEY        = 'mi-economia-budget-v3'
@@ -46,6 +49,7 @@ export const USER_DATA_KEYS = [
   BUDGET_NOTIF_KEY,
   ANNUAL_NOTIF_KEY,
   SHORTCUT_QUEUE_KEY,
+  TX_QUEUE_KEY,
 ]
 
 // Sesión caducada (401): solo se pierde el token y la caché de finanzas.

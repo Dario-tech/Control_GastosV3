@@ -1,16 +1,15 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
 import { postTransaction, suggestEmoji } from '../../services/api'
 import { TYPES, EMOJI_SUGGESTIONS, combineCategories, categoryExists, categoryKey } from '../../data/categories'
-import { isUnusualAmount, fmt } from '../../utils'
+import { isUnusualAmount, fmt, todayLocal, addDaysLocal } from '../../utils'
 import { FormScreen, Field, Section, AmountInput, Chips, PrimaryButton, Icon } from './FormKit'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import { useCategories } from '../../hooks/useCategories'
-
-function today() {
-  return new Date().toISOString().slice(0, 10)
-}
+import { useApp } from '../../context/AppContext'
+import { newId } from '../../utils/id'
+import { classifyTxError, txErrorMessage, enqueueTx, MSG_OFFLINE } from '../../utils/txQueue'
 
 export const DUPLICATE_CAT_MSG = 'Ya existe una categoría con ese nombre'
 
@@ -21,7 +20,7 @@ export default function AddTransactionModal({ onClose }) {
   const [showDate, setShowDate] = useState(false)
   const [tipo, setTipo]         = useState(null)
   const [importe, setImporte]   = useState('')
-  const [fecha, setFecha]       = useState(today())
+  const [fecha, setFecha]       = useState(todayLocal())
   const [comentario, setComentario] = useState('')
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState(null)
@@ -34,6 +33,10 @@ export default function AddTransactionModal({ onClose }) {
   const [suggesting, setSuggesting] = useState(false)
 
   const { refresh, data }    = useFinanceData()
+  const { showToast }        = useApp()
+  // Id de cliente: uno por formulario abierto; se reutiliza en cualquier reintento.
+  const clientId             = useRef(null)
+  if (!clientId.current) clientId.current = newId()
   const { customCategories, addCategory } = useSettings()
   const DEFAULT_CATEGORIES = useCategories()
 
@@ -45,15 +48,19 @@ export default function AddTransactionModal({ onClose }) {
     setLoading(true)
     setError(null)
     try {
-      await postTransaction(amt, tipo, concepto, fecha, comentario.trim() || null)
+      await postTransaction(amt, tipo, concepto, fecha, comentario.trim() || null, clientId.current)
       refresh()
       onClose()
     } catch (err) {
-      setError(
-        err?.name === 'TimeoutError' || err?.name === 'AbortError'
-          ? 'El servidor está despertando, puede tardar unos segundos. Vuelve a intentarlo.'
-          : 'Error al guardar. Inténtalo de nuevo.'
-      )
+      if (classifyTxError(err) === 'offline') {
+        // Red / timeout / servidor dormido: se guarda en la cola con el mismo
+        // id y se reenvía solo al volver la conexión (sin duplicar).
+        enqueueTx({ id: clientId.current, importe: amt, tipo, concepto, fecha, comentario: comentario.trim() || null })
+        showToast(MSG_OFFLINE)
+        onClose()
+        return
+      }
+      setError(txErrorMessage(err))
       setLoading(false)
     }
   }
@@ -88,8 +95,8 @@ export default function AddTransactionModal({ onClose }) {
   const allCats = tipo ? combineCategories(DEFAULT_CATEGORIES[tipo], customCategories[tipo]) : []
   const amtNum = parseFloat(String(importe).replace(',', '.'))
   const amtOk  = amtNum > 0
-  const hoy    = today()
-  const ayer   = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  const hoy    = todayLocal()
+  const ayer   = addDaysLocal(-1)
   const dateMode = fecha === hoy ? 'hoy' : fecha === ayer ? 'ayer' : 'otra'
   const unusualSel = selected && amtOk ? isUnusualAmount(data, selected, amtNum) : null
   const tipoMeta = TYPES.find(t => t.id === tipo)

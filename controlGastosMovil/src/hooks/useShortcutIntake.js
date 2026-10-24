@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createPending } from '../services/api'
+import { todayLocal } from '../utils'
 import { useApp } from '../context/AppContext'
 import {
   captureIntakeFromUrl, loadIntakeQueue, enqueueIntake, removeIntake, isRetryableError,
@@ -9,11 +10,6 @@ import {
 // eventos (visibilidad, online, pageshow) pueden llegar casi a la vez; así
 // nunca hay dos envíos de la cola en paralelo.
 let processing = false
-
-function todayISO() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 /* Recibe los pagos de Apple Pay que llegan por URL desde el Atajo de iOS
    (?atajo=1&importe=…&comercio=…), los envía como pendientes y abre la hoja
@@ -41,7 +37,7 @@ export function useShortcutIntake({ onChange } = {}) {
             id:        res.id,
             importe:   res.importe ?? item.importe,
             comercio:  res.comercio ?? item.comercio,
-            fecha:     String(res.fecha ?? item.fecha ?? todayISO()).slice(0, 10),
+            fecha:     String(res.fecha ?? item.fecha ?? todayLocal()).slice(0, 10),
             suggested: res.sugerencia ?? null,
             fuente:    'wallet',
           })

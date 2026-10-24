@@ -10,7 +10,7 @@ const TABS = [
     icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>,
   },
   {
-    id: 'stats', label: 'Stats',
+    id: 'stats', label: 'Estadísticas',
     icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>,
   },
   {
@@ -30,6 +30,7 @@ export default function BottomNav({ onTabChange }) {
   return (
     <nav
       className="bottom-nav"
+      aria-label="Secciones"
       style={{ '--i': Math.max(0, TABS.findIndex(t => t.id === activeTab)), '--tabs': TABS.length }}
     >
       <span className="nav-drop" aria-hidden="true">
@@ -42,6 +43,7 @@ export default function BottomNav({ onTabChange }) {
           data-tour={`tab-${tab.id}`}
           onClick={() => handleTab(tab.id)}
           aria-label={tab.label}
+          aria-current={activeTab === tab.id ? 'page' : undefined}
         >
           <div className="nav-icon-bg">{tab.icon}</div>
           <span className="nav-label">{tab.label}</span>

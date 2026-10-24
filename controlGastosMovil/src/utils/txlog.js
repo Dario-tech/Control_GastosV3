@@ -3,6 +3,7 @@
 // del cuerpo parcial del PATCH. Sin React ni API, para poder testearla aislada.
 
 import { MONTH_NAMES } from '../data/mockData'
+import { localISODate } from './index'
 
 const WEEKDAYS       = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 const WEEKDAYS_SHORT = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
@@ -24,11 +25,7 @@ export function tipoToBucket(tipo) {
   return TIPO_TO_BUCKET[tipo] || 'variableExpenses'
 }
 
-/** Fecha local de hoy en "YYYY-MM-DD" (no UTC: a medianoche toISOString se va al día anterior/siguiente). */
-export function localISODate(d = new Date()) {
-  const p = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
+export { localISODate }
 
 function parseISO(fecha) {
   const [y, m, d] = String(fecha || '').slice(0, 10).split('-').map(Number)
