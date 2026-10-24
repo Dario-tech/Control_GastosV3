@@ -226,3 +226,32 @@ def test_mensajes_en_espanol(client, auth_headers, db):
 
 def test_endpoint_comment_sigue_existiendo(client):
     assert client.patch("/api/transactions/7/comment", json={"comentario": "x"}).status_code == 401
+
+
+# ── Regresión (QA local con estructura de PROD, rama fix/qa-mejoras) ────────
+# Un importe finito pero enorme (≥ 1e26: 1e26, 1e300, 10**26) no da OverflowError
+# en float(), así que llega a redondear_importe(), que lanza ValueError al
+# cuantizar (InvalidOperation) y _validate_tx_patch no la captura → 500 en vez
+# de 422. El POST /api/transaction sí la captura (validar_importe en try).
+# Fallo de la app pendiente de arreglo (backend): quitar el xfail al arreglarlo.
+
+@pytest.mark.xfail(strict=True, reason="PATCH con importe ≥ 1e26 da 500 en vez de 422 (pendiente de arreglo)")
+@pytest.mark.parametrize("raw", ["1e26", "1e300", "100000000000000000000000000"])
+def test_importe_enorme_finito_422_no_500(client, auth_headers, db, broadcasts, raw):
+    r = client.patch("/api/transactions/7", headers={**auth_headers, "Content-Type": "application/json"},
+                     content='{"importe": %s}' % raw)
+    assert r.status_code == 422
+    assert "1.000.000" in r.json()["detail"]
+    assert db.executed == [] and broadcasts == []
+
+
+@pytest.mark.parametrize("raw", ["1e300", "1e26", "1000001", "100000000"])
+def test_post_importe_enorme_422(client, auth_headers, monkeypatch, raw):
+    import main
+
+    async def no_debe_llamarse(*a, **k):
+        raise AssertionError("no debe llegar a la BD")
+    monkeypatch.setattr(main, "post_transaction", no_debe_llamarse)
+    r = client.post("/api/transaction", headers={**auth_headers, "Content-Type": "application/json"},
+                    content='{"importe": %s, "tipo": "Gasto Variable", "concepto": "X"}' % raw)
+    assert r.status_code == 422
