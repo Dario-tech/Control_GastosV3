@@ -32,16 +32,22 @@ describe('CategorizeModal con comercio', () => {
     expect(screen.getByText(/12,40/)).toBeTruthy()
   })
 
-  it('sugerencia por historial muestra "✨ Sugerido" y sin comercio no hay casilla de recordar', () => {
+  it('sugerencia del diccionario muestra "✨ Sugerido por comercio"', () => {
+    renderModal({ ...base, comercio: 'Zara', suggested: sug('diccionario') })
+    expect(screen.getByText('✨ Sugerido por comercio')).toBeTruthy()
+  })
+
+  it('sugerencia por historial muestra "✨ Por tu historial" y sin comercio no hay casilla de recordar', () => {
     renderModal({ ...base, comercio: null, suggested: sug('historial') })
-    expect(screen.getByText('✨ Sugerido')).toBeTruthy()
+    expect(screen.getByText('✨ Por tu historial')).toBeTruthy()
     expect(screen.queryByLabelText('Recordar para este comercio')).toBeNull()
   })
 
   it('suggestionBadge según origen', () => {
     expect(suggestionBadge(sug('comercio'), 'Lidl')).toBe('✨ Como la última vez en Lidl')
-    expect(suggestionBadge(sug('comercio'), null)).toBe('✨ Sugerido')
-    expect(suggestionBadge(sug('historial'), 'Lidl')).toBe('✨ Sugerido')
+    expect(suggestionBadge(sug('comercio'), null)).toBe('✨ Aprendido de ti')
+    expect(suggestionBadge(sug('diccionario'), 'Zara')).toBe('✨ Sugerido por comercio')
+    expect(suggestionBadge(sug('historial'), 'Lidl')).toBe('✨ Por tu historial')
     expect(suggestionBadge({ tipo: 'x', concepto: 'y' }, 'Lidl')).toBe('✨ Sugerido')
   })
 

@@ -1,6 +1,9 @@
+import json
+
 from fastapi import HTTPException
 from .db import db_cursor, run_in_thread
 from .suggest import suggest_category
+from .merchant_dict import clave_marca, match_comercio, suggest_from_dictionary
 from .crypto import encrypt_str, encrypt_float, decrypt_str, decrypt_transaction, hmac_tag
 from .wallet import normalize_merchant
 from . import legacy_plain
@@ -42,6 +45,15 @@ def merchant_tag(comercio: str | None) -> bytes | None:
     return hmac_tag("comercio:" + norm) if norm else None
 
 
+def brand_tag(comercio: str | None) -> bytes | None:
+    """HMAC de la MARCA reconocida por el diccionario (None si no es una marca
+    conocida). Segunda clave de las reglas aprendidas: lo que el usuario enseña con
+    «ZARA MADRID» vale también para «ZARA 0123 SEVILLA». Va después de la clave
+    exacta del comercio, que siempre tiene prioridad."""
+    marca = clave_marca(comercio) if comercio else None
+    return hmac_tag("marca:" + marca) if marca else None
+
+
 def id_externo_tag(id_externo: str | None) -> bytes | None:
     return hmac_tag("id_externo:" + id_externo) if id_externo else None
 
@@ -80,6 +92,37 @@ def _rule_to_suggestion(rule) -> dict | None:
     return {"tipo": rule["tipo"], "concepto": concepto, "confidence": 1.0, "origen": "comercio"}
 
 
+def _fetch_user_categories(cur, email: str) -> tuple[list[dict], list[dict]]:
+    """(categorías propias, categorías por defecto ocultas) del usuario, descifradas.
+    Lo que no se pueda descifrar se ignora: la sugerencia solo se vuelve menos precisa."""
+    cur.execute("SELECT tipo, concepto_enc FROM user_categories WHERE user_email = %s", (email,))
+    propias = []
+    for r in cur.fetchall():
+        nombre = _decrypt_or_none(r["concepto_enc"])
+        if nombre:
+            propias.append({"tipo": r["tipo"], "concepto": nombre})
+    cur.execute("SELECT data_enc FROM user_prefs WHERE user_email = %s AND kind = 'hidden_categories'", (email,))
+    row = cur.fetchone()
+    ocultas = []
+    if row:
+        try:
+            data = json.loads(decrypt_str(bytes(row["data_enc"])))
+            ocultas = [o for o in data if isinstance(o, dict)] if isinstance(data, list) else []
+        except Exception:
+            ocultas = []
+    return propias, ocultas
+
+
+def _regla_de(pend: dict, comercio: str | None, reglas) -> bytes | None:
+    """Clave de la regla aprendida que aplica a este pendiente (la del comercio exacto
+    primero, luego la de su marca), o None. `reglas`: conjunto/dict de claves existentes."""
+    exacta = pend.get("comercio_hmac")
+    if exacta and bytes(exacta) in reglas:
+        return bytes(exacta)
+    marca = brand_tag(comercio)
+    return marca if marca and marca in reglas else None
+
+
 # ── Crear ─────────────────────────────────────────────────────────────────────
 
 async def create_pending(email: str, importe: float, fecha: str | None = None,
@@ -114,6 +157,7 @@ async def create_pending_dedup(email: str, importe: float, fecha: str, comercio:
     Un advisory lock por usuario serializa las peticiones simultáneas para que
     dos reintentos paralelos no creen dos filas."""
     c_hmac = merchant_tag(comercio)
+    b_hmac = brand_tag(comercio)
     ide_hmac = id_externo_tag(id_externo)
     comercio_enc = encrypt_str(comercio) if comercio else None
     dedup_reciente = c_hmac is not None or fuente == "wallet"
@@ -147,16 +191,22 @@ async def create_pending_dedup(email: str, importe: float, fecha: str, comercio:
                 row, duplicada = dict(cur.fetchone()), False
                 row["comercio"] = comercio
 
-            # Sugerencia: a) regla aprendida por comercio; b) historial.
+            # Sugerencia, por orden: a) regla aprendida del usuario (siempre manda);
+            # b) diccionario de comercios conocidos; c) historial por importe.
             sugerencia = None
-            if c_hmac is not None:
+            for tag in (c_hmac, b_hmac):
+                if tag is None or sugerencia is not None:
+                    continue
                 cur.execute(
                     "SELECT tipo, concepto_enc FROM merchant_rules WHERE user_email = %s AND comercio_hmac = %s",
-                    (email, c_hmac),
+                    (email, tag),
                 )
                 rule = cur.fetchone()
                 if rule:
                     sugerencia = _rule_to_suggestion(rule)
+            if sugerencia is None and match_comercio(comercio):
+                propias, ocultas = _fetch_user_categories(cur, email)
+                sugerencia = suggest_from_dictionary(comercio, propias, ocultas)
             if sugerencia is None:
                 hist = _fetch_history(cur, email)
                 s = suggest_category(hist, float(row["importe"]))
@@ -186,13 +236,16 @@ async def get_pending(email: str) -> list:
                 (email,),
             )
             pending = cur.fetchall()
+            comercios = [_decrypt_or_none(p.get("comercio_enc")) for p in pending]
             # Historial del usuario para sugerir categoría (una sola query)
             cur.execute(
                 "SELECT id, tipo, concepto_enc, importe_enc FROM transactions WHERE user_email = %s",
                 (email,),
             )
             history = cur.fetchall()
-            tags = list({bytes(p["comercio_hmac"]) for p in pending if p.get("comercio_hmac")})
+            tags = {bytes(p["comercio_hmac"]) for p in pending if p.get("comercio_hmac")}
+            tags |= {t for t in (brand_tag(c) for c in comercios) if t}
+            tags = list(tags)
             rules = []
             if tags:
                 cur.execute(
@@ -201,25 +254,32 @@ async def get_pending(email: str) -> list:
                     (email, tags),
                 )
                 rules = cur.fetchall()
-            return pending, history, rules
+            # Categorías del usuario solo si algún pendiente sin regla puede casar con el diccionario
+            ruled = {bytes(r["comercio_hmac"]) for r in rules}
+            cats = None
+            if any(match_comercio(c) and not _regla_de(p, c, ruled) for p, c in zip(pending, comercios)):
+                cats = _fetch_user_categories(cur, email)
+            return pending, comercios, history, rules, cats
 
-    pending, history, rules = await run_in_thread(_q)
+    pending, comercios, history, rules, cats = await run_in_thread(_q)
     history = _decrypt_history(history)
     rules_by_tag = {bytes(r["comercio_hmac"]): r for r in rules}
 
     result = []
-    for r in pending:
+    for r, comercio in zip(pending, comercios):
         item = {
             "id": r["id"],
             "importe": r["importe"],
             "fecha": r["fecha"],
-            "comercio": _decrypt_or_none(r.get("comercio_enc")),
+            "comercio": comercio,
             "fuente": r.get("fuente"),
         }
         suggested = None
-        tag = r.get("comercio_hmac")
-        if tag and bytes(tag) in rules_by_tag:
-            suggested = _rule_to_suggestion(rules_by_tag[bytes(tag)])
+        tag = _regla_de(r, comercio, rules_by_tag)
+        if tag:
+            suggested = _rule_to_suggestion(rules_by_tag[tag])
+        if suggested is None and cats is not None:
+            suggested = suggest_from_dictionary(item["comercio"], *cats)
         if suggested is None:
             try:
                 s = suggest_category(history, float(item["importe"]))
@@ -242,7 +302,7 @@ async def categorize_pending(pending_id: int, email: str, tipo: str, concepto: s
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                "SELECT importe, fecha, comercio_hmac FROM pending_transactions "
+                "SELECT importe, fecha, comercio_hmac, comercio_enc FROM pending_transactions "
                 "WHERE id = %s AND user_email = %s",
                 (pending_id, email),
             )
@@ -277,14 +337,21 @@ async def categorize_pending(pending_id: int, email: str, tipo: str, concepto: s
             tx = cur.fetchone()
             c_hmac = row.get("comercio_hmac")
             if recordar and c_hmac:
-                cur.execute(
-                    """INSERT INTO merchant_rules (user_email, comercio_hmac, tipo, concepto_enc, hits, updated_at)
-                       VALUES (%s, %s, %s, %s, 1, now())
-                       ON CONFLICT (user_email, comercio_hmac) DO UPDATE SET
-                           tipo = EXCLUDED.tipo, concepto_enc = EXCLUDED.concepto_enc,
-                           hits = merchant_rules.hits + 1, updated_at = now()""",
-                    (email, bytes(c_hmac), tipo, concepto_enc),
-                )
+                # Regla del comercio exacto y, si es una marca conocida, también la de la marca
+                # (así corregir «Zara Madrid» sirve para «Zara Sevilla»).
+                tags = [bytes(c_hmac)]
+                marca = brand_tag(_decrypt_or_none(row.get("comercio_enc")))
+                if marca and marca not in tags:
+                    tags.append(marca)
+                for tag in tags:
+                    cur.execute(
+                        """INSERT INTO merchant_rules (user_email, comercio_hmac, tipo, concepto_enc, hits, updated_at)
+                           VALUES (%s, %s, %s, %s, 1, now())
+                           ON CONFLICT (user_email, comercio_hmac) DO UPDATE SET
+                               tipo = EXCLUDED.tipo, concepto_enc = EXCLUDED.concepto_enc,
+                               hits = merchant_rules.hits + 1, updated_at = now()""",
+                        (email, tag, tipo, concepto_enc),
+                    )
             cur.execute(
                 "DELETE FROM pending_transactions WHERE id = %s AND user_email = %s",
                 (pending_id, email),

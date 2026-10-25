@@ -12,11 +12,16 @@ function formatDate(dateStr) {
   try { return DATE_FMT.format(new Date(dateStr + 'T12:00:00')) } catch { return dateStr }
 }
 
-// Texto de la etiqueta de sugerencia según de dónde salga: regla aprendida para
-// ese comercio, o adivinada por el historial (importe/fecha parecidos).
+// Texto de la etiqueta de sugerencia según de dónde salga: aprendida de lo que
+// el usuario eligió en ese comercio, del diccionario de comercios conocidos, o
+// adivinada por el historial (importe parecido).
 export function suggestionBadge(suggested, comercio) {
-  if (suggested?.origen === 'comercio' && comercio) return `✨ Como la última vez en ${comercio}`
-  return '✨ Sugerido'
+  switch (suggested?.origen) {
+    case 'comercio': return comercio ? `✨ Como la última vez en ${comercio}` : '✨ Aprendido de ti'
+    case 'diccionario': return '✨ Sugerido por comercio'
+    case 'historial': return '✨ Por tu historial'
+    default: return '✨ Sugerido'
+  }
 }
 
 /* variant="received": hoja "Gasto recibido" que se abre al llegar un pago del

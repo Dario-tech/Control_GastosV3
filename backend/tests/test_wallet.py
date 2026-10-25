@@ -136,6 +136,8 @@ class FakeDB:
         self.pending: list[dict] = []
         self.transactions: list[dict] = []
         self.rules: dict[tuple, dict] = {}
+        self.user_cats: list[dict] = []          # {user_email, tipo, concepto_enc}
+        self.prefs: dict[tuple, bytes] = {}      # (email, kind) -> data_enc
         self.users = {EMAIL: TOKEN, OTRO: "tok-del-otro-usuario-0123456789"}
         self._seq = 100
         self.sql: list[str] = []
@@ -195,6 +197,13 @@ class FakeCursor:
             db.pending.append(row)
             self._res = [{"id": row["id"], "fecha": fecha, "importe": importe}]
             return
+        if q.startswith("SELECT tipo, concepto_enc FROM user_categories"):
+            self._res = [c for c in db.user_cats if c["user_email"] == params[0]]
+            return
+        if q.startswith("SELECT data_enc FROM user_prefs"):
+            d = db.prefs.get((params[0], "hidden_categories"))
+            self._res = [{"data_enc": d}] if d is not None else []
+            return
         if q.startswith("SELECT tipo, concepto_enc FROM merchant_rules"):
             r = db.rules.get((params[0], bytes(params[1])))
             self._res = [r] if r else []
@@ -211,7 +220,7 @@ class FakeCursor:
             self._res = [dict(r, comercio_hmac=k[1]) for k, r in db.rules.items()
                          if k[0] == email and k[1] in tags]
             return
-        if q.startswith("SELECT importe, fecha, comercio_hmac FROM pending_transactions"):
+        if q.startswith("SELECT importe, fecha, comercio_hmac, comercio_enc FROM pending_transactions"):
             pid, email = params
             self._res = [p for p in db.pending if p["id"] == pid and p["user_email"] == email]
             return
@@ -490,7 +499,7 @@ def test_shortcut_pending_antiguo_usa_fecha_o_hoy_madrid(client, db, broadcasts,
 # ── Sugerencia: regla por comercio vs historial ───────────────────────────────
 
 def test_sin_historial_ni_regla(post, db, broadcasts):
-    assert post({"importe": "12,30", "comercio": "Mercadona"}).json()["sugerencia"] is None
+    assert post({"importe": "12,30", "comercio": "Taller Paco"}).json()["sugerencia"] is None
 
 
 def test_sugerencia_por_historial(post, db, broadcasts):
@@ -509,9 +518,9 @@ def test_sugerencia_por_regla_tiene_prioridad(post, db, broadcasts):
 
 
 def test_regla_de_otro_usuario_no_aplica(post, db, broadcasts):
-    db.rules[(OTRO, pending_mod.merchant_tag("Mercadona"))] = {
-        "tipo": "Gasto Variable", "concepto_enc": crypto.encrypt_str("Comida"), "hits": 1}
-    assert post({"importe": 1, "comercio": "Mercadona"}).json()["sugerencia"] is None
+    db.rules[(OTRO, pending_mod.merchant_tag("Taller Paco"))] = {
+        "tipo": "Gasto Variable", "concepto_enc": crypto.encrypt_str("Ocio"), "hits": 1}
+    assert post({"importe": 1, "comercio": "Taller Paco"}).json()["sugerencia"] is None
 
 
 # ── GET /api/pending ──────────────────────────────────────────────────────────
@@ -702,3 +711,125 @@ def test_get_token_exige_jwt(client, db):
 def test_get_token_rate_limit(client, db, auth_headers):
     codes = [client.get("/api/shortcut/token", headers=auth_headers).status_code for _ in range(21)]
     assert codes[:20] == [200] * 20 and codes[20] == 429
+
+
+# ── Sugerencia por diccionario de comercios: prioridad y categorías del usuario ──
+
+def _cat_propia(db, email, tipo, nombre):
+    db.user_cats.append({"user_email": email, "tipo": tipo, "concepto_enc": crypto.encrypt_str(nombre)})
+
+
+def _ocultar(db, email, lista):
+    import json
+    db.prefs[(email, "hidden_categories")] = crypto.encrypt_str(json.dumps(lista))
+
+
+def test_diccionario_sugiere_sin_regla_ni_historial(post, db, broadcasts):
+    j = post({"importe": 12.3, "comercio": "ZARA 0123 MADRID", "fuente": "wallet"}).json()
+    assert j["sugerencia"] == {"tipo": "Gasto Variable", "concepto": "Ropa", "origen": "diccionario"}
+
+
+def test_diccionario_gana_al_historial(post, db, broadcasts):
+    db.transactions.append(_tx(EMAIL, "Gasto Variable", "Ocio", 12.0))
+    j = post({"importe": 12.3, "comercio": "Mercadona"}).json()
+    assert j["sugerencia"]["origen"] == "diccionario" and j["sugerencia"]["concepto"] == "Comida"
+
+
+def test_regla_del_usuario_gana_al_diccionario(post, db, broadcasts):
+    db.rules[(EMAIL, pending_mod.merchant_tag("Zara Madrid"))] = {
+        "tipo": "Gasto Variable", "concepto_enc": crypto.encrypt_str("Ocio"), "hits": 2}
+    j = post({"importe": 30, "comercio": "ZARA 0123 MADRID"}).json()
+    assert j["sugerencia"] == {"tipo": "Gasto Variable", "concepto": "Ocio", "origen": "comercio"}
+
+
+def test_sin_dato_del_diccionario_sigue_el_historial(post, db, broadcasts):
+    db.transactions.append(_tx(EMAIL, "Gasto Variable", "Ocio", 12.0))
+    j = post({"importe": 12.3, "comercio": "Taller Paco"}).json()
+    assert j["sugerencia"]["origen"] == "historial"
+
+
+def test_categoria_propia_y_oculta_del_usuario(post, db, broadcasts):
+    _cat_propia(db, EMAIL, "Gasto Variable", "Supermercado")
+    _cat_propia(db, OTRO, "Gasto Variable", "Ajena")
+    _ocultar(db, EMAIL, [{"tipo": "Gasto Variable", "concepto": "Ropa"}])
+    j = post({"importe": 5, "comercio": "Alcampo"}).json()
+    assert j["sugerencia"] == {"tipo": "Gasto Variable", "concepto": "Supermercado", "origen": "diccionario"}
+    # Ropa está oculta y no hay propia: no hay sugerencia del diccionario ni historial
+    assert post({"importe": 5, "comercio": "Zara"}).json()["sugerencia"] is None
+
+
+def test_categorias_de_otro_usuario_no_se_usan(post, db, broadcasts):
+    _cat_propia(db, OTRO, "Gasto Variable", "Supermercado")
+    j = post({"importe": 5, "comercio": "Lidl"}).json()
+    assert j["sugerencia"]["concepto"] == "Comida"
+
+
+def test_pref_oculta_ilegible_no_rompe(post, db, broadcasts):
+    db.prefs[(EMAIL, "hidden_categories")] = b"basura-no-cifrada"
+    assert post({"importe": 5, "comercio": "Lidl"}).json()["sugerencia"]["concepto"] == "Comida"
+
+
+def test_corregir_la_sugerencia_gana_la_proxima_vez(client, post, db, broadcasts, auth_headers):
+    pid = post({"importe": 20, "comercio": "Decathlon 0099"}).json()
+    assert pid["sugerencia"]["concepto"] == "Ocio" and pid["sugerencia"]["origen"] == "diccionario"
+    # El usuario no acepta «Ocio» y elige «Ropa» (también para otra tienda de la marca)
+    client.post(f"/api/pending/{pid['id']}/categorize", headers=auth_headers,
+                json={"tipo": "Gasto Variable", "concepto": "Ropa"})
+    db.now += timedelta(minutes=5)
+    j = post({"importe": 25, "comercio": "DECATHLON MADRID"}).json()
+    assert j["sugerencia"] == {"tipo": "Gasto Variable", "concepto": "Ropa", "origen": "comercio"}
+
+
+def test_correccion_vale_para_otra_tienda_de_la_misma_marca(client, post, db, broadcasts, auth_headers):
+    p = post({"importe": 20, "comercio": "ZARA MADRID"}).json()
+    client.post(f"/api/pending/{p['id']}/categorize", headers=auth_headers,
+                json={"tipo": "Gasto Variable", "concepto": "Regalos"})
+    db.now += timedelta(minutes=5)
+    j = post({"importe": 25, "comercio": "ZARA 0456 SEVILLA"}).json()
+    assert j["sugerencia"] == {"tipo": "Gasto Variable", "concepto": "Regalos", "origen": "comercio"}
+    # otra marca no se contagia
+    assert post({"importe": 25, "comercio": "BERSHKA SEVILLA"}).json()["sugerencia"]["concepto"] == "Ropa"
+
+
+def test_correccion_con_palabra_generica_no_se_comparte(client, post, db, broadcasts, auth_headers):
+    p = post({"importe": 8, "comercio": "FARMACIA LOPEZ"}).json()
+    assert p["sugerencia"]["concepto"] == "Variado"
+    client.post(f"/api/pending/{p['id']}/categorize", headers=auth_headers,
+                json={"tipo": "Gasto Variable", "concepto": "Salud"})
+    assert len(db.rules) == 1  # solo la regla del comercio exacto
+    db.now += timedelta(minutes=5)
+    assert post({"importe": 8, "comercio": "FARMACIA LOPEZ"}).json()["sugerencia"]["origen"] == "comercio"
+    assert post({"importe": 8, "comercio": "FARMACIA GOMEZ"}).json()["sugerencia"]["origen"] == "diccionario"
+
+
+def test_get_pending_regla_de_marca(client, post, db, broadcasts, auth_headers):
+    p = post({"importe": 20, "comercio": "ZARA MADRID", "fuente": "wallet"}).json()
+    client.post(f"/api/pending/{p['id']}/categorize", headers=auth_headers,
+                json={"tipo": "Gasto Variable", "concepto": "Regalos"})
+    post({"importe": 25, "comercio": "ZARA SEVILLA", "fuente": "wallet"})
+    s = client.get("/api/pending", headers=auth_headers).json()[0]["suggested"]
+    assert (s["origen"], s["concepto"]) == ("comercio", "Regalos")
+
+
+def test_get_pending_muestra_origen_diccionario(client, post, db, broadcasts, auth_headers):
+    _cat_propia(db, EMAIL, "Gasto Variable", "Supermercado")
+    post({"importe": 12.3, "comercio": "Mercadona", "fuente": "wallet"})
+    post({"importe": 9, "comercio": "Netflix.com", "fuente": "wallet"})
+    post({"importe": 3, "comercio": "Taller Paco", "fuente": "wallet"})
+    items = client.get("/api/pending", headers=auth_headers).json()
+    assert items[0]["suggested"]["origen"] == "diccionario" and items[0]["suggested"]["concepto"] == "Supermercado"
+    assert items[1]["suggested"]["concepto"] == "Suscripciones"
+    assert items[2]["suggested"] is None
+
+
+def test_get_pending_regla_gana_al_diccionario(client, post, db, broadcasts, auth_headers):
+    db.rules[(EMAIL, pending_mod.merchant_tag("Mercadona"))] = {
+        "tipo": "Gasto Fijo", "concepto_enc": crypto.encrypt_str("Piso"), "hits": 1}
+    post({"importe": 12.3, "comercio": "Mercadona", "fuente": "wallet"})
+    s = client.get("/api/pending", headers=auth_headers).json()[0]["suggested"]
+    assert (s["origen"], s["concepto"]) == ("comercio", "Piso")
+
+
+def test_sin_comercio_no_consulta_categorias(post, db, broadcasts):
+    post({"importe": 5})
+    assert not any("user_categories" in q or "user_prefs" in q for q in db.sql)
