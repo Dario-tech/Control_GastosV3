@@ -1,5 +1,6 @@
 import { fmt } from '../../../utils'
 import { BUDGET_STATUS, budgetProgress } from '../../../utils/budget'
+import Amt from '../Amt'
 
 /* ── Ítem de categoría ── */
 export default function BudgetItem({ item, spent, threshold, onEdit }) {
@@ -13,7 +14,7 @@ export default function BudgetItem({ item, spent, threshold, onEdit }) {
           <span className="bgt-item-emoji">{item.emoji}</span>
           <div className="bgt-item-titles">
             <span className="bgt-item-name">{item.name}</span>
-            <span className="bgt-item-sub tabular">{fmt(spent)} / {fmt(item.limit)}</span>
+            <span className="bgt-item-sub tabular"><Amt>{fmt(spent)} / {fmt(item.limit)}</Amt></span>
           </div>
         </div>
         <span className="bgt-item-pct tabular">{Math.round(rawPct)}%</span>
@@ -33,7 +34,7 @@ export default function BudgetItem({ item, spent, threshold, onEdit }) {
       <div className="bgt-bar-footer">
         <span className="bgt-status-chip"><span aria-hidden="true">{BUDGET_STATUS[st].icon}</span>{BUDGET_STATUS[st].label}</span>
         <span className="bgt-rem-label tabular">
-          {over ? `Excedido ${fmt(-remaining)}` : `Quedan ${fmt(remaining)}`}
+          {over ? <>Excedido <Amt>{fmt(-remaining)}</Amt></> : <>Quedan <Amt>{fmt(remaining)}</Amt></>}
         </span>
       </div>
     </div>

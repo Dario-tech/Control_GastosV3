@@ -27,6 +27,7 @@ const MonthTab  = lazy(importMonthTab)
 const StatsTab  = lazy(importStatsTab)
 const BudgetTab = lazy(importBudgetTab)
 const CategorizeModal      = lazy(() => import('./components/ui/CategorizeModal'))
+const TransactionSearchModal = lazy(() => import('./components/ui/TransactionSearchModal'))
 const AddTransactionModal  = lazy(() => import('./components/ui/AddTransactionModal'))
 const SpotlightTour        = lazy(() => import('./components/ui/SpotlightTour'))
 
@@ -50,6 +51,7 @@ function AppContent() {
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [categorizeOpen, setCategorizeOpen] = useState(false)
   const [addOpen,        setAddOpen]        = useState(false)
+  const [searchOpen,     setSearchOpen]     = useState(false)
   const [guideOpen,      setGuideOpen]      = useState(false)
   const { queue, fetchQueue, categorizePending, discardPending } = usePendingTransaction()
   // Pagos de Apple Pay que llegan por URL desde el Atajo de iOS (?atajo=1…)
@@ -74,6 +76,13 @@ function AppContent() {
   // Avisos de error al guardar cambios en el servidor (con reversión)
   useEffect(() => { if (syncNotice) showToast(syncNotice.msg) }, [syncNotice, showToast])
 
+  // La clase también va en <html>: los modales y hojas que se montan en
+  // document.body (portales) quedan fuera de .app y también deben difuminarse.
+  useEffect(() => {
+    document.documentElement.classList.toggle('hide-amounts', !!settings.hideAmounts)
+    return () => document.documentElement.classList.remove('hide-amounts')
+  }, [settings.hideAmounts])
+
   return (
     <div className={`app${settings.hideAmounts ? ' hide-amounts' : ''}`}>
       <Header
@@ -81,13 +90,15 @@ function AppContent() {
         pendingCount={queue.length}
         onPendingClick={async () => { await fetchQueue(); setCategorizeOpen(true) }}
         onAddClick={() => setAddOpen(true)}
+        onSearchClick={() => setSearchOpen(true)}
       />
       <main className="main">
         {syncWarnings?.map(msg => (
           <div key={msg} className="sync-warning" role="alert">⚠️ {msg}</div>
         ))}
         {txWarning && <div className="sync-warning" role="alert">⚠️ {txWarning}</div>}
-        <ErrorBoundary key={activeTab} variant="inline">
+        {/* key con la moneda: al cambiarla se repintan las pantallas con el nuevo símbolo */}
+        <ErrorBoundary key={`${activeTab}-${settings.currency}`} variant="inline">
           <Suspense fallback={<TabSkeleton />}>
             {activeTab === 'year'        && <YearTab />}
             {activeTab === 'month'       && <MonthTab />}
@@ -140,6 +151,11 @@ function AppContent() {
               onSkip={() => setCategorizeOpen(false)}
             />
           )}
+        </Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary onClose={() => setSearchOpen(false)}>
+        <Suspense fallback={<FormSkeleton />}>
+          {searchOpen && <TransactionSearchModal onClose={() => setSearchOpen(false)} />}
         </Suspense>
       </ErrorBoundary>
       <ErrorBoundary onClose={() => setAddOpen(false)}>

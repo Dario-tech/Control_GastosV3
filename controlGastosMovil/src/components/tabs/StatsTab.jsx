@@ -6,9 +6,9 @@ import { useFinanceData } from '../../context/FinanceDataContext'
 import { useRecurring } from '../../hooks/useRecurring'
 import { useApp } from '../../context/AppContext'
 import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
+import { getExpenseBreakdown } from '../../utils/breakdown'
+import Amt from '../ui/Amt'
 import { MONTH_NAMES } from '../../data/mockData'
-
-const BREAKDOWN_COLORS = ['#5b7cff','#2dd4a0','#ff9f43','#ff5f7e','#ffd93d','#6bcfff','#a78bff']
 
 const RECUR_DATE_FMT = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' })
 function fmtRecurDate(dateStr) {
@@ -27,17 +27,9 @@ export default function StatsTab() {
   const forecast = getBalanceForecast(data, selectedMonth)
   const report = getMonthlyReport(data, selectedMonth)
 
-  const breakdown = [
-    { name: '🏠 Alquiler',      val: sumAll(data.fixedExpenses.filter(i => i.concept === 'Alquiler')) },
-    { name: '📈 Inversiones',   val: sumAll(data.fixedExpenses.filter(i => i.concept === 'Inversiones' || i.concept === 'Cripto')) },
-    { name: '🎉 Ocio',          val: sumAll(data.variableExpenses.filter(i => i.concept === 'Ocio & salidas')) },
-    { name: '✈️  Viajes',       val: sumAll(data.variableExpenses.filter(i => i.concept === 'Vuelos / Viajes')) },
-    { name: '🍽️  Comida',       val: sumAll(data.variableExpenses.filter(i => i.concept === 'Comida')) },
-    { name: '⚡ Suministros',   val: sumAll(data.fixedExpenses.filter(i => ['Luz','Gas','WiFi'].includes(i.concept))) },
-    { name: '🚇 Transporte',    val: sumAll(data.fixedExpenses.filter(i => i.concept === 'Transporte')) },
-  ].filter(c => c.val > 0).sort((a, b) => b.val - a.val)
+  const { items: breakdown, total: breakdownTotal } = getExpenseBreakdown(data, 6)
 
-  const maxBreak = breakdown[0]?.val || 1
+  const maxBreak = Math.max(...breakdown.map(c => c.val), 1)
 
   return (
     <div className="tab-panel">
@@ -53,7 +45,7 @@ export default function StatsTab() {
             {fmt(forecast.projectedBalance)}
           </span>
           <span className="stats-forecast-sub">
-            Ahora mismo: {fmt(forecast.currentBalance)} · día {forecast.daysElapsed} de {forecast.daysInMonth}
+            Ahora mismo: <Amt>{fmt(forecast.currentBalance)}</Amt> · día {forecast.daysElapsed} de {forecast.daysInMonth}
           </span>
           <div className="forecast-stats">
             <div className="forecast-stat">
@@ -177,29 +169,31 @@ export default function StatsTab() {
       </Card>
 
       <Card title="¿En qué va el dinero?" noPad>
-        <div className="breakdown-list">
-          {breakdown.map((c, i) => {
-            const pct = expenses > 0 ? Math.round((c.val / expenses) * 100) : 0
-            return (
-              <div key={i} className="breakdown-item">
+        {breakdown.length === 0 ? (
+          <p className="breakdown-empty">Aún no hay gastos registrados. Cuando añadas movimientos verás aquí en qué categorías se va tu dinero.</p>
+        ) : (
+          <div className="breakdown-list">
+            {breakdown.map(c => (
+              <div key={c.key} className="breakdown-item">
                 <div className="breakdown-row">
-                  <span className="breakdown-name">{c.name}</span>
+                  <span className="breakdown-name">{c.emoji} {c.name}</span>
                   <span className="breakdown-amount">{fmt(c.val)}</span>
                 </div>
                 <div className="breakdown-bar-bg">
                   <div
                     className="breakdown-bar-fill"
-                    style={{
-                      width: `${Math.round((c.val / maxBreak) * 100)}%`,
-                      background: BREAKDOWN_COLORS[i % BREAKDOWN_COLORS.length],
-                    }}
+                    style={{ width: `${Math.round((c.val / maxBreak) * 100)}%`, background: c.color }}
                   />
                 </div>
-                <span className="breakdown-pct">{pct}% del total</span>
+                <span className="breakdown-pct">{c.pct}% del total</span>
               </div>
-            )
-          })}
-        </div>
+            ))}
+            <div className="breakdown-total">
+              <span>Total gastos</span>
+              <span className="breakdown-amount">{fmt(breakdownTotal)}</span>
+            </div>
+          </div>
+        )}
       </Card>
 
     </div>

@@ -6,6 +6,8 @@ import { Icon } from './FormKit'
 export const DUPLICATE_CAT_MSG = 'Ya existe una categoría con ese nombre'
 export const EMPTY_CAT_MSG = 'Escribe un nombre'
 export const CAT_NAME_MAX = 32
+export const AI_HINT = 'Envía solo el nombre de la categoría a un servicio de IA para sugerir el emoji'
+const AI_HINT_ID = 'cat-ai-hint'
 
 /* Valida el nombre de una categoría nueva con las mismas reglas en todas las
    pantallas. `existing` = categorías visibles del tipo (por defecto + propias).
@@ -54,10 +56,11 @@ export function CategoryFields({ emoji, onEmoji, name, onName, error, suggesting
           onChange={e => onName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && onEnter?.()} autoFocus={autoFocus} />
         <button type="button" className="fm-icon-btn" onClick={onSuggest}
-          disabled={!name.trim() || suggesting} aria-label="Sugerir emoji con IA" title="Sugerir emoji con IA">
+          disabled={!name.trim() || suggesting} aria-label="Sugerir emoji con IA" aria-describedby={AI_HINT_ID} title={AI_HINT}>
           {suggesting ? <span className="fm-spinner" aria-hidden="true" /> : '✨'}
         </button>
       </div>
+      <span id={AI_HINT_ID} className="sr-only">{AI_HINT}</span>
       {name.length >= CAT_NAME_MAX && !error && (
         <p className="fm-hint" role="status">{name.length}/{CAT_NAME_MAX} caracteres: es el máximo</p>
       )}

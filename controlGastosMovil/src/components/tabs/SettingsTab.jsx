@@ -1,6 +1,13 @@
-import { useRef, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import { useSettings, ACCENTS } from '../../context/SettingsContext'
+import { createPortal } from 'react-dom'
 import NewCategoryScreen from '../ui/NewCategoryScreen'
+import { DEFAULT_CATEGORIES, TYPES, categoryKey, combineCategories } from '../../data/categories'
+import { useFinanceData } from '../../context/FinanceDataContext'
+import {
+  buildCsv, buildExportPayload, downloadText, exportErrorMessage, fetchAllTransactions, fetchExtras,
+} from '../../utils/exportData'
+import { localISODate } from '../../utils'
 
 const THEMES = [
   { id: 'dark',     name: 'Oscuro' },
@@ -86,13 +93,20 @@ function Segmented({ options, value, onChange }) {
 }
 
 
+const TIPO_PLURAL = { 'Gasto Variable': 'Gastos variables', 'Gasto Fijo': 'Gastos fijos', 'Ingreso': 'Ingresos' }
 const TIPO_LABEL = { 'Gasto Variable': 'Variable', 'Gasto Fijo': 'Fijo', 'Ingreso': 'Ingreso' }
 
+const LAST_VISIBLE_MSG = 'Debe quedar al menos una categoría visible de este tipo'
+
 export default function SettingsTab() {
-  const { settings, update, customCategories, removeCategory } = useSettings()
+  const { settings, update, customCategories, removeCategory, hiddenCategories = [], setHiddenCategories } = useSettings()
+  const finance = useFinanceData()
   const { allItems: budgetItems, removeItem } = useBudget()
   const { showToast } = useApp()
   const [sendingReport, setSendingReport] = useState(false)
+  // Exportación: null | 'json' | 'csv' (preparando)
+  const [exporting, setExporting] = useState(null)
+  const [exportError, setExportError] = useState('')
   const [newCatOpen, setNewCatOpen] = useState(false)
   const newCatBtn = useRef(null)
   // Al cerrar el formulario el foco vuelve al botón que lo abrió.
@@ -124,20 +138,61 @@ export default function SettingsTab() {
     }
   }
 
-  function exportData() {
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      budget:     budgetItems,
-      settings,
+  // Pide los movimientos de todos los años y, según el formato, genera el fichero.
+  async function runExport(kind) {
+    if (exporting) return
+    setExporting(kind)
+    setExportError('')
+    try {
+      const { transactions, years, unreadable } = await fetchAllTransactions(finance?.data?.availableYears)
+      const day = localISODate()
+      if (kind === 'csv') {
+        downloadText(buildCsv(transactions), `mi-economia-movimientos-${day}.csv`, 'text/csv;charset=utf-8')
+        showToast(`📄 ${transactions.length} movimientos exportados`)
+      } else {
+        const extras = await fetchExtras()
+        const payload = buildExportPayload({
+          budget: budgetItems, settings, hiddenCategories, transactions, years, unreadable, ...extras,
+        })
+        downloadText(JSON.stringify(payload, null, 2), `mi-economia-${day}.json`, 'application/json')
+        showToast('📤 Datos exportados')
+      }
+      if (unreadable) setExportError(`${unreadable} movimientos no se pudieron leer en el servidor y no están en el fichero.`)
+    } catch (e) {
+      setExportError(exportErrorMessage(e))
+    } finally {
+      setExporting(null)
     }
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-    const url  = URL.createObjectURL(blob)
-    const a    = Object.assign(document.createElement('a'), {
-      href: url,
-      download: `mi-economia-${new Date().toISOString().slice(0, 10)}.json`,
-    })
-    a.click()
-    URL.revokeObjectURL(url)
+  }
+
+  // ── Categorías por defecto ocultas ──
+  const hiddenKeys = new Set(hiddenCategories.map(h => categoryKey(h.tipo, h.concepto)))
+  const hiddenCount = DEFAULT_CATEGORIES
+    ? TYPES.reduce((n, t) => n + DEFAULT_CATEGORIES[t.id].filter(c => hiddenKeys.has(categoryKey(t.id, c.concepto))).length, 0)
+    : 0
+  // Quedan elegibles en el tipo (por defecto visibles + propias) si se oculta `skip`
+  const visibleLeft = (tipo, skipKey) => combineCategories(
+    DEFAULT_CATEGORIES[tipo].filter(c => {
+      const k = categoryKey(tipo, c.concepto)
+      return k !== skipKey && !hiddenKeys.has(k)
+    }),
+    customCategories?.[tipo] || [],
+  ).length
+
+  function toggleDefaultCategory(tipo, concepto) {
+    const k = categoryKey(tipo, concepto)
+    if (hiddenKeys.has(k)) {
+      setHiddenCategories?.(hiddenCategories.filter(h => categoryKey(h.tipo, h.concepto) !== k))
+    } else {
+      if (visibleLeft(tipo, k) < 1) return
+      setHiddenCategories?.([...hiddenCategories, { tipo, concepto }])
+    }
+  }
+
+  function showAllCategories() {
+    // Solo las de las categorías por defecto; cualquier otra entrada se conserva
+    const defaults = new Set(TYPES.flatMap(t => DEFAULT_CATEGORIES[t.id].map(c => categoryKey(t.id, c.concepto))))
+    setHiddenCategories?.(hiddenCategories.filter(h => !defaults.has(categoryKey(h.tipo, h.concepto))))
   }
 
   function clearBudget() {
@@ -193,6 +248,7 @@ export default function SettingsTab() {
             ]}
           />
         </Row>
+        <p className="s-note">Solo cambia el símbolo; no convierte importes.</p>
       </Section>
 
       <Section title="Presupuesto">
@@ -241,12 +297,66 @@ export default function SettingsTab() {
           </button>
         </div>
       </Section>
-      {newCatOpen && <NewCategoryScreen onClose={closeNewCat} />}
+      {/* Portal: .profile-screen tiene transform, que encerraría el position:fixed */}
+      {newCatOpen && createPortal(<NewCategoryScreen onClose={closeNewCat} />, document.body)}
+
+      <Section title="Categorías por defecto">
+        <p className="s-note s-note--top">
+          Ocultar una categoría solo quita la opción de elegirla en movimientos nuevos y pendientes.
+          Los movimientos ya guardados no cambian. Siempre queda al menos una visible por tipo.
+        </p>
+        <div className="s-hidden-head">
+          <span className="s-value-text" aria-live="polite">
+            {hiddenCount === 0 ? 'Ninguna oculta' : `${hiddenCount} ${hiddenCount === 1 ? 'oculta' : 'ocultas'}`}
+          </span>
+          <button type="button" className="s-action-btn s-touch" onClick={showAllCategories} disabled={hiddenCount === 0}>
+            Mostrar todas
+          </button>
+        </div>
+        {TYPES.map(t => (
+          <div key={t.id} role="group" aria-label={`Categorías de ${TIPO_LABEL[t.id].toLowerCase()}`}>
+            <div className="s-cat-group-title">{TIPO_PLURAL[t.id]}</div>
+            {DEFAULT_CATEGORIES[t.id].map(c => {
+              const k = categoryKey(t.id, c.concepto)
+              const hidden = hiddenKeys.has(k)
+              const lastOne = !hidden && visibleLeft(t.id, k) < 1
+              return (
+                <Fragment key={k}>
+                <div className={`s-defcat-row${hidden ? ' is-hidden' : ''}`}>
+                  <span className="s-defcat-name"><span aria-hidden="true">{c.emoji}</span> {c.concepto}</span>
+                  <button
+                    type="button"
+                    className="s-action-btn s-touch"
+                    onClick={() => toggleDefaultCategory(t.id, c.concepto)}
+                    disabled={lastOne}
+                    aria-pressed={hidden}
+                    aria-label={`${hidden ? 'Mostrar' : 'Ocultar'} la categoría ${c.concepto}`}
+                    aria-describedby={lastOne ? `s-last-${t.id.replace(/\W/g, '')}` : undefined}
+                    title={lastOne ? LAST_VISIBLE_MSG : undefined}
+                  >
+                    {hidden ? 'Mostrar' : 'Ocultar'}
+                  </button>
+                </div>
+                {lastOne && <p className="s-defcat-note" id={`s-last-${t.id.replace(/\W/g, '')}`}>{LAST_VISIBLE_MSG}</p>}
+                </Fragment>
+              )
+            })}
+          </div>
+        ))}
+      </Section>
 
       <Section title="Datos">
         <Row icon="📤" label="Exportar datos">
-          <button className="s-action-btn" onClick={exportData}>Exportar</button>
+          <button className="s-action-btn" onClick={() => runExport('json')} disabled={!!exporting}>
+            {exporting === 'json' ? 'Preparando…' : 'Exportar'}
+          </button>
         </Row>
+        <Row icon="📄" label="Exportar movimientos (CSV)">
+          <button className="s-action-btn" onClick={() => runExport('csv')} disabled={!!exporting}>
+            {exporting === 'csv' ? 'Preparando…' : 'Exportar'}
+          </button>
+        </Row>
+        {exportError && <p className="s-note s-note--error" role="alert">{exportError}</p>}
         <Row icon="📧" label="Informe mensual por email">
           <button className="s-action-btn" onClick={handleSendReport} disabled={sendingReport}>
             {sendingReport ? 'Enviando…' : 'Enviar ahora'}

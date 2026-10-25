@@ -1,5 +1,6 @@
 import { fmt } from '../../../utils'
 import { BUDGET_STATUS, budgetProgress } from '../../../utils/budget'
+import Amt from '../Amt'
 
 /* ── Hero total mensual ── */
 export default function TotalHero({ totalLimit, totalSpent, daysLeft, threshold }) {
@@ -11,13 +12,13 @@ export default function TotalHero({ totalLimit, totalSpent, daysLeft, threshold 
       <div className="bgt-hero-top">
         <div className="bgt-hero-left">
           <span className="bgt-hero-title">Total mensual</span>
-          <span className="bgt-hero-sub tabular">{fmt(totalSpent)} de {fmt(totalLimit)}</span>
+          <span className="bgt-hero-sub tabular"><Amt>{fmt(totalSpent)} de {fmt(totalLimit)}</Amt></span>
         </div>
         {daysLeft > 0 && <span className="bgt-days-badge">{daysLeft}d restantes</span>}
       </div>
 
       <div className="bgt-hero-main">
-        <span className="bgt-hero-remaining tabular">{fmt(Math.abs(remaining))}</span>
+        <span className="bgt-hero-remaining tabular"><Amt>{fmt(Math.abs(remaining))}</Amt></span>
         <span className="bgt-hero-remaining-label">{over ? 'excedido' : 'restantes'}</span>
       </div>
 
@@ -31,7 +32,7 @@ export default function TotalHero({ totalLimit, totalSpent, daysLeft, threshold 
         <span className="bgt-status-chip"><span aria-hidden="true">{BUDGET_STATUS[st].icon}</span>{BUDGET_STATUS[st].label}</span>
       </div>
       {pace != null && (
-        <div className="bgt-pace tabular">Ritmo sugerido: {fmt(pace)} al día</div>
+        <div className="bgt-pace tabular">Ritmo sugerido: <Amt>{fmt(pace)}</Amt> al día</div>
       )}
     </div>
   )

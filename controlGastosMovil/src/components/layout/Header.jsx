@@ -1,7 +1,7 @@
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useAuth } from '../../context/AuthContext'
 
-export default function Header({ onAvatarClick, pendingCount, onPendingClick, onAddClick }) {
+export default function Header({ onAvatarClick, pendingCount, onPendingClick, onAddClick, onSearchClick }) {
   const { data } = useFinanceData()
   const { user } = useAuth()
 
@@ -25,6 +25,11 @@ export default function Header({ onAvatarClick, pendingCount, onPendingClick, on
             <span className="pending-badge">{pendingCount}</span>
           </button>
         )}
+        <button className="search-btn" onClick={onSearchClick} aria-label="Buscar movimientos">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>
+          </svg>
+        </button>
         <button className="add-tx-btn" data-tour="add" onClick={onAddClick} aria-label="Añadir movimiento">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
             <path d="M12 5v14M5 12h14"/>

@@ -12,6 +12,7 @@ import { newId } from '../../utils/id'
 import { classifyTxError, txErrorMessage, enqueueTx, MSG_OFFLINE } from '../../utils/txQueue'
 
 import { CategoryFields, useEmojiSuggest, validateCategoryName, DUPLICATE_CAT_MSG } from './CategoryFields'
+import Amt from './Amt'
 
 export { DUPLICATE_CAT_MSG }
 
@@ -106,7 +107,7 @@ export default function AddTransactionModal({ onClose }) {
         <>
           {error && <p className="fm-error fm-footer-error" role="alert"><Icon name="alert" size={15} />{error}</p>}
           <PrimaryButton loading={loading} disabled={!canSave} hint={missing} onClick={() => handleSubmit(selected)}>
-            {amtOk ? `Guardar ${fmt(amtNum, Number.isInteger(amtNum) ? 0 : 2)}` : 'Guardar movimiento'}
+            {amtOk ? <>Guardar <Amt>{fmt(amtNum, Number.isInteger(amtNum) ? 0 : 2)}</Amt></> : 'Guardar movimiento'}
           </PrimaryButton>
         </>
       ) : null}

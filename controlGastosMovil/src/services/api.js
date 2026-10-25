@@ -90,6 +90,15 @@ export async function fetchFinanceData() {
   return apiJson(res)
 }
 
+// Movimientos de un solo año (más ligero que pedirlo todo de golpe).
+export async function fetchFinanceYear(year) {
+  const res = await fetch(`${BASE}/api/finance?year=${encodeURIComponent(year)}`, {
+    headers: authHeaders(),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return apiJson(res)
+}
+
 // `idCliente` (UUID generado al abrir el formulario) permite al backend
 // reconocer un reenvío del mismo movimiento y no duplicarlo.
 export async function postTransaction(importe, tipo, concepto, fecha = null, comentario = null, idCliente = null) {
@@ -106,12 +115,13 @@ export async function postTransaction(importe, tipo, concepto, fecha = null, com
   return apiJson(res)
 }
 
+// El servidor gratuito puede estar durmiendo: se da el mismo margen que a las escrituras.
 export async function searchTransactions({ q = '', tipo = 'all', cursor = null, limit = 30 } = {}) {
   const params = new URLSearchParams({ q, tipo, limit: String(limit) })
   if (cursor) params.set('cursor', cursor)
   const res = await fetch(`${BASE}/api/transactions/search?${params}`, {
     headers: authHeaders(),
-    signal:  AbortSignal.timeout(15000),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
   })
   return apiJson(res)
 }

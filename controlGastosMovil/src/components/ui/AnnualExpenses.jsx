@@ -5,6 +5,7 @@ import { MONTH_NAMES } from '../../data/mockData'
 import { ConfirmSheet } from './FormKit'
 import { FormSkeleton } from './Skeleton'
 import { notifCache, annualProgress, dueState, downloadIcs } from './annual/annualUtils'
+import Amt from './Amt'
 
 // El formulario solo se necesita al abrirlo: va en su propio chunk.
 const ExpenseFormModal = lazy(() => import('./annual/ExpenseFormModal'))
@@ -107,9 +108,9 @@ export default function AnnualExpenses() {
       {expenses.length > 0 && (
         <div className="annual-summary">
           <span className="annual-summary-label">A reservar al mes</span>
-          <span className="annual-summary-main tabular">{fmt(totalAnual / 12)}</span>
+          <span className="annual-summary-main tabular"><Amt>{fmt(totalAnual / 12)}</Amt></span>
           <span className="annual-summary-sub tabular">
-            Total anual {fmt(totalAnual)} · {expenses.length} gasto{expenses.length !== 1 ? 's' : ''}
+            Total anual <Amt>{fmt(totalAnual)}</Amt> · {expenses.length} gasto{expenses.length !== 1 ? 's' : ''}
           </span>
         </div>
       )}
@@ -137,7 +138,7 @@ export default function AnnualExpenses() {
                   ))}
                 </div>
                 <span className="annual-quota-text tabular">
-                  {progress ? progress.pasados : 0}/{exp.meses_reparto.length} cuotas · {fmt(exp.reparto_mensual)}/mes
+                  {progress ? progress.pasados : 0}/{exp.meses_reparto.length} cuotas · <Amt>{fmt(exp.reparto_mensual)}</Amt>/mes
                 </span>
               </div>
             )}

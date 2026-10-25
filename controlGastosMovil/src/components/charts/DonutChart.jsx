@@ -1,15 +1,17 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { fmt } from '../../utils'
+import { fmtAmount } from '../../utils/amounts'
+import { useHideAmounts } from '../../hooks/useHideAmounts'
 
 const COLORS = ['#5b7cff', '#ff9f43']
 const LABELS = ['Gastos Fijos', 'Gastos Variables']
 
-const CustomTooltip = ({ active, payload }) => {
+const CustomTooltip = ({ active, payload, hide }) => {
   if (!active || !payload?.length) return null
   return (
     <div className="chart-tooltip">
       <p className="tt-row"><strong>{payload[0].name}</strong></p>
-      <p className="tt-row">{fmt(payload[0].value)}</p>
+      <p className="tt-row">{fmtAmount(payload[0].value, hide)}</p>
     </div>
   )
 }
@@ -28,6 +30,7 @@ const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent
 }
 
 export default function DonutChart({ fixed, variable }) {
+  const hide = useHideAmounts()
   const total = fixed + variable
   const data = [
     { name: 'Gastos Fijos',     value: fixed },
@@ -62,7 +65,7 @@ export default function DonutChart({ fixed, variable }) {
                 <Cell key={i} fill={`url(#donutGrad${i})`} stroke={COLORS[i]} strokeOpacity={0.5} strokeWidth={1} style={{ filter: `drop-shadow(0 0 6px ${COLORS[i]})` }} />
               ))}
             </Pie>
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip hide={hide} />} />
           </PieChart>
         </ResponsiveContainer>
         <div className="donut-center">

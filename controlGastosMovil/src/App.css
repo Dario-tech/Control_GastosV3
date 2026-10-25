@@ -3641,3 +3641,94 @@ img.fm-goal-hero-icon { width: 64px; height: 64px; border-radius: 20px; object-f
 .eb-actions { display: flex; flex-direction: column; gap: 10px; }
 .eb-inline { padding: 24px 16px; }
 .eb-sheet { padding-bottom: env(safe-area-inset-bottom); }
+
+/* ===== Ajustes: moneda, categorías por defecto, exportar; pantallas sólidas ===== */
+.s-note { margin: 0; padding: 8px 14px 12px; font-size: var(--fs-xs); line-height: 1.4; color: var(--text2); }
+.s-note--top { padding-top: 12px; }
+.s-note--error { color: var(--red); }
+.s-hidden-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 14px 8px; }
+.s-cat-group-title { padding: 10px 14px 4px; font-size: var(--fs-xs); font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text2); }
+.s-defcat-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 14px; border-top: 1px solid var(--border); }
+.s-defcat-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); color: var(--text); }
+.s-defcat-row.is-hidden .s-defcat-name { color: var(--text2); text-decoration: line-through; }
+.s-action-btn.s-touch { min-height: 44px; min-width: 88px; }
+.s-action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Pantalla de formulario con fondo sólido (sin transparencias de cristal) */
+.fm-screen.fm-screen--solid {
+  background: var(--glass-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* ===== BUSCAR MOVIMIENTOS (botón de la cabecera + estados del modal) ===== */
+.search-btn {
+  position: relative; flex-shrink: 0;
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-sm), inset 0 1px 0 var(--glass-highlight);
+  color: var(--text2); cursor: pointer; padding: 0;
+  transition: transform 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.search-btn svg { width: 18px; height: 18px; }
+.search-btn::after {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  width: 44px; height: 44px; transform: translate(-50%, -50%);
+}
+.search-btn:active { transform: scale(0.9); color: var(--accent-fg); border-color: var(--accent); }
+.search-btn:focus-visible, .search-close:focus-visible, .search-retry:focus-visible,
+.search-filter-chip:focus-visible, .search-load-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.search-close { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; }
+.search-filter-chip { min-height: 36px; }
+.search-sheet .search-input { min-width: 0; }
+.search-slow { display: block; margin-top: 8px; font-size: var(--fs-xs); color: var(--text3); }
+.search-error { color: var(--red); display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 20px 16px; }
+.search-retry {
+  min-height: 44px; padding: 0 20px; border-radius: 12px; cursor: pointer;
+  background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent-fg); font-weight: 600;
+}
+.search-note { margin: 8px 2px 0; font-size: var(--fs-xs); color: var(--text3); text-align: center; }
+.search-load-more { min-height: 44px; }
+
+/* ===== OCULTAR IMPORTES: todas las cifras monetarias =====
+   La clase va en <html> y en .app (los portales cuelgan de body). */
+.hide-amounts .amt,
+.hide-amounts .mt-cell.positive, .hide-amounts .mt-cell.negative,
+.hide-amounts .ss-value.positive, .hide-amounts .ss-value.negative,
+.hide-amounts .stats-forecast-value, .hide-amounts .forecast-stat-value, .hide-amounts .report-stat-value,
+.hide-amounts .recur-amount, .hide-amounts .top-amount, .hide-amounts .breakdown-amount,
+.hide-amounts .donut-value, .hide-amounts .legend-amount,
+.hide-amounts .annual-item-amount, .hide-amounts .annual-summary-main,
+.hide-amounts .bgt-hero-remaining,
+.hide-amounts .txlog-importe, .hide-amounts .txlog-day-total span,
+.hide-amounts .search-importe, .hide-amounts .search-footer-total,
+.hide-amounts .cv-row-amt, .hide-amounts .fm-list-amount, .hide-amounts .fm-memory-caption,
+.hide-amounts .catmodal-amount {
+  filter: blur(7px);
+  user-select: none;
+  pointer-events: none;
+}
+/* Los tooltips/ejes de los gráficos no pintan cifras en este modo (ver useHideAmounts). */
+
+/* ===== ESTADÍSTICAS: ¿En qué va el dinero? ===== */
+.breakdown-empty { margin: 0; padding: 20px 16px; text-align: center; font-size: var(--fs-sm); color: var(--text2); line-height: 1.45; }
+.breakdown-total {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding-top: 12px; border-top: 1px solid var(--border, rgba(255,255,255,0.08));
+  font-size: var(--fs-sm); color: var(--text2); font-weight: 600;
+}
+.breakdown-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
+
+/* ===== OCULTAR IMPORTES en formularios de edición =====
+   El importe escrito se difumina mientras no tiene el foco (al enfocarlo se ve para poder editar). */
+.hide-amounts .fm-amount:not(:focus-within) .fm-amount-input,
+.hide-amounts .fm-preview-amount,
+.hide-amounts .fm-goal-hero-saved,
+.hide-amounts .fm-goal-hero-target {
+  filter: blur(7px);
+  user-select: none;
+}
+
+/* Motivo visible cuando no se puede ocultar la última categoría de un tipo */
+.s-defcat-note { margin: -2px 0 8px; padding: 0 2px; font-size: var(--fs-xs); color: var(--text2); line-height: 1.35; }

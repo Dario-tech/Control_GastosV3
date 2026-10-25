@@ -4,6 +4,7 @@ import { fmt } from '../../../utils'
 import { FormScreen, Field, Section, AmountInput, Chips, DangerButton, PrimaryButton, ConfirmSheet, Sheet, Icon } from '../FormKit'
 import { GoalRing, GoalIcon } from './GoalRing'
 import { goalRemaining, formatGoalDate, formatContribDate, compressImage } from './goalUtils'
+import Amt from '../Amt'
 
 export default function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, onDelete, onDeleteContribution }) {
   useLockBodyScroll()
@@ -100,7 +101,7 @@ export default function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, on
       footer={
         done ? null : (
           <PrimaryButton loading={busy} disabled={!canAdd} hint="Escribe cuánto quieres añadir" onClick={submitAdd}>
-            {amt > 0 ? `Añadir ${fmt(amt, Number.isInteger(amt) ? 0 : 2)}` : 'Añadir dinero'}
+            {amt > 0 ? <>Añadir <Amt>{fmt(amt, Number.isInteger(amt) ? 0 : 2)}</Amt></> : 'Añadir dinero'}
           </PrimaryButton>
         )
       }
@@ -111,14 +112,14 @@ export default function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, on
           <GoalIcon goal={goal} className="fm-goal-hero-icon" />
         </GoalRing>
         <div className="fm-goal-hero-amount tabular">
-          <span className="fm-goal-hero-saved">{fmt(goal.ahorrado)}</span>
-          <span className="fm-goal-hero-target"> / {fmt(goal.objetivo)}</span>
+          <span className="fm-goal-hero-saved"><Amt>{fmt(goal.ahorrado)}</Amt></span>
+          <span className="fm-goal-hero-target"> / <Amt>{fmt(goal.objetivo)}</Amt></span>
         </div>
         <div className="fm-goal-hero-status">
           {done ? <span className="fm-pill ok"><Icon name="check" size={14} />¡Completada!</span> : (
             <>
-              <span className="fm-pill">{Math.round(pct)}% · faltan <b className="tabular">{fmt(remaining.falta)}</b></span>
-              {remaining.mes != null && <span className="fm-goal-hero-hint tabular">≈ {fmt(remaining.mes)}/mes hasta {formatGoalDate(goal.fecha)}</span>}
+              <span className="fm-pill">{Math.round(pct)}% · faltan <b className="tabular"><Amt>{fmt(remaining.falta)}</Amt></b></span>
+              {remaining.mes != null && <span className="fm-goal-hero-hint tabular">≈ <Amt>{fmt(remaining.mes)}</Amt>/mes hasta {formatGoalDate(goal.fecha)}</span>}
             </>
           )}
         </div>
@@ -171,7 +172,7 @@ export default function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, on
             {memories.map(c => (
               <button key={c.id} type="button" className="fm-memory" onClick={() => setLightbox(c)} aria-label={`Ver foto de +${fmt(c.importe)}`}>
                 <img className="fm-memory-img" src={c.foto} alt="" loading="lazy" />
-                <span className="fm-memory-caption tabular">+{fmt(c.importe)}</span>
+                <span className="fm-memory-caption tabular"><Amt>+{fmt(c.importe)}</Amt></span>
               </button>
             ))}
           </div>
@@ -192,7 +193,7 @@ export default function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, on
                   <span className="fm-list-name">{c.user_email === myEmail ? 'Tú' : c.name}</span>
                   <span className="fm-list-date">{formatContribDate(c.fecha)}</span>
                 </div>
-                <span className="fm-list-amount tabular">+{fmt(c.importe)}</span>
+                <span className="fm-list-amount tabular"><Amt>+{fmt(c.importe)}</Amt></span>
                 {(c.user_email === myEmail || isCreator) && (
                   <button
                     type="button"
@@ -221,7 +222,7 @@ export default function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, on
           </button>
           <img className="fm-lightbox-img" src={lightbox.foto} alt="Recuerdo" />
           <div className="fm-lightbox-caption tabular">
-            {lightbox.user_email === myEmail ? 'Tú' : lightbox.name} · {formatContribDate(lightbox.fecha)} · +{fmt(lightbox.importe)}
+            {lightbox.user_email === myEmail ? 'Tú' : lightbox.name} · {formatContribDate(lightbox.fecha)} · <Amt>+{fmt(lightbox.importe)}</Amt>
           </div>
         </div>
       )}

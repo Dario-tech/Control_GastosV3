@@ -30,6 +30,7 @@ export default function NewCategoryScreen({ onClose }) {
 
   return (
     <FormScreen
+      solid
       title="Nueva categoría"
       subtitle="Podrás usarla al añadir gastos y al categorizar pendientes."
       onClose={onClose}

@@ -5,6 +5,7 @@ import { fmt } from '../../utils'
 import { GoalRing, GoalIcon } from './goals/GoalRing'
 import { goalRemaining, formatGoalDate } from './goals/goalUtils'
 import { FormSkeleton } from './Skeleton'
+import Amt from './Amt'
 
 // El formulario y el detalle solo se necesitan al abrirlos: van en su propio
 // chunk para no cargarlos con la pantalla principal (Año usa este bloque).
@@ -85,20 +86,20 @@ export default function SavingsGoals({ compact = false }) {
               </span>
               {compact && (
                 <span className="goal-square-amounts">
-                  <b>{fmt(g.ahorrado)}</b> / {fmt(g.objetivo)}
+                  <Amt><b>{fmt(g.ahorrado)}</b> / {fmt(g.objetivo)}</Amt>
                 </span>
               )}
               {!compact && (
                 <>
                   <span className="goal-square-amounts">
-                    <b>{fmt(g.ahorrado)}</b> / {fmt(g.objetivo)}
+                    <Amt><b>{fmt(g.ahorrado)}</b> / {fmt(g.objetivo)}</Amt>
                   </span>
                   <span className="goal-square-foot">
-                    {done ? '¡Lograda! 🎉' : `Faltan ${fmt(remaining.falta)}`}
+                    {done ? '¡Lograda! 🎉' : <>Faltan <Amt>{fmt(remaining.falta)}</Amt></>}
                   </span>
                   {!done && g.fecha && (
                     <span className="goal-square-date">
-                      {formatGoalDate(g.fecha)}{remaining.mes != null && ` · ${fmt(remaining.mes)}/mes`}
+                      {formatGoalDate(g.fecha)}{remaining.mes != null && <> · <Amt>{fmt(remaining.mes)}</Amt>/mes</>}
                     </span>
                   )}
                 </>

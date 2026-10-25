@@ -2,11 +2,13 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
 } from 'recharts'
-import { getChartData, fmt } from '../../utils'
+import { getChartData } from '../../utils'
+import { fmtAmount, axisTick } from '../../utils/amounts'
+import { useHideAmounts } from '../../hooks/useHideAmounts'
 import { MONTH_SHORT } from '../../data/mockData'
 import { useChartColors } from '../../hooks/useChartColors'
 
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload, label, hide }) => {
   if (!active || !payload?.length) return null
   const inc = payload.find(p => p.dataKey === 'income')?.value ?? 0
   const exp = payload.find(p => p.dataKey === 'expenses')?.value ?? 0
@@ -14,15 +16,16 @@ const CustomTooltip = ({ active, payload, label }) => {
   return (
     <div className="chart-tooltip">
       <p className="tt-title">{MONTH_SHORT[label]}</p>
-      <p className="tt-row tt-green">Ingresos <strong>{fmt(inc)}</strong></p>
-      <p className="tt-row tt-red">Gastos <strong>{fmt(exp)}</strong></p>
-      <p className={`tt-row ${bal >= 0 ? 'tt-blue' : 'tt-red'}`}>Balance <strong>{fmt(bal)}</strong></p>
+      <p className="tt-row tt-green">Ingresos <strong>{fmtAmount(inc, hide)}</strong></p>
+      <p className="tt-row tt-red">Gastos <strong>{fmtAmount(exp, hide)}</strong></p>
+      <p className={`tt-row ${bal >= 0 ? 'tt-blue' : 'tt-red'}`}>Balance <strong>{fmtAmount(bal, hide)}</strong></p>
     </div>
   )
 }
 
 export default function IncomeExpenseChart({ data: financeData }) {
   const { tick, grid, cursor, incomeColor, expenseColor } = useChartColors()
+  const hide = useHideAmounts()
   const data = getChartData(financeData).map(d => ({ ...d, monthLabel: MONTH_SHORT[d.month] }))
 
   return (
@@ -49,9 +52,9 @@ export default function IncomeExpenseChart({ data: financeData }) {
           tick={{ fill: tick, fontSize: 11 }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}
+          tickFormatter={axisTick(hide)}
         />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: cursor }} />
+        <Tooltip content={<CustomTooltip hide={hide} />} cursor={{ fill: cursor }} />
         <Legend
           wrapperStyle={{ fontSize: 12, color: tick, paddingTop: 8 }}
           formatter={(value) => value === 'income' ? 'Ingresos' : 'Gastos'}

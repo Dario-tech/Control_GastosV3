@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { fmt } from '../../utils'
 import { MONTH_NAMES } from '../../data/mockData'
+import Amt from './Amt'
 
 /* CALENDARIO DE CALOR (aislado: borrar este archivo + la sección CSS
    "CALENDARIO DE CALOR" de App.css + su única línea en MonthTab.jsx).
@@ -58,7 +59,7 @@ export default function CalendarView({ monthIndex, year, annualExpenses = [] }) 
   return (
     <div className="cv">
       <div className="cv-stats">
-        <div className="cv-stat"><span className="cv-stat-v tabular">{fmt(avg)}</span><span className="cv-stat-l">Media diaria</span></div>
+        <div className="cv-stat"><span className="cv-stat-v tabular"><Amt>{fmt(avg)}</Amt></span><span className="cv-stat-l">Media diaria</span></div>
         <div className="cv-stat"><span className="cv-stat-v tabular">{expenses[peakIdx] > 0 ? `${peakIdx + 1} ${MONTH_NAMES[monthIndex].slice(0, 3).toLowerCase()}` : '—'}</span><span className="cv-stat-l">Día más caro</span></div>
         <div className="cv-stat"><span className="cv-stat-v tabular">{zeroDays}</span><span className="cv-stat-l">Días sin gasto</span></div>
       </div>
@@ -110,7 +111,7 @@ export default function CalendarView({ monthIndex, year, annualExpenses = [] }) 
               <div className="cv-panel-sub">{DOW_LONG[new Date(year, monthIndex, sel).getDay()]}</div>
             </div>
             <div className={`cv-panel-total tabular${net > 0 ? ' pos' : net < 0 ? ' neg' : ''}`}>
-              {net === 0 ? fmt(0) : `${net > 0 ? '+' : '−'}${fmt(Math.abs(net))}`}
+              <Amt>{net === 0 ? fmt(0) : `${net > 0 ? '+' : '−'}${fmt(Math.abs(net))}`}</Amt>
               <span>Total del día</span>
             </div>
           </div>
@@ -119,7 +120,7 @@ export default function CalendarView({ monthIndex, year, annualExpenses = [] }) 
           ) : (
             <div className="cv-list">
               {selDue.map(e => (
-                <div key={`d${e.id}`} className="cv-row"><i className="cv-due" aria-hidden="true" /><span className="cv-row-name">Vence: {e.nombre}</span><span className="cv-row-amt tabular">{fmt(e.importe)}</span></div>
+                <div key={`d${e.id}`} className="cv-row"><i className="cv-due" aria-hidden="true" /><span className="cv-row-name">Vence: {e.nombre}</span><span className="cv-row-amt tabular"><Amt>{fmt(e.importe)}</Amt></span></div>
               ))}
               {selTx.map((t, i) => {
                 const inc = t.bucket === 'income'
@@ -127,7 +128,7 @@ export default function CalendarView({ monthIndex, year, annualExpenses = [] }) 
                   <div key={t.rowIndex ?? i} className="cv-row">
                     <i className={inc ? 'cv-inc-dot' : 'cv-exp-dot'} aria-hidden="true" />
                     <span className="cv-row-name">{t.concepto}{t.comentario && <small>{t.comentario}</small>}</span>
-                    <span className={`cv-row-amt tabular${inc ? ' pos' : ''}`}>{inc ? '+' : '−'}{fmt(t.importe)}</span>
+                    <span className={`cv-row-amt tabular${inc ? ' pos' : ''}`}><Amt>{inc ? '+' : '−'}{fmt(t.importe)}</Amt></span>
                   </div>
                 )
               })}

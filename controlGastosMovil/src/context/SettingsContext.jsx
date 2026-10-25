@@ -5,6 +5,7 @@ import { fetchPrefs, putPref } from '../services/prefsApi'
 import { fetchCategories, createCategory, deleteCategory, importCategories } from '../services/categoriesApi'
 import { importLegacy, claimLegacy, legacyHiddenFor, readLegacyCats, readLegacyBudgets, readLegacySettings, hasLegacyTour } from '../utils/legacyImport'
 import { newId } from '../utils/id'
+import { setCurrency } from '../utils/currency'
 import { mergeCategories, categoryExists, categoryKey, normalizeCategoryName } from '../data/categories'
 
 export const ACCENTS = [
@@ -320,6 +321,11 @@ export function SettingsProvider({ children }) {
     commit('budgets', fn(prefsRef.current.budgets))
   }, [])
 
+  // Categorías por defecto ocultas: lista completa [{ tipo, concepto }]
+  const setHiddenCategories = useCallback((list) => {
+    commit('hidden_categories', Array.isArray(list) ? list : [])
+  }, [])
+
   const markTourSeen = useCallback(() => {
     if (prefsRef.current.tour) return
     commit('tour', new Date().toISOString())
@@ -407,6 +413,9 @@ export function SettingsProvider({ children }) {
 
   const customCategories = useMemo(() => groupByTipo(cats), [cats])
   const settings = prefs.settings
+  // Moneda del formato de importes: se fija ya en el render, antes de que
+  // pinten los hijos (que llaman a fmt()). Idempotente.
+  setCurrency(settings.currency)
   const syncWarnings = useMemo(() => [
     ...unreadable.kinds.map(kindUnreadMsg),
     ...(unreadable.cats > 0 ? [unreadableCatsMsg(unreadable.cats)] : []),
@@ -454,7 +463,7 @@ export function SettingsProvider({ children }) {
   return (
     <Ctx.Provider value={{
       settings, update, customCategories, addCategory, removeCategory,
-      hiddenCategories: prefs.hidden,
+      hiddenCategories: prefs.hidden, setHiddenCategories,
       budgetItems: prefs.budgets, updateBudgets,
       tourSeen: !!prefs.tour, prefsLoaded: loaded, markTourSeen,
       syncNotice: notice, syncWarnings,

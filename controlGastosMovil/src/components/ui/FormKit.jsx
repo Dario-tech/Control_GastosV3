@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { currencySymbol } from '../../utils/currency'
 
 /* Conjunto único de piezas de formulario (clases `fm-*` en App.css) para las
    pantallas que se abren desde Planificación: presupuesto, meta de ahorro,
@@ -52,7 +53,7 @@ export function Icon({ name, size = 20, className = '' }) {
 
 /* Pantalla completa de cristal: barra con atrás, título grande, cuerpo con
    scroll y pie fijo para la acción principal (respeta la safe-area). */
-export function FormScreen({ title, subtitle, onClose, headerRight, footer, error, children, label }) {
+export function FormScreen({ title, subtitle, onClose, headerRight, footer, error, children, label, solid = false }) {
   const ref = useRef(null)
   const [scrolled, setScrolled] = useState(false)
 
@@ -68,7 +69,7 @@ export function FormScreen({ title, subtitle, onClose, headerRight, footer, erro
   }, [])
 
   return (
-    <div className="fm-screen" role="dialog" aria-modal="true" aria-label={label || title} ref={ref} tabIndex={-1}>
+    <div className={`fm-screen${solid ? ' fm-screen--solid' : ''}`} role="dialog" aria-modal="true" aria-label={label || title} ref={ref} tabIndex={-1}>
       <header className={`fm-header${scrolled ? ' scrolled' : ''}`}>
         <button type="button" className="fm-icon-btn" onClick={onClose} aria-label="Volver">
           <Icon name="back" />
@@ -131,7 +132,7 @@ export function Section({ title, aside, children }) {
 }
 
 /* Importe protagonista: grande, centrado, cifras tabulares, teclado decimal. */
-export function AmountInput({ value, onChange, onBlur, id, describedBy, invalid, placeholder = '0', size = 'lg', autoFocus, suffix = '€', ariaLabel, onEnter }) {
+export function AmountInput({ value, onChange, onBlur, id, describedBy, invalid, placeholder = '0', size = 'lg', autoFocus, suffix = currencySymbol(), ariaLabel, onEnter }) {
   function handle(e) {
     // Solo dígitos y un separador decimal (coma o punto).
     let v = e.target.value.replace(/[^\d.,]/g, '')
