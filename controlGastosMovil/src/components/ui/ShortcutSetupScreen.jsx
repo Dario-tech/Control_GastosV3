@@ -9,11 +9,15 @@ import { BASE, getShortcutToken } from '../../services/api'
      crea el pendiente y pide confirmarlo. Sin claves.
    - "fondo" (En segundo plano): el Atajo manda el pago directo al servidor
      (POST /api/shortcut/pending con la clave personal) y queda PENDIENTE.
-   La clave solo se pide al servidor al pulsar el botón y nunca va en el prompt.
+   - "manual": paso a paso sin IA, de los dos tipos.
+   La clave solo se pide al servidor al pulsar «Copiar prompt» / «Copiar mi clave»: va al
+   portapapeles y NUNCA se pinta, se guarda ni se registra. El prompt que se ve lleva el marcador.
    La PWA no puede leer Cartera ni instalar automatizaciones: solo guía. */
 
 // \u003c = «<» (escrito así para no confundir al test de imports que busca etiquetas JSX).
 export const KEY_PLACEHOLDER = '\u003cPEGA_AQUI_TU_CLAVE>'
+
+export const KEY_WARNING = 'El prompt copiado incluye tu clave personal: pégalo solo en Atajos y no lo compartas.'
 
 // Base del enlace del Atajo: el ORIGEN REAL donde corre la app (no la API).
 export function shortcutLinkBase(origin = window.location.origin) {
@@ -37,7 +41,7 @@ En Atajos, pestaña «Atajos», toca «+» y ponle de nombre «Mi Economía». A
 3. Acción «Codificar URL»: en el campo de entrada pon la variable «Entrada del atajo» y elige su propiedad «Importe». Esta acción es «Codificar URL 2».
 4. Acción «Texto»: escribe exactamente, sin espacios ni saltos de línea:
 ${link}&importe=[Resultado de Codificar URL 2]&comercio=[Resultado de Codificar URL 1]
-Los dos textos entre corchetes son variables: se insertan tocando «Variable» encima del teclado y eligiendo el resultado de cada «Codificar URL». No se escriben a mano.
+Atención al orden: primero el importe (resultado de la SEGUNDA acción «Codificar URL») y después el comercio (resultado de la PRIMERA). Los dos textos entre corchetes son variables: se insertan tocando «Variable» encima del teclado y eligiendo el resultado de cada «Codificar URL». No se escriben a mano.
 5. Acción «Abrir URLs»: ábrela con la variable «Texto» de la acción anterior.
 
 PARTE 2. CREAR LA AUTOMATIZACIÓN
@@ -54,9 +58,10 @@ Debe abrirse la app con un pago de 1,00 € en «Prueba».
 Notas: el enlace se abre en Safari, así que tengo que haber iniciado sesión una vez en Safari en esa dirección. Solo funciona con Apple Pay del iPhone. Dime al final qué comprobar si la app no se abre.`
 }
 
-// Prompt del modo "En segundo plano". Lleva la URL real de la API y el marcador
-// literal de la clave: NUNCA la clave real (el texto puede acabar en una IA ajena).
-export function buildPromptBackground(api = BASE) {
+// Prompt del modo "En segundo plano". Lleva la URL real de la API y, en `key`, el
+// marcador por defecto (lo que se ve en pantalla). Al copiar se llama con la clave
+// real, que solo acaba en el portapapeles, nunca en pantalla.
+export function buildPromptBackground(api = BASE, key = KEY_PLACEHOLDER) {
   const url = `${api}/api/shortcut/pending`
   return `Quiero crear en la app Atajos de iPhone (iOS 17 o posterior) un atajo llamado «Mi Economía (segundo plano)» y una automatización que lo ejecute cada vez que pague con Apple Pay. El atajo NO abre ninguna app: manda el pago directamente a mi servidor y queda como PENDIENTE de revisar. Explícame o guíame paso a paso, usando los nombres de las acciones en español de iOS.
 
@@ -71,7 +76,7 @@ En Atajos, pestaña «Atajos», toca «+» y ponle de nombre «Mi Economía (seg
       - Método: POST
       - Cabeceras: añade una con nombre «Content-Type» y valor «application/json».
       - Cuerpo de la solicitud: JSON, con estos campos de tipo texto:
-          «shortcut_token» = ${KEY_PLACEHOLDER}
+          «shortcut_token» = ${key}
           «importe» = la variable «Importe» (de «Entrada del atajo»), como texto, tal cual
           «comercio» = la variable «Comercio» (de «Entrada del atajo»)
           «id_externo» = la variable «ID» (el texto del paso 2)
@@ -87,7 +92,7 @@ En Atajos, pestaña «Atajos», toca «+» y ponle de nombre «Mi Economía (seg
    - Acción «Mostrar notificación»: «No se pudo guardar el pago de [Comercio]. Añádelo a mano.»
    - Opcional, como alternativa: acción «Texto» con la dirección de mi app seguida de ?atajo=1&importe=[Importe codificado]&comercio=[Comercio codificado] y después «Abrir URLs», para abrir mi app con el pago ya rellenado.
 
-IMPORTANTE SOBRE LA CLAVE: ${KEY_PLACEHOLDER} es un marcador. NO tienes mi clave ni debes inventarla. Déjalo escrito tal cual en tu respuesta y yo lo sustituiré a mano, dentro del campo «shortcut_token» de la acción «Obtener contenido de URL». No me pidas la clave.
+IMPORTANTE SOBRE LA CLAVE: mi clave personal ya va incluida en este texto, en el campo «shortcut_token» de la acción «Obtener contenido de URL». Úsala tal cual en ese campo. NO la repitas ni la muestres en tus respuestas (ni en resúmenes ni en ejemplos): si necesitas referirte a ella, di «tu clave».
 
 PARTE 2. CREAR LA AUTOMATIZACIÓN
 1. En Atajos, pestaña «Automatización», toca «Nueva automatización» (o «+»).
@@ -134,8 +139,9 @@ function ActionRow({ k, v }) {
 const Var = ({ children }) => <span className="sc-var">{children}</span>
 
 const MODES = [
-  { id: 'app',   label: 'Abrir la app',    hint: 'Se abre la app y guardas con un toque' },
-  { id: 'fondo', label: 'En segundo plano', hint: 'No se abre nada; queda pendiente' },
+  { id: 'app',    label: 'Abrir la app',     hint: 'Guardas con un toque' },
+  { id: 'fondo',  label: 'En segundo plano', hint: 'Queda pendiente' },
+  { id: 'manual', label: 'Manual',           hint: 'Paso a paso, sin IA' },
 ]
 
 // Copia con el mismo patrón en todos los botones: "✓ Copiado" 2 s o aviso de fallo.
@@ -160,8 +166,115 @@ function useCopy() {
   return { copied, copyFailed, copy }
 }
 
-function PromptBlock({ prompt }) {
-  const { copied, copyFailed, copy } = useCopy()
+function keyErrorMessage(err) {
+  if (err?.status === 401) return 'Tu sesión ha caducado. Vuelve a iniciar sesión.'
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'No hay conexión. Conéctate a internet y vuelve a intentarlo.'
+  if (err?.name === 'TimeoutError' || err?.name === 'AbortError' || [502, 503, 504].includes(err?.status)) {
+    return 'El servidor está despertando, vuelve a intentarlo en unos segundos.'
+  }
+  if (err?.status) return 'No se pudo obtener la clave. Inténtalo de nuevo en unos segundos.'
+  return 'No hay conexión con el servidor. Comprueba tu internet y vuelve a intentarlo.'
+}
+
+async function fetchKey() {
+  const { shortcut_token } = await getShortcutToken()
+  if (!shortcut_token) throw new Error('clave vacía')
+  return shortcut_token
+}
+
+/* Copia al portapapeles un texto que lleva la clave real, sin pintarla.
+   - Pide la clave (getShortcutToken) y construye el texto con build(clave).
+   - Safari/iOS: writeText tras un await pierde el gesto del usuario, así que se llama
+     a clipboard.write con un ClipboardItem cuyo contenido es una PROMESA del texto
+     (se resuelve cuando llega la clave). Sin ClipboardItem, se usa writeText.
+   - Plan B si el portapapeles falla pero la clave llegó: se guarda en una referencia
+     (no en estado) y se muestra «Pulsa otra vez para copiar»; el segundo toque ya
+     tiene la clave. Si vuelve a fallar: textarea de solo lectura con el texto, que se
+     oculta (y se borra la clave) al copiar o al pulsar «Ya lo he copiado».
+   - Si no hay clave (sesión caducada, sin conexión) solo muestra el error: nunca
+     copia un texto sin clave. */
+function useSecretCopy(build) {
+  const keyRef   = useRef(null)
+  const buildRef = useRef(build)
+  buildRef.current = build
+  const alive = useRef(true)
+  const timer = useRef(null)
+  const [busy, setBusy]       = useState(false)
+  const [copied, setCopied]   = useState(false)
+  const [error, setError]     = useState('')
+  const [retry, setRetry]     = useState(false)
+  const [manual, setManual]   = useState(null)
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false; keyRef.current = null; clearTimeout(timer.current) }
+  }, [])
+
+  function done() {
+    keyRef.current = null
+    if (!alive.current) return
+    setRetry(false); setManual(null); setError(''); setCopied(true)
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => { if (alive.current) setCopied(false) }, 2500)
+  }
+
+  function dismissManual() {
+    keyRef.current = null
+    setManual(null); setRetry(false)
+  }
+
+  function copy() {
+    setError(''); setCopied(false); setBusy(true)
+    const keyP  = keyRef.current ? Promise.resolve(keyRef.current) : fetchKey()
+    const textP = keyP.then(k => { keyRef.current = k; return buildRef.current(k) })
+    let writing
+    try {
+      const cb = navigator.clipboard
+      writing = (typeof ClipboardItem !== 'undefined' && typeof cb?.write === 'function')
+        ? cb.write([new ClipboardItem({ 'text/plain': textP.then(t => new Blob([t], { type: 'text/plain' })) })])
+        : textP.then(t => cb.writeText(t))
+    } catch (e) {
+      writing = Promise.reject(e)
+    }
+    return writing.then(done, async () => {
+      let text
+      try { text = await textP } catch (e) {
+        keyRef.current = null
+        if (alive.current) setError(keyErrorMessage(e))
+        return
+      }
+      if (!alive.current) return
+      if (retry) setManual(text); else setRetry(true)
+    }).finally(() => { if (alive.current) setBusy(false) })
+  }
+
+  return { copy, busy, copied, error, retry, manual, dismissManual, done }
+}
+
+// Avisos comunes de los botones que copian algo con la clave.
+function SecretCopyFeedback({ sc, okText }) {
+  return (
+    <>
+      <p className="sr-only" role="status" aria-live="polite">{sc.copied ? 'Copiado' : ''}</p>
+      {sc.copied && <p className="sc-hint">✓ {okText}</p>}
+      {sc.retry && !sc.manual && <p className="sc-warn" role="alert">Pulsa otra vez para copiar</p>}
+      {sc.manual != null && (
+        <div className="sc-manual-copy">
+          <p className="sc-warn" role="alert">No se pudo copiar automáticamente. Selecciona el texto, cópialo y pulsa «Ya lo he copiado».</p>
+          <textarea className="sc-prompt" readOnly rows={8} value={sc.manual} aria-label="Texto para copiar a mano"
+            onFocus={e => e.target.select()} onCopy={sc.done} />
+          <button type="button" className="fm-secondary fm-secondary--wide" onClick={sc.dismissManual}>Ya lo he copiado</button>
+        </div>
+      )}
+      {sc.error && <p className="sc-warn" role="alert">{sc.error}</p>}
+    </>
+  )
+}
+
+// Prompt para pegar en la IA de Atajos. Con `withKey`, al copiar se sustituye el
+// marcador por la clave real; en pantalla siempre se ve el marcador.
+function PromptBlock({ prompt, withKey = false, buildCopy }) {
+  const plain = useCopy()
+  const sc = useSecretCopy(buildCopy || (() => prompt))
   return (
     <section className="fm-card sc-step" aria-label="Prompt para una IA o para Atajos">
       <div className="sc-step-head">
@@ -173,89 +286,73 @@ function PromptBlock({ prompt }) {
         Describe, acción por acción, lo que hay que crear en la app Atajos.
       </p>
       <pre className="sc-prompt" data-testid="sc-prompt" tabIndex={0} aria-label="Texto del prompt">{prompt}</pre>
-      <button type="button" className="shortcut-token-copy sc-copy-btn" onClick={() => copy(prompt)}>
-        {copied ? '✓ Copiado' : 'Copiar prompt'}
-      </button>
-      <p className="sr-only" role="status" aria-live="polite">{copied ? 'Prompt copiado' : ''}</p>
-      {copyFailed && (
-        <p className="sc-warn" role="alert">No se pudo copiar automáticamente. Mantén pulsado el texto para seleccionarlo y copiarlo.</p>
+      {withKey ? (
+        <>
+          <button type="button" className="shortcut-token-copy sc-copy-btn" onClick={sc.copy} disabled={sc.busy}>
+            {sc.busy ? 'Copiando…' : sc.copied ? '✓ Copiado' : 'Copiar prompt'}
+          </button>
+          <p className="sc-hint sc-key-warning">{KEY_WARNING}</p>
+          <SecretCopyFeedback sc={sc} okText="Prompt copiado con tu clave. Pégalo en la IA de Atajos." />
+        </>
+      ) : (
+        <>
+          <button type="button" className="shortcut-token-copy sc-copy-btn" onClick={() => plain.copy(prompt)}>
+            {plain.copied ? '✓ Copiado' : 'Copiar prompt'}
+          </button>
+          <p className="sr-only" role="status" aria-live="polite">{plain.copied ? 'Copiado' : ''}</p>
+          {plain.copyFailed && (
+            <p className="sc-warn" role="alert">No se pudo copiar automáticamente. Mantén pulsado el texto para seleccionarlo y copiarlo.</p>
+          )}
+        </>
       )}
     </section>
   )
 }
 
-function keyErrorMessage(err) {
-  if (err?.status === 401) return 'Tu sesión ha caducado. Vuelve a iniciar sesión.'
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'No hay conexión. Conéctate a internet y vuelve a intentarlo.'
-  if (err?.name === 'TimeoutError' || err?.name === 'AbortError' || [502, 503, 504].includes(err?.status)) {
-    return 'El servidor está despertando, vuelve a intentarlo en unos segundos.'
-  }
-  if (err?.status) return 'No se pudo obtener la clave. Inténtalo de nuevo en unos segundos.'
-  return 'No hay conexión con el servidor. Comprueba tu internet y vuelve a intentarlo.'
-}
-
-// La clave solo vive en el estado de este componente (se pierde al cambiar de
-// modo o salir de la pantalla). No se guarda en localStorage ni en el prompt.
-function KeyStep({ n }) {
-  const [key, setKey]       = useState(null)
-  const [shown, setShown]   = useState(false)
-  const [busy, setBusy]     = useState(false)
-  const [error, setError]   = useState('')
-  const [copyOk, setCopyOk] = useState(null)
-  const alive = useRef(true)
-  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
-
-  async function reveal() {
-    setBusy(true); setError(''); setCopyOk(null)
-    try {
-      const { shortcut_token } = await getShortcutToken()
-      if (!alive.current) return
-      if (!shortcut_token) throw new Error('vacía')
-      setKey(shortcut_token)
-      setShown(false)
-      let ok = false
-      try { await navigator.clipboard.writeText(shortcut_token); ok = true } catch { /* se avisa abajo */ }
-      if (alive.current) setCopyOk(ok)
-    } catch (e) {
-      if (alive.current) { setKey(null); setError(keyErrorMessage(e)) }
-    } finally {
-      if (alive.current) setBusy(false)
-    }
-  }
-
+// Botón «Copiar mi clave»: la clave va al portapapeles sin mostrarse nunca.
+function KeyCopy() {
+  const sc = useSecretCopy(k => k)
   return (
-    <section className="fm-card sc-step" aria-labelledby={`sc-step-${n}`}>
-      <StepHead n={n} title="Tu clave personal" />
+    <div className="sc-keycopy">
       <p className="sc-tip sc-tip--warn sc-tip--inline" role="note">
         <span aria-hidden="true">🔑</span>
-        <span>Es como una llave de tu cuenta solo para el Atajo. No la pegues en la IA ni la compartas: pégala solo en el campo marcado dentro del Atajo.</span>
+        <span>Es como una llave de tu cuenta solo para el Atajo. No la pegues en ninguna IA ni la compartas: pégala solo en el campo «shortcut_token» dentro del Atajo. No se muestra en pantalla: se copia directamente.</span>
       </p>
-      <button type="button" className="fm-secondary fm-secondary--wide" onClick={reveal} disabled={busy}>
-        {busy ? 'Pidiendo la clave…' : 'Mostrar y copiar mi clave'}
+      <button type="button" className="fm-secondary fm-secondary--wide" onClick={sc.copy} disabled={sc.busy}>
+        {sc.busy ? 'Pidiendo la clave…' : sc.copied ? '✓ Copiada' : 'Copiar mi clave'}
       </button>
-      {key && (
-        <div className="sc-copy">
-          <span className="sc-copy-label">Tu clave</span>
-          <code className="sc-copy-value" data-testid="sc-key">{shown ? key : '•'.repeat(12)}</code>
-          <button type="button" className="shortcut-token-copy sc-copy-btn" aria-pressed={shown} onClick={() => setShown(v => !v)}>
-            {shown ? 'Ocultar' : 'Mostrar'}
-          </button>
-        </div>
+      <SecretCopyFeedback sc={sc} okText="Clave copiada. Pégala en el campo «shortcut_token»." />
+    </div>
+  )
+}
+
+// Valor + botón de copiar (URL de la API, enlace de la app...).
+function CopyField({ label, value, buttonLabel, testId }) {
+  const { copied, copyFailed, copy } = useCopy()
+  return (
+    <div className="sc-copy">
+      <span className="sc-copy-label">{label}</span>
+      <code className="sc-copy-value" data-testid={testId}>{value}</code>
+      <button type="button" className="shortcut-token-copy sc-copy-btn" onClick={() => copy(value)}>
+        {copied ? '✓ Copiado' : buttonLabel}
+      </button>
+      <p className="sr-only" role="status" aria-live="polite">{copied ? 'Copiado' : ''}</p>
+      {copyFailed && (
+        <p className="sc-warn" role="alert">No se pudo copiar automáticamente. Mantén pulsado el texto para copiarlo.</p>
       )}
-      <p className="sr-only" role="status" aria-live="polite">{copyOk ? 'Clave copiada' : ''}</p>
-      {copyOk && <p className="sc-hint">✓ Clave copiada. Pégala en el Atajo, en el campo «shortcut_token».</p>}
-      {copyOk === false && <p className="sc-warn" role="alert">No se pudo copiar automáticamente. Pulsa «Mostrar» y cópiala a mano.</p>}
-      {error && <p className="sc-warn" role="alert">{error}</p>}
-    </section>
+    </div>
   )
 }
 
 function ModeSelector({ mode, setMode }) {
   function onKey(e) {
-    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+    const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+    if (!d) return
     e.preventDefault()
-    const next = MODES[(MODES.findIndex(m => m.id === mode) + 1) % MODES.length].id
+    const i = MODES.findIndex(m => m.id === mode)
+    const next = MODES[(i + d + MODES.length) % MODES.length].id
     setMode(next)
+    requestAnimationFrame(() => document.getElementById(`sc-mode-${next}`)?.focus())
   }
   return (
     <div className="sc-modes" role="tablist" aria-label="Cómo quieres recibir los pagos">
@@ -273,8 +370,171 @@ function ModeSelector({ mode, setMode }) {
 }
 
 const SUBTITLES = {
-  app:   'Cada vez que pagues con Apple Pay, se abrirá la app con el gasto ya rellenado para que lo guardes con un toque.',
-  fondo: 'Cada vez que pagues con Apple Pay, el pago se guarda solo, sin abrir la app. Lo revisas después desde la campana.',
+  app:    'Cada vez que pagues con Apple Pay, se abrirá la app con el gasto ya rellenado para que lo guardes con un toque.',
+  fondo:  'Cada vez que pagues con Apple Pay, el pago se guarda solo, sin abrir la app. Lo revisas después desde la campana.',
+  manual: 'Monta el Atajo tú mismo, acción por acción, sin IA. Elige el tipo que prefieras.',
+}
+
+// Acciones del Atajo «Abrir la app» (se usan en el modo y en el Manual).
+function AppActions({ link }) {
+  return (
+    <div className="sc-actions" aria-label="Acciones del Atajo">
+      <ActionBlock n={1} icon="💳" tone="accent" name="Recibir entrada">
+        <ActionRow k="Recibir" v={<><strong>Transacciones</strong> de <strong>Cartera</strong></>} />
+        <p className="sc-hint">Suele aparecer arriba del todo al tocar el atajo (ⓘ → «Recibir»).</p>
+      </ActionBlock>
+
+      <ActionBlock n={2} icon="🔤" tone="orange" name="Codificar URL (comercio)">
+        <ActionRow k="Codificar" v={<><Var>Entrada del atajo</Var> → <strong>Comercio</strong></>} />
+        <p className="sc-hint">Toca la variable y elige <strong>Comercio</strong>. Así funcionan nombres con espacios o acentos.</p>
+      </ActionBlock>
+
+      <ActionBlock n={3} icon="🔤" tone="orange" name="Codificar URL (importe)">
+        <ActionRow k="Codificar" v={<><Var>Entrada del atajo</Var> → <strong>Importe</strong></>} />
+      </ActionBlock>
+
+      <ActionBlock n={4} icon="📝" tone="green" name="Texto">
+        <p className="sc-text sc-text-build">
+          Pega el enlace y añade detrás, sin espacios:
+        </p>
+        <code className="sc-formula">
+          {link}<wbr />&amp;importe=<Var>resultado de Codificar URL (importe)</Var><wbr />&amp;comercio=<Var>resultado de Codificar URL (comercio)</Var>
+        </code>
+        <p className="sc-hint">Primero el importe y después el comercio. Las fichas azules se insertan tocando <strong>Variable</strong> encima del teclado y eligiendo el resultado de cada «Codificar URL».</p>
+      </ActionBlock>
+
+      <ActionBlock n={5} icon="🧭" tone="red" name="Abrir URLs">
+        <ActionRow k="Abrir" v={<Var>Texto</Var>} />
+      </ActionBlock>
+    </div>
+  )
+}
+
+// Acciones del Atajo «En segundo plano», con todos los campos.
+function FondoActions({ api }) {
+  return (
+    <div className="sc-actions" aria-label="Acciones del Atajo en segundo plano">
+      <ActionBlock n={1} icon="💳" tone="accent" name="Recibir">
+        <ActionRow k="Recibir" v={<><strong>Transacciones</strong> de <strong>Cartera</strong></>} />
+      </ActionBlock>
+
+      <ActionBlock n={2} icon="📝" tone="green" name="Texto (el ID del pago)">
+        <p className="sc-text">En este orden y sin espacios:</p>
+        <code className="sc-formula">
+          <Var>Fecha actual</Var> (formato <strong>ISO 8601</strong>)<wbr /><Var>Comercio</Var><wbr /><Var>Importe</Var>
+        </code>
+        <p className="sc-hint">«Comercio» e «Importe» salen de «Entrada del atajo». Se calcula UNA sola vez, antes de reintentar, para que los reintentos no dupliquen el pago. Ponle a esta acción el nombre <strong>ID</strong>.</p>
+      </ActionBlock>
+
+      <ActionBlock n={3} icon="🔁" tone="orange" name="Repetir">
+        <ActionRow k="Repetir" v={<strong>3 veces</strong>} />
+        <p className="sc-hint">Las acciones 4 a 7 van DENTRO del bucle.</p>
+      </ActionBlock>
+
+      <ActionBlock n={4} icon="🌐" tone="accent" name="Obtener contenido de URL">
+        <ActionRow k="URL" v={<code>{api}/api/shortcut/pending</code>} />
+        <ActionRow k="Método" v={<strong>POST</strong>} />
+        <ActionRow k="Cabeceras" v={<><code>Content-Type</code> = <code>application/json</code></>} />
+        <ActionRow k="Cuerpo" v={<strong>JSON</strong>} />
+        <p className="sc-hint">Añade estos campos, todos de tipo <strong>Texto</strong>:</p>
+        <ActionRow k="shortcut_token" v="tu clave personal (botón «Copiar mi clave» de abajo)" />
+        <ActionRow k="importe" v={<><Var>Importe</Var> de Entrada del atajo, tal cual</>} />
+        <ActionRow k="comercio" v={<><Var>Comercio</Var> de Entrada del atajo</>} />
+        <ActionRow k="id_externo" v={<><Var>ID</Var> (la acción 2)</>} />
+        <p className="sc-hint">En «Mostrar más», sube el tiempo de espera (timeout) al máximo: el servidor gratuito puede tardar unos 30 segundos en despertar. Ponle de nombre al resultado <strong>Respuesta</strong>.</p>
+      </ActionBlock>
+
+      <ActionBlock n={5} icon="❓" tone="orange" name="Si">
+        <ActionRow k="Si" v={<><Var>Respuesta</Var> <strong>tiene algún valor</strong></>} />
+      </ActionBlock>
+
+      <ActionBlock n={6} icon="🔔" tone="green" name="Mostrar notificación + Detener este atajo">
+        <p className="sc-hint">Dentro del «Si»: «Mostrar notificación» con «Pago guardado: Comercio Importe. Revísalo en Mi Economía.» (variables) y después «Detener este atajo» para salir del bucle.</p>
+      </ActionBlock>
+
+      <ActionBlock n={7} icon="⏳" tone="orange" name="Si no → Esperar">
+        <ActionRow k="Esperar" v={<strong>20 segundos</strong>} />
+        <p className="sc-hint">En el «Si no», y después «Fin Si». Al terminar la vuelta, el bucle hace el siguiente intento.</p>
+      </ActionBlock>
+
+      <ActionBlock n={8} icon="🔁" tone="orange" name="Fin de Repetir">
+        <p className="sc-hint">Cierra el bucle. Solo se llega aquí si los 3 intentos fallaron.</p>
+      </ActionBlock>
+
+      <ActionBlock n={9} icon="🔔" tone="red" name="Mostrar notificación">
+        <p className="sc-hint">«No se pudo guardar el pago de Comercio. Añádelo a mano.»</p>
+      </ActionBlock>
+    </div>
+  )
+}
+
+function AutomationSteps({ n, shortcutName }) {
+  return (
+    <section className="fm-card sc-step" aria-labelledby={`sc-step-${n}`}>
+      <StepHead n={n} title="Crea la automatización" />
+      <ol className="sc-sublist">
+        <li>En Atajos, pestaña <strong>Automatización</strong> → <strong>Nueva automatización</strong> (o <strong>+</strong>).</li>
+        <li>Elige <strong>Transacción</strong>.</li>
+        <li>Marca tus tarjetas de Cartera (puedes dejar todas las categorías).</li>
+        <li>Elige <strong>Ejecutar inmediatamente</strong> (no «Ejecutar tras confirmación»).</li>
+        <li>Toca <strong>Siguiente</strong> y elige el atajo <strong>{shortcutName}</strong>.</li>
+      </ol>
+    </section>
+  )
+}
+
+// Modo Manual: los dos tipos, paso a paso y sin IA.
+function ManualMode({ link, api }) {
+  const url = `${api}/api/shortcut/pending`
+  return (
+    <>
+      <section className="fm-card sc-step" aria-labelledby="sc-man-app">
+        <div className="sc-step-head">
+          <span className="sc-step-num" aria-hidden="true">A</span>
+          <h2 className="sc-step-title" id="sc-man-app">Tipo «Abrir la app»</h2>
+        </div>
+        <p className="sc-text">El Atajo abre la app con el pago ya rellenado y lo guardas con un toque. No usa claves.</p>
+        <CopyField label="Enlace del atajo" value={link} buttonLabel="Copiar enlace de la app" testId="sc-man-link" />
+        <ol className="sc-sublist">
+          <li>Abre la app <strong>Atajos</strong>, pestaña <strong>Atajos</strong>, y toca <strong>+</strong>.</li>
+          <li>Ponle de nombre <strong>Mi Economía</strong>.</li>
+          <li>Añade estas acciones, en este orden:</li>
+        </ol>
+        <AppActions link={link} />
+        <p className="sc-hint">Después crea la automatización (abajo) con el atajo <strong>Mi Economía</strong>. El iPhone abre el enlace en Safari: entra una vez en {window.location.host} desde Safari e inicia sesión.</p>
+      </section>
+
+      <section className="fm-card sc-step" aria-labelledby="sc-man-fondo">
+        <div className="sc-step-head">
+          <span className="sc-step-num" aria-hidden="true">B</span>
+          <h2 className="sc-step-title" id="sc-man-fondo">Tipo «En segundo plano»</h2>
+        </div>
+        <p className="sc-text">El Atajo manda el pago directamente al servidor, sin abrir nada. Queda pendiente y lo revisas desde la campana.</p>
+        <CopyField label="URL de la API" value={url} buttonLabel="Copiar URL de la API" testId="sc-man-api" />
+        <KeyCopy />
+        <ol className="sc-sublist">
+          <li>En Atajos, pestaña <strong>Atajos</strong>, toca <strong>+</strong> y llámalo <strong>Mi Economía (segundo plano)</strong>.</li>
+          <li>Añade estas acciones, en este orden:</li>
+        </ol>
+        <FondoActions api={api} />
+        <p className="sc-hint">Opcional, tras el aviso de fallo: acción «Texto» con el enlace de la app, <code>&amp;importe=</code> y <code>&amp;comercio=</code> (codificados) y «Abrir URLs», para abrir la app con el pago ya rellenado.</p>
+      </section>
+
+      <section className="fm-card sc-step" aria-labelledby="sc-man-auto">
+        <div className="sc-step-head">
+          <span className="sc-step-num" aria-hidden="true">3</span>
+          <h2 className="sc-step-title" id="sc-man-auto">Crea la automatización (los dos tipos)</h2>
+        </div>
+        <ol className="sc-sublist">
+          <li>En Atajos, pestaña <strong>Automatización</strong> → <strong>Nueva automatización</strong> (o <strong>+</strong>).</li>
+          <li>Elige <strong>Transacción</strong>.</li>
+          <li>Marca tus tarjetas de Cartera (puedes dejar todas las categorías).</li>
+          <li>Elige <strong>Ejecutar inmediatamente</strong> (no «Ejecutar tras confirmación»).</li>
+          <li>Toca <strong>Siguiente</strong> y elige el atajo <strong>Mi Economía</strong> o <strong>Mi Economía (segundo plano)</strong>.</li>
+        </ol>
+      </section>
+    </>
+  )
 }
 
 export default function ShortcutSetupScreen({ onClose, navigate = url => window.location.assign(url) }) {
@@ -283,6 +543,7 @@ export default function ShortcutSetupScreen({ onClose, navigate = url => window.
   const { copied, copyFailed, copy } = useCopy()
   const copyLink = () => copy(link)
   const fondo = mode === 'fondo'
+  const manual = mode === 'manual'
 
   return (
     <FormScreen title="Pagos automáticos (iPhone)" label="Configurar pagos automáticos con Apple Pay" onClose={onClose}
@@ -293,6 +554,7 @@ export default function ShortcutSetupScreen({ onClose, navigate = url => window.
       <div id="sc-mode-panel" role="tabpanel" aria-labelledby={`sc-mode-${mode}`} className="sc-panel">
 
       {/* Qué hace y límites */}
+      {!manual && (
       <section className="fm-card sc-intro" aria-label="Cómo funciona">
         <div className="sc-phone" aria-hidden="true">
           <div className="sc-phone-notch" />
@@ -317,9 +579,10 @@ export default function ShortcutSetupScreen({ onClose, navigate = url => window.
           {fondo && <li>Si el servidor estaba dormido, el Atajo reintenta solo hasta 3 veces. Si no lo consigue, te avisa con una notificación.</li>}
         </ul>
       </section>
+      )}
 
       {/* Aviso Safari: solo si el Atajo abre la app */}
-      {!fondo && (
+      {mode === 'app' && (
         <section className="sc-tip sc-tip--warn" aria-label="Importante: Safari">
           <span aria-hidden="true">⚠️</span>
           <p>
@@ -330,15 +593,15 @@ export default function ShortcutSetupScreen({ onClose, navigate = url => window.
         </section>
       )}
 
-      {fondo ? (
+      {manual ? (
+        <ManualMode link={link} api={BASE} />
+      ) : fondo ? (
         <>
-          <KeyStep n={1} />
-
-          <section className="fm-card sc-step" aria-labelledby="sc-step-2">
-            <StepHead n={2} title="Crea el Atajo" />
+          <section className="fm-card sc-step" aria-labelledby="sc-step-1">
+            <StepHead n={1} title="Crea el Atajo" />
             <p className="sc-text">
               En Atajos, pestaña <strong>Atajos</strong>, toca <strong>+</strong> y llámalo <strong>Mi Economía (segundo plano)</strong>.
-              Es largo de montar a mano: lo más cómodo es copiar el prompt de abajo y dárselo a una IA, o seguirlo tú acción por acción.
+              Es largo de montar a mano: lo más cómodo es copiar el prompt de abajo y dárselo a una IA de Atajos. Si prefieres hacerlo tú, usa la pestaña «Manual».
             </p>
             <div className="sc-actions" aria-label="Resumen de acciones del Atajo">
               <ActionBlock n={1} icon="💳" tone="accent" name="Recibir">
@@ -354,6 +617,14 @@ export default function ShortcutSetupScreen({ onClose, navigate = url => window.
                 <p className="sc-hint">Tras 3 fallos: «No se pudo guardar el pago de COMERCIO. Añádelo a mano.»</p>
               </ActionBlock>
             </div>
+          </section>
+          <AutomationSteps n={2} shortcutName="Mi Economía (segundo plano)" />
+          <section className="fm-card sc-step" aria-labelledby="sc-step-3">
+            <StepHead n={3} title="Pruébalo" />
+            <p className="sc-text">
+              Paga algo pequeño con Apple Pay. Al cabo de unos segundos, entra en la app: la <strong>campana</strong> debe mostrar
+              un pago pendiente. Si el servidor estaba dormido, puede tardar hasta un minuto.
+            </p>
           </section>
         </>
       ) : (
@@ -382,62 +653,14 @@ export default function ShortcutSetupScreen({ onClose, navigate = url => window.
               <li>Ponle de nombre <strong>Mi Economía</strong>.</li>
               <li>Añade estas acciones, en este orden:</li>
             </ol>
-
-            <div className="sc-actions" aria-label="Acciones del Atajo">
-              <ActionBlock n={1} icon="💳" tone="accent" name="Recibir entrada">
-                <ActionRow k="Recibir" v={<><strong>Transacciones</strong> de <strong>Cartera</strong></>} />
-                <p className="sc-hint">Suele aparecer arriba del todo al tocar el atajo (ⓘ → «Recibir»).</p>
-              </ActionBlock>
-
-              <ActionBlock n={2} icon="🔤" tone="orange" name="Codificar URL">
-                <ActionRow k="Codificar" v={<><Var>Entrada del atajo</Var> → <strong>Comercio</strong></>} />
-                <p className="sc-hint">Toca la variable y elige <strong>Comercio</strong>. Así funcionan nombres con espacios o acentos.</p>
-              </ActionBlock>
-
-              <ActionBlock n={3} icon="🔤" tone="orange" name="Codificar URL">
-                <ActionRow k="Codificar" v={<><Var>Entrada del atajo</Var> → <strong>Importe</strong></>} />
-              </ActionBlock>
-
-              <ActionBlock n={4} icon="📝" tone="green" name="Texto">
-                <p className="sc-text sc-text-build">
-                  Pega el enlace y añade detrás, sin espacios:
-                </p>
-                <code className="sc-formula">
-                  {link}<wbr />&amp;importe=<Var>resultado de Codificar URL 3</Var><wbr />&amp;comercio=<Var>resultado de Codificar URL 2</Var>
-                </code>
-                <p className="sc-hint">Las fichas azules se insertan tocando <strong>Variable</strong> encima del teclado y eligiendo el resultado de cada «Codificar URL».</p>
-              </ActionBlock>
-
-              <ActionBlock n={5} icon="🧭" tone="red" name="Abrir URLs">
-                <ActionRow k="Abrir" v={<Var>Texto</Var>} />
-              </ActionBlock>
-            </div>
+            <AppActions link={link} />
           </section>
-        </>
-      )}
 
-      {/* Paso 3 */}
-      <section className="fm-card sc-step" aria-labelledby="sc-step-3">
-        <StepHead n={3} title="Crea la automatización" />
-        <ol className="sc-sublist">
-          <li>En Atajos, pestaña <strong>Automatización</strong> → <strong>Nueva automatización</strong> (o <strong>+</strong>).</li>
-          <li>Elige <strong>Transacción</strong>.</li>
-          <li>Marca tus tarjetas de Cartera (puedes dejar todas las categorías).</li>
-          <li>Elige <strong>Ejecutar inmediatamente</strong> (no «Ejecutar tras confirmación»).</li>
-          <li>Toca <strong>Siguiente</strong> y elige el atajo <strong>{fondo ? 'Mi Economía (segundo plano)' : 'Mi Economía'}</strong>.</li>
-        </ol>
-      </section>
+          <AutomationSteps n={3} shortcutName="Mi Economía" />
 
-      {/* Paso 4 */}
-      <section className="fm-card sc-step" aria-labelledby="sc-step-4">
-        <StepHead n={4} title="Pruébalo" />
-        {fondo ? (
-          <p className="sc-text">
-            Paga algo pequeño con Apple Pay. Al cabo de unos segundos, entra en la app: la <strong>campana</strong> debe mostrar
-            un pago pendiente. Si el servidor estaba dormido, puede tardar hasta un minuto.
-          </p>
-        ) : (
-          <>
+          {/* Paso 4 */}
+          <section className="fm-card sc-step" aria-labelledby="sc-step-4">
+            <StepHead n={4} title="Pruébalo" />
             <p className="sc-text">
               Mira cómo queda sin pagar nada: «Probar ahora» abre la app como si hubieras pagado 1,00 € en «Prueba».
               Luego puedes descartarlo.
@@ -449,11 +672,12 @@ export default function ShortcutSetupScreen({ onClose, navigate = url => window.
               Después, paga algo pequeño con Apple Pay. ¿No se abre la app? Revisa que la automatización esté en
               «Ejecutar inmediatamente» y que la acción «Texto» empiece por {link}.
             </p>
-          </>
-        )}
-      </section>
+          </section>
+        </>
+      )}
 
-      <PromptBlock key={mode} prompt={fondo ? buildPromptBackground() : buildPromptApp(link)} />
+      {mode === 'app' && <PromptBlock key="app" prompt={buildPromptApp(link)} />}
+      {fondo && <PromptBlock key="fondo" withKey prompt={buildPromptBackground()} buildCopy={k => buildPromptBackground(BASE, k)} />}
 
       </div>
     </FormScreen>

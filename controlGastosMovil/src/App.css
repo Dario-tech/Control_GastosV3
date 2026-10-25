@@ -3599,3 +3599,12 @@ img.fm-goal-hero-icon { width: 64px; height: 64px; border-radius: 20px; object-f
   font-family: monospace; font-size: var(--fs-xs); line-height: 1.45; color: var(--text);
   background: var(--surface2); border: 1px solid var(--border2, var(--border)); border-radius: var(--radius-sm, 14px);
 }
+
+/* Guía Atajo: tercer modo (Manual), aviso de clave y copia a mano */
+.sc-modes { grid-template-columns: repeat(3, 1fr); }
+.sc-mode { padding: 8px 8px; min-width: 0; }
+.sc-mode-label { font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.sc-key-warning { color: var(--text2); }
+.sc-manual-copy { display: flex; flex-direction: column; gap: 8px; }
+.sc-manual-copy textarea.sc-prompt { width: 100%; box-sizing: border-box; resize: vertical; }
+.sc-keycopy { display: flex; flex-direction: column; gap: 8px; }
