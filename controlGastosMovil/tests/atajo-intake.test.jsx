@@ -183,7 +183,8 @@ describe('ShortcutSetupScreen', () => {
     expect(tabFondo.getAttribute('aria-selected')).toBe('true')
     expect(screen.queryByText('Importante:')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Probar ahora' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Mostrar y copiar mi clave' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Copiar mi clave' })).toBeNull() // la clave solo en Manual
+    expect(screen.getAllByRole('tab')).toHaveLength(3)
   })
 
   it('prompt del modo A lleva el enlace de la app y la fórmula; el de B la API y el marcador, sin token', () => {
@@ -195,6 +196,7 @@ describe('ShortcutSetupScreen', () => {
     const b = buildPromptBackground()
     expect(b).toContain(`${BASE}/api/shortcut/pending`)
     expect(b).toContain(KEY_PLACEHOLDER)
+    expect(b).not.toMatch(/NO tienes mi clave|No me pidas la clave/)
     expect(KEY_PLACEHOLDER).toBe('<PEGA_AQUI_TU_CLAVE>')
     for (const s of ['Recibir', 'Repetir', 'Obtener contenido de URL', 'POST', 'application/json', 'id_externo', 'Esperar', 'ISO 8601', 'Mostrar notificación', 'Ejecutar inmediatamente']) {
       expect(b).toContain(s)
@@ -211,53 +213,7 @@ describe('ShortcutSetupScreen', () => {
     expect(await screen.findByText('✓ Copiado')).toBeTruthy()
 
     fireEvent.click(screen.getAllByRole('tab')[1])
-    writeText.mockRejectedValueOnce(new Error('no'))
-    fireEvent.click(screen.getByRole('button', { name: 'Copiar prompt' }))
-    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith(buildPromptBackground()))
-    expect(await screen.findByText(/No se pudo copiar automáticamente/)).toBeTruthy()
-  })
-
-  it('«Mostrar y copiar mi clave»: pide la clave con JWT, la copia, la enmascara y no la guarda', async () => {
-    login()
-    const writeText = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
-    const f = vi.fn(() => jsonRes({ shortcut_token: 'SECRETO-123' })); vi.stubGlobal('fetch', f)
-    render(<ShortcutSetupScreen onClose={() => {}} />)
-    fireEvent.click(screen.getAllByRole('tab')[1])
-    fireEvent.click(screen.getByRole('button', { name: 'Mostrar y copiar mi clave' }))
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith('SECRETO-123'))
-    expect(f.mock.calls[0][0]).toBe(`${BASE}/api/shortcut/token`)
-    expect(f.mock.calls[0][1].headers.Authorization).toBe('Bearer jwt')
-    const key = await screen.findByTestId('sc-key')
-    expect(key.textContent).not.toContain('SECRETO')
-    fireEvent.click(screen.getByRole('button', { name: 'Mostrar' }))
-    expect(screen.getByTestId('sc-key').textContent).toBe('SECRETO-123')
-    expect(screen.getByTestId('sc-prompt').textContent).not.toContain('SECRETO')
-    expect(JSON.stringify({ ...localStorage })).not.toContain('SECRETO')
-    // al volver al modo A se olvida
-    fireEvent.click(screen.getAllByRole('tab')[0])
-    fireEvent.click(screen.getAllByRole('tab')[1])
-    expect(screen.queryByTestId('sc-key')).toBeNull()
-  })
-
-  it('«Mostrar y copiar mi clave»: errores de servidor despertando, sin conexión y sesión caducada', async () => {
-    login()
-    render(<ShortcutSetupScreen onClose={() => {}} />)
-    fireEvent.click(screen.getAllByRole('tab')[1])
-    const btn = () => screen.getByRole('button', { name: 'Mostrar y copiar mi clave' })
-
-    vi.stubGlobal('fetch', vi.fn(() => jsonRes({ detail: 'x' }, 503)))
-    fireEvent.click(btn())
-    expect(await screen.findByText(/El servidor está despertando/)).toBeTruthy()
-
-    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))))
-    fireEvent.click(btn())
-    expect(await screen.findByText(/No hay conexión con el servidor/)).toBeTruthy()
-
-    vi.stubGlobal('fetch', vi.fn(() => jsonRes({}, 401)))
-    fireEvent.click(btn())
-    expect(await screen.findByText(/sesión ha caducado/)).toBeTruthy()
-    expect(screen.queryByTestId('sc-key')).toBeNull()
+    // el de segundo plano pide la clave (ver atajo-prompt-clave.test.jsx)
   })
 })
 
