@@ -3613,7 +3613,7 @@ img.fm-goal-hero-icon { width: 64px; height: 64px; border-radius: 20px; object-f
 .sc-mode-label { font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .sc-key-warning { color: var(--text2); }
 .sc-manual-copy { display: flex; flex-direction: column; gap: 8px; }
-.sc-manual-copy textarea.sc-prompt { width: 100%; box-sizing: border-box; resize: vertical; }
+.sc-manual-copy textarea.sc-prompt { font-size: max(16px, var(--fs-xs)); /* <16px hace que iOS amplíe al enfocar */ width: 100%; box-sizing: border-box; resize: vertical; }
 .sc-keycopy { display: flex; flex-direction: column; gap: 8px; }
 
 /* Ajustes: botón «+ Nueva categoría» */
@@ -3634,3 +3634,10 @@ img.fm-goal-hero-icon { width: 64px; height: 64px; border-radius: 20px; object-f
 
 /* Toast: ancho acotado, texto largo con puntos suspensivos */
 .toast { max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+
+/* Fallback de ErrorBoundary (sin colores fijos: sigue los 3 temas) */
+.eb-box { display: flex; flex-direction: column; gap: 16px; padding: 24px 20px; text-align: center; color: var(--text); }
+.eb-text { margin: 0; font-size: var(--fs-md); line-height: 1.45; color: var(--text); }
+.eb-actions { display: flex; flex-direction: column; gap: 10px; }
+.eb-inline { padding: 24px 16px; }
+.eb-sheet { padding-bottom: env(safe-area-inset-bottom); }
