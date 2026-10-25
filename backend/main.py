@@ -215,7 +215,7 @@ async def auth_login(body: GoogleLoginIn, request: Request):
     google_user   = await verify_google_token(body.token)
     email         = google_user["email"]
     name          = google_user.get("name") or email.split("@")[0]
-    user_data     = await ensure_user(email, name)
+    await ensure_user(email, name)
     session_token = create_jwt(email)
     return {
         "session_token": session_token,
@@ -224,7 +224,6 @@ async def auth_login(body: GoogleLoginIn, request: Request):
             "email":          email,
             "name":           name,
             "picture":        google_user.get("picture", ""),
-            "shortcut_token": user_data.get("shortcut_token", ""),
         },
     }
 
@@ -252,7 +251,8 @@ class EmailLoginIn(BaseModel):
     password: str
 
 
-def _session_response(email: str, name: str, shortcut_token: str) -> dict:
+def _session_response(email: str, name: str) -> dict:
+    # No incluye shortcut_token: se obtiene solo por GET /api/shortcut/token (JWT).
     return {
         "session_token": create_jwt(email),
         "needs_setup":   False,
@@ -260,7 +260,6 @@ def _session_response(email: str, name: str, shortcut_token: str) -> dict:
             "email":          email,
             "name":           name,
             "picture":        "",
-            "shortcut_token": shortcut_token,
         },
     }
 
@@ -284,7 +283,7 @@ async def auth_register(body: RegisterIn, request: Request):
     if created is None:
         raise HTTPException(status_code=409, detail="Ya existe una cuenta con este email")
 
-    return _session_response(email, created["name"], created["shortcut_token"])
+    return _session_response(email, created["name"])
 
 
 # Hash bcrypt (cost 12, igual que hash_password) de un valor aleatorio descartado:
@@ -312,7 +311,7 @@ async def auth_login_email(body: EmailLoginIn, request: Request):
     ratelimit_reset("login-email", email)
 
     user = await get_user(email)
-    return _session_response(email, (user or {}).get("name", ""), (user or {}).get("shortcut_token", ""))
+    return _session_response(email, (user or {}).get("name", ""))
 
 
 # ── SSE ───────────────────────────────────────────────────────────────────────
@@ -701,8 +700,8 @@ async def shortcut_create_pending(request: Request):
     - id_externo (opcional): texto <= 128 caracteres (UUID o fecha-hora del disparo).
     Con comercio y/o id_externo se deduplican reintentos (mismo id_externo en 24 h, o
     mismo importe+comercio en < 2 min) con create_pending_dedup: 200 con el existente
-    y "duplicada": true. Respuesta en ese caso: {id, importe, fecha, comercio,
-    duplicada, sugerencia}. Sin comercio ni id_externo (Atajos antiguos) la respuesta
+    y "duplicada": true. Respuesta en ese caso, recortada a propósito (no filtra
+    comercio, importe ni categorías aprendidas): {id, duplicada}. Sin comercio ni id_externo (Atajos antiguos) la respuesta
     es la de siempre: {id, importe, fecha}. Nunca se registra comercio ni importe."""
     try:
         data = await request.json()
@@ -757,8 +756,9 @@ async def shortcut_create_pending(request: Request):
         id_externo = id_externo.strip()
 
     if comercio is not None or id_externo is not None:
-        result = await create_pending_dedup(email, importe, fecha.isoformat(), comercio,
-                                            id_externo, fuente="atajo")
+        full = await create_pending_dedup(email, importe, fecha.isoformat(), comercio,
+                                          id_externo, fuente="atajo")
+        result = {"id": full["id"], "duplicada": bool(full.get("duplicada"))}
     else:
         result = await create_pending(email, importe, fecha.isoformat(), fuente="atajo")
     if not (isinstance(result, dict) and result.get("duplicada")):

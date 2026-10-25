@@ -628,7 +628,7 @@ def test_atajo_comercio_cifrado_y_importe_de_cartera(client, db, broadcasts):
     r = _atajo(client, importe="12,40 €", comercio="  Mercadona  ", fecha="2026-10-01")
     assert r.status_code == 200, r.text
     j = r.json()
-    assert j["importe"] == 12.4 and j["comercio"] == "Mercadona" and j["duplicada"] is False
+    assert j == {"id": db.pending[0]["id"], "duplicada": False}
     row = db.pending[0]
     assert row["user_email"] == EMAIL and row["fuente"] == "atajo"
     assert b"Mercadona" not in row["comercio_enc"] and crypto.decrypt_str(row["comercio_enc"]) == "Mercadona"
@@ -679,6 +679,25 @@ def test_atajo_reintento_mismo_id_externo_duplicada(client, db, broadcasts):
     assert len(db.pending) == 1 and broadcasts == [1]
 
 
+def test_atajo_dedup_respuesta_recortada(client, db, broadcasts):
+    j = _atajo(client, importe="12,40 €", comercio="Mercadona", id_externo="x1").json()
+    assert set(j) == {"id", "duplicada"}
+    for k in ("sugerencia", "comercio", "importe"):
+        assert k not in j
+
+
+def test_atajo_dedup_reintento_mismo_id_sin_fugas(client, db, broadcasts):
+    a = _atajo(client, importe=9, comercio="Zara", id_externo="x2").json()
+    b = _atajo(client, importe=9, comercio="Zara", id_externo="x2").json()
+    assert b == {"id": a["id"], "duplicada": True}
+    assert broadcasts == [1]
+
+
+def test_atajo_antiguo_conserva_respuesta(client, db, broadcasts):
+    j = _atajo(client, importe=4, fecha="2026-10-01").json()
+    assert j == {"id": db.pending[0]["id"], "importe": 4.0, "fecha": "2026-10-01"}
+
+
 # ── GET /api/shortcut/token ───────────────────────────────────────────────────
 
 def test_get_token_existente(client, db, auth_headers):
@@ -702,3 +721,43 @@ def test_get_token_exige_jwt(client, db):
 def test_get_token_rate_limit(client, db, auth_headers):
     codes = [client.get("/api/shortcut/token", headers=auth_headers).status_code for _ in range(21)]
     assert codes[:20] == [200] * 20 and codes[20] == 429
+
+
+# ── Las respuestas de sesión no llevan shortcut_token ────────────────────────
+
+def test_sesion_no_devuelve_shortcut_token(client, monkeypatch):
+    import main
+    secreto = "SECRETO-SHORTCUT-TOKEN-123"
+
+    async def get_hash(_):
+        return "hash"
+
+    async def get_user(_):
+        return {"name": "Ana", "shortcut_token": secreto}
+
+    async def create(email, name, pw_hash):
+        return {"name": name, "shortcut_token": secreto}
+
+    async def google(_):
+        return {"email": "g@example.com", "name": "G", "picture": "p"}
+
+    async def ensure(email, name):
+        return {"name": name, "shortcut_token": secreto}
+    monkeypatch.setattr(main, "get_password_hash", get_hash)
+    monkeypatch.setattr(main, "get_user", get_user)
+    monkeypatch.setattr(main, "verify_password", lambda pw, h: True)
+    monkeypatch.setattr(main, "hash_password", lambda pw: "h")
+    monkeypatch.setattr(main, "create_user_with_password", create)
+    monkeypatch.setattr(main, "verify_google_token", google)
+    monkeypatch.setattr(main, "ensure_user", ensure)
+
+    respuestas = [
+        client.post("/api/auth/login-email", json={"email": "a@b.com", "password": "x"}),
+        client.post("/api/auth/register", json={"email": "n@b.com", "name": "N", "password": "1234567890"}),
+        client.post("/api/auth/login", json={"token": "g"}),
+    ]
+    for r in respuestas:
+        assert r.status_code == 200, r.text
+        assert "shortcut_token" not in r.text and secreto not in r.text
+        u = r.json()["user"]
+        assert u["email"] and "name" in u and "picture" in u and r.json()["session_token"]
