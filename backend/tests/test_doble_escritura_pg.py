@@ -37,7 +37,7 @@ def _ddl(schema: str, estructura: str) -> list[str]:
                 id SERIAL PRIMARY KEY, user_email TEXT NOT NULL,
                 importe NUMERIC(10,2) NOT NULL, fecha DATE NOT NULL DEFAULT CURRENT_DATE,
                 created_at TIMESTAMPTZ DEFAULT now(), comercio_enc BYTEA, comercio_hmac BYTEA,
-                fuente TEXT, id_externo_hmac BYTEA)""",
+                fuente TEXT, id_externo_hmac BYTEA, importe_enc BYTEA, importe_hmac BYTEA)""",
     ]
 
 

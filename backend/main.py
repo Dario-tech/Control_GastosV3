@@ -39,6 +39,7 @@ from services.ratelimit import enforce, reset as ratelimit_reset, client_ip
 from services.pending import (
     create_pending, get_pending, categorize_pending, delete_pending,
     create_pending_dedup, ensure_wallet_schema,
+    ensure_pending_importe_schema, backfill_pending_importe,
 )
 from services.wallet import (
     parse_importe, parse_fecha, today_madrid, clean_comercio, clean_id_externo,
@@ -69,6 +70,8 @@ async def lifespan(app: FastAPI):
     ensure_id_cliente()  # migración aditiva idempotente (id_cliente: idempotencia del alta)
     ensure_search_index()  # migración aditiva idempotente (índice para paginar la búsqueda)
     ensure_wallet_schema()  # migración aditiva idempotente (Atajo de Cartera: comercio, reglas)
+    ensure_pending_importe_schema()  # migración aditiva idempotente (importe de pendientes cifrado)
+    backfill_pending_importe()  # cifra pendientes antiguos sin tocar el claro; nunca rompe el arranque
     user_data.ensure_user_data_schema()  # migración aditiva idempotente (categorías y prefs por usuario)
     # TEMPORAL (B2, hasta la fase 3 de MIGRACION_QA_A_PROD.md): si la tabla aún
     # tiene concepto/importe en claro (PROD), las escrituras los rellenan también.

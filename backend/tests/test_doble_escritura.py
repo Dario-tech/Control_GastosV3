@@ -108,7 +108,7 @@ class FakeCursor:
                          ("id", "fecha", "tipo", "concepto_enc", "importe_enc", "comentario")}
             return
 
-        if q.startswith("SELECT importe, fecha, comercio_hmac FROM pending_transactions"):
+        if q.startswith("SELECT id, importe, importe_enc, fecha, comercio_hmac FROM pending_transactions"):
             pid, email = params
             p = db.pending.get(pid)
             self._res = dict(p) if p and p["user_email"] == email else None

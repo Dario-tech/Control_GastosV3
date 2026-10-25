@@ -163,37 +163,38 @@ class FakeCursor:
         self._res = []
         if q.startswith("SELECT pg_advisory_xact_lock"):
             return
-        if q.startswith("SELECT id, importe, fecha::text, comercio_enc FROM pending_transactions"):
-            email, ide, _, reciente, importe, chmac = params
+        if q.startswith("SELECT id, importe, importe_enc, fecha::text, comercio_enc FROM pending_transactions"):
+            email, ide, _, reciente, itag, chmac = params
             cands = [
                 p for p in db.pending if p["user_email"] == email and (
                     (ide is not None and p["id_externo_hmac"] == ide
                      and p["created_at"] > db.now - timedelta(hours=24))
-                    or (reciente and round(p["importe"], 2) == round(importe, 2)
+                    or (reciente and p["importe_hmac"] == itag
                         and p["comercio_hmac"] == chmac
                         and p["created_at"] > db.now - timedelta(minutes=2)))
             ]
             cands.sort(key=lambda p: -p["id"])
-            self._res = [{k: cands[0][k] for k in ("id", "importe", "fecha", "comercio_enc")}] if cands else []
+            self._res = [{k: cands[0].get(k) for k in ("id", "importe", "importe_enc", "fecha", "comercio_enc")}] if cands else []
             return
         if q.startswith("INSERT INTO pending_transactions") and "comercio_enc" in q:
-            email, importe, fecha, cenc, chmac, fuente, ide = params
-            row = {"id": db.next_id(), "user_email": email, "importe": round(importe, 2), "fecha": fecha,
-                   "comercio_enc": cenc, "comercio_hmac": chmac, "fuente": fuente,
+            email, ienc, itag, fecha, cenc, chmac, fuente, ide = params
+            row = {"id": db.next_id(), "user_email": email, "importe": None, "importe_enc": ienc,
+                   "importe_hmac": itag, "fecha": fecha, "comercio_enc": cenc, "comercio_hmac": chmac, "fuente": fuente,
                    "id_externo_hmac": ide, "created_at": db.now}
             db.pending.append(row)
-            self._res = [{"id": row["id"], "importe": row["importe"], "fecha": fecha}]
+            self._res = [{"id": row["id"], "fecha": fecha}]
             return
-        if q.startswith("INSERT INTO pending_transactions (user_email, importe"):
-            if len(params) == 4:
-                email, importe, fecha, fuente = params
+        if q.startswith("INSERT INTO pending_transactions (user_email, importe_enc"):
+            if len(params) == 5:
+                email, ienc, itag, fecha, fuente = params
             else:
-                (email, importe, fuente), fecha = params, "2000-01-01"
-            row = {"id": db.next_id(), "user_email": email, "importe": importe, "fecha": fecha,
+                (email, ienc, itag, fuente), fecha = params, "2000-01-01"
+            row = {"id": db.next_id(), "user_email": email, "importe": None, "importe_enc": ienc,
+                   "importe_hmac": itag, "fecha": fecha,
                    "comercio_enc": None, "comercio_hmac": None, "fuente": fuente,
                    "id_externo_hmac": None, "created_at": db.now}
             db.pending.append(row)
-            self._res = [{"id": row["id"], "fecha": fecha, "importe": importe}]
+            self._res = [{"id": row["id"], "fecha": fecha}]
             return
         if q.startswith("SELECT tipo, concepto_enc FROM merchant_rules"):
             r = db.rules.get((params[0], bytes(params[1])))
@@ -202,7 +203,7 @@ class FakeCursor:
         if q.startswith("SELECT id, tipo, concepto_enc, importe_enc FROM transactions"):
             self._res = [t for t in db.transactions if t["user_email"] == params[0]]
             return
-        if q.startswith("SELECT id, importe, fecha::text, comercio_enc, comercio_hmac, fuente"):
+        if q.startswith("SELECT id, importe, importe_enc, fecha::text, comercio_enc, comercio_hmac, fuente"):
             self._res = sorted((p for p in db.pending if p["user_email"] == params[0]),
                                key=lambda p: (p["created_at"], p["id"]))
             return
@@ -211,7 +212,7 @@ class FakeCursor:
             self._res = [dict(r, comercio_hmac=k[1]) for k, r in db.rules.items()
                          if k[0] == email and k[1] in tags]
             return
-        if q.startswith("SELECT importe, fecha, comercio_hmac FROM pending_transactions"):
+        if q.startswith("SELECT id, importe, importe_enc, fecha, comercio_hmac FROM pending_transactions"):
             pid, email = params
             self._res = [p for p in db.pending if p["id"] == pid and p["user_email"] == email]
             return

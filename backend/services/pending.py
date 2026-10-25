@@ -1,10 +1,16 @@
+import logging
+from decimal import Decimal
+
 from fastapi import HTTPException
 from .db import db_cursor, run_in_thread
 from .suggest import suggest_category
-from .crypto import encrypt_str, encrypt_float, decrypt_str, decrypt_transaction, hmac_tag
+from .crypto import (encrypt_str, encrypt_float, decrypt_str, decrypt_float, decrypt_transaction,
+                     hmac_tag, EncryptionNotConfigured)
 from .wallet import normalize_merchant
 from . import legacy_plain
-from .importes import validar_importe
+from .importes import validar_importe, redondear_importe
+
+_log = logging.getLogger(__name__)
 
 
 def ensure_wallet_schema():
@@ -34,12 +40,83 @@ def ensure_wallet_schema():
         cur.execute("ALTER TABLE public.merchant_rules ENABLE ROW LEVEL SECURITY")
 
 
+def ensure_pending_importe_schema():
+    """Migración ADITIVA e idempotente: el importe de los pendientes se guarda
+    cifrado (importe_enc) con una huella HMAC (importe_hmac) para el dedup. La
+    columna en claro `importe` pasa a admitir NULL (las filas nuevas la dejan
+    vacía); no se borra ni se modifica ningún dato."""
+    with db_cursor() as cur:
+        cur.execute("ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS importe_enc BYTEA")
+        cur.execute("ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS importe_hmac BYTEA")
+        cur.execute("ALTER TABLE pending_transactions ALTER COLUMN importe DROP NOT NULL")
+
+
+def backfill_pending_importe() -> int:
+    """Cifra el importe de los pendientes antiguos (importe_enc NULL) a partir de
+    la columna en claro, SIN tocarla. Idempotente y a prueba de fallos: nunca
+    rompe el arranque ni registra importes (solo contadores). Devuelve cuántos
+    pendientes ha cifrado."""
+    done = 0
+    try:
+        with db_cursor() as cur:
+            cur.execute(
+                "SELECT id, importe FROM pending_transactions "
+                "WHERE importe_enc IS NULL AND importe IS NOT NULL"
+            )
+            rows = cur.fetchall()
+            for r in rows:
+                try:
+                    imp = redondear_importe(r["importe"])
+                    cur.execute(
+                        "UPDATE pending_transactions SET importe_enc = %s, importe_hmac = %s "
+                        "WHERE id = %s AND importe_enc IS NULL",
+                        (encrypt_float(imp), importe_tag(imp), r["id"]),
+                    )
+                    done += 1
+                except EncryptionNotConfigured:
+                    raise
+                except Exception as e:
+                    _log.warning("Backfill de pendientes: fila id=%s omitida (%s)", r["id"], type(e).__name__)
+    except Exception as e:
+        _log.warning("Backfill de importes pendientes no completado (%s)", type(e).__name__)
+    return done
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def merchant_tag(comercio: str | None) -> bytes | None:
     """HMAC del comercio normalizado, o None si no queda nada tras normalizar."""
     norm = normalize_merchant(comercio or "")
     return hmac_tag("comercio:" + norm) if norm else None
+
+
+def importe_tag(importe) -> bytes:
+    """HMAC del importe normalizado a céntimos (entero), para el dedup por igualdad."""
+    cents = int((Decimal(str(redondear_importe(importe))) * 100).to_integral_value())
+    return hmac_tag(f"importe:{cents}")
+
+
+def read_importe(row) -> float | None:
+    """Importe de un pendiente: importe_enc si existe; si es NULL (pendiente antiguo
+    sin migrar) la columna en claro. None si no se puede leer (se registra solo el
+    id, nunca el valor)."""
+    enc = row.get("importe_enc")
+    if enc is not None:
+        try:
+            return float(decrypt_float(bytes(enc)))
+        except EncryptionNotConfigured:
+            raise
+        except Exception as e:
+            _log.warning("No se pudo descifrar el importe del pendiente id=%s (%s)",
+                         row.get("id"), type(e).__name__)
+            return None
+    plain = row.get("importe")
+    if plain is None:
+        return None
+    try:
+        return float(plain)
+    except (TypeError, ValueError):
+        return None
 
 
 def id_externo_tag(id_externo: str | None) -> bytes | None:
@@ -84,22 +161,27 @@ def _rule_to_suggestion(rule) -> dict | None:
 
 async def create_pending(email: str, importe: float, fecha: str | None = None,
                          fuente: str | None = None) -> dict:
+    importe = redondear_importe(importe)
+    imp_enc, imp_tag = encrypt_float(importe), importe_tag(importe)
+
     def _q():
         with db_cursor() as cur:
             if fecha:
                 cur.execute(
-                    "INSERT INTO pending_transactions (user_email, importe, fecha, fuente) "
-                    "VALUES (%s, %s, %s::date, %s) RETURNING id, fecha::text, importe",
-                    (email, importe, fecha, fuente),
+                    "INSERT INTO pending_transactions (user_email, importe_enc, importe_hmac, fecha, fuente) "
+                    "VALUES (%s, %s, %s, %s::date, %s) RETURNING id, fecha::text",
+                    (email, imp_enc, imp_tag, fecha, fuente),
                 )
             else:
                 cur.execute(
-                    "INSERT INTO pending_transactions (user_email, importe, fuente) "
-                    "VALUES (%s, %s, %s) RETURNING id, fecha::text, importe",
-                    (email, importe, fuente),
+                    "INSERT INTO pending_transactions (user_email, importe_enc, importe_hmac, fuente) "
+                    "VALUES (%s, %s, %s, %s) RETURNING id, fecha::text",
+                    (email, imp_enc, imp_tag, fuente),
                 )
             return cur.fetchone()
-    return dict(await run_in_thread(_q))
+    row = dict(await run_in_thread(_q))
+    row["importe"] = importe
+    return row
 
 
 async def create_pending_dedup(email: str, importe: float, fecha: str, comercio: str | None,
@@ -117,34 +199,40 @@ async def create_pending_dedup(email: str, importe: float, fecha: str, comercio:
     ide_hmac = id_externo_tag(id_externo)
     comercio_enc = encrypt_str(comercio) if comercio else None
     dedup_reciente = c_hmac is not None or fuente == "wallet"
+    importe = redondear_importe(importe)
+    imp_enc, imp_tag = encrypt_float(importe), importe_tag(importe)
 
     def _q():
         with db_cursor() as cur:
             cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 42))", (email,))
             cur.execute(
-                """SELECT id, importe, fecha::text, comercio_enc FROM pending_transactions
+                """SELECT id, importe, importe_enc, fecha::text, comercio_enc FROM pending_transactions
                    WHERE user_email = %s AND (
                          (%s::bytea IS NOT NULL AND id_externo_hmac = %s::bytea
                           AND created_at > now() - interval '24 hours')
-                      OR (%s AND importe = %s::numeric(12,2)
+                      OR (%s AND importe_hmac = %s::bytea
                           AND comercio_hmac IS NOT DISTINCT FROM %s::bytea
                           AND created_at > now() - interval '2 minutes'))
                    ORDER BY id DESC LIMIT 1""",
-                (email, ide_hmac, ide_hmac, dedup_reciente, importe, c_hmac),
+                (email, ide_hmac, ide_hmac, dedup_reciente, imp_tag, c_hmac),
             )
             dup = cur.fetchone()
             if dup:
                 row, duplicada = dict(dup), True
                 row["comercio"] = _decrypt_or_none(row.pop("comercio_enc", None))
+                leido = read_importe(row)
+                row["importe"] = importe if leido is None else leido
             else:
                 cur.execute(
                     """INSERT INTO pending_transactions
-                         (user_email, importe, fecha, comercio_enc, comercio_hmac, fuente, id_externo_hmac)
-                       VALUES (%s, %s, %s::date, %s, %s, %s, %s)
-                       RETURNING id, importe, fecha::text""",
-                    (email, importe, fecha, comercio_enc, c_hmac, fuente, ide_hmac),
+                         (user_email, importe_enc, importe_hmac, fecha, comercio_enc, comercio_hmac,
+                          fuente, id_externo_hmac)
+                       VALUES (%s, %s, %s, %s::date, %s, %s, %s, %s)
+                       RETURNING id, fecha::text""",
+                    (email, imp_enc, imp_tag, fecha, comercio_enc, c_hmac, fuente, ide_hmac),
                 )
                 row, duplicada = dict(cur.fetchone()), False
+                row["importe"] = importe
                 row["comercio"] = comercio
 
             # Sugerencia: a) regla aprendida por comercio; b) historial.
@@ -181,7 +269,7 @@ async def get_pending(email: str) -> list:
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                "SELECT id, importe, fecha::text, comercio_enc, comercio_hmac, fuente "
+                "SELECT id, importe, importe_enc, fecha::text, comercio_enc, comercio_hmac, fuente "
                 "FROM pending_transactions WHERE user_email = %s ORDER BY created_at ASC",
                 (email,),
             )
@@ -209,9 +297,12 @@ async def get_pending(email: str) -> list:
 
     result = []
     for r in pending:
+        importe = read_importe(r)
+        if importe is None:
+            continue  # importe ilegible: se omite (ya registrado el id); se puede descartar por id
         item = {
             "id": r["id"],
-            "importe": r["importe"],
+            "importe": importe,
             "fecha": r["fecha"],
             "comercio": _decrypt_or_none(r.get("comercio_enc")),
             "fuente": r.get("fuente"),
@@ -242,7 +333,7 @@ async def categorize_pending(pending_id: int, email: str, tipo: str, concepto: s
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                "SELECT importe, fecha, comercio_hmac FROM pending_transactions "
+                "SELECT id, importe, importe_enc, fecha, comercio_hmac FROM pending_transactions "
                 "WHERE id = %s AND user_email = %s",
                 (pending_id, email),
             )
@@ -252,7 +343,11 @@ async def categorize_pending(pending_id: int, email: str, tipo: str, concepto: s
             # Mismo tope y redondeo que el alta directa: un pendiente antiguo
             # (anterior al tope) podría desbordar `importe NUMERIC(10,2)` de PROD.
             try:
-                importe = validar_importe(row["importe"])
+                leido = read_importe(row)
+                if leido is None:
+                    raise HTTPException(status_code=422,
+                                        detail="El importe de este pendiente no se puede leer; descártalo")
+                importe = validar_importe(leido)
             except ValueError:
                 raise HTTPException(status_code=422,
                                     detail="El importe debe ser mayor que 0 y no superar 1.000.000")

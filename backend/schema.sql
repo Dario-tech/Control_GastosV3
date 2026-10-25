@@ -44,9 +44,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_transactions_user_id_cliente
 CREATE TABLE IF NOT EXISTS pending_transactions (
     id              SERIAL PRIMARY KEY,
     user_email      TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
-    importe         NUMERIC(12,2) NOT NULL,
+    importe         NUMERIC(12,2),          -- LEGADO en claro: NULL en filas nuevas (ver importe_enc)
     fecha           DATE NOT NULL DEFAULT CURRENT_DATE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    importe_enc     BYTEA,                  -- importe cifrado (AES-GCM, encrypt_float)
+    importe_hmac    BYTEA,                  -- HMAC del importe en céntimos (dedup por igualdad)
     comercio_enc    BYTEA,
     comercio_hmac   BYTEA,
     fuente          TEXT,
@@ -57,6 +59,9 @@ ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS comercio_enc    BYTEA;
 ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS comercio_hmac   BYTEA;
 ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS fuente          TEXT;
 ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS id_externo_hmac BYTEA;
+ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS importe_enc     BYTEA;
+ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS importe_hmac    BYTEA;
+ALTER TABLE pending_transactions ALTER COLUMN importe DROP NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_pending_user ON pending_transactions(user_email);
 CREATE INDEX IF NOT EXISTS idx_pending_user_created ON pending_transactions(user_email, created_at DESC);
 
