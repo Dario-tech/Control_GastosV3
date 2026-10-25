@@ -3615,3 +3615,22 @@ img.fm-goal-hero-icon { width: 64px; height: 64px; border-radius: 20px; object-f
 .sc-manual-copy { display: flex; flex-direction: column; gap: 8px; }
 .sc-manual-copy textarea.sc-prompt { width: 100%; box-sizing: border-box; resize: vertical; }
 .sc-keycopy { display: flex; flex-direction: column; gap: 8px; }
+
+/* Ajustes: botón «+ Nueva categoría» */
+.settings-add-cat { padding: 10px 14px; border-top: 1px solid var(--border); }
+.s-add-cat-btn {
+  width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: 12px; border: 1px dashed var(--accent); background: var(--accent-dim); color: var(--accent);
+  font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
+}
+.s-add-cat-btn:active { background: var(--accent); color: var(--on-accent); }
+.s-add-cat-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Fila de categoría propia: el nombre se encoge (elipsis); tipo y botón mantienen su tamaño */
+.setting-row--cat .setting-row-left { flex: 1 1 auto; min-width: 0; }
+.setting-row--cat .setting-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.setting-row--cat .setting-row-right { flex: 0 0 auto; }
+.setting-row--cat .setting-row-right > * { flex-shrink: 0; }
+
+/* Toast: ancho acotado, texto largo con puntos suspensivos */
+.toast { max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }

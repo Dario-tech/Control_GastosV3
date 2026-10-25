@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useSettings, ACCENTS } from '../../context/SettingsContext'
+import NewCategoryScreen from '../ui/NewCategoryScreen'
 
 const THEMES = [
   { id: 'dark',     name: 'Oscuro' },
@@ -43,9 +44,9 @@ function Section({ title, children }) {
   )
 }
 
-function Row({ icon, label, last, danger, wrap, children }) {
+function Row({ icon, label, last, danger, wrap, cat, children }) {
   return (
-    <div className={`setting-row${last ? ' last' : ''}${danger ? ' danger-row' : ''}${wrap ? ' setting-row--wrap' : ''}`}>
+    <div className={`setting-row${last ? ' last' : ''}${danger ? ' danger-row' : ''}${wrap ? ' setting-row--wrap' : ''}${cat ? ' setting-row--cat' : ''}`}>
       <div className="setting-row-left">
         <span className="setting-icon">{icon}</span>
         <span className={`setting-label${danger ? ' danger-label' : ''}`}>{label}</span>
@@ -92,6 +93,13 @@ export default function SettingsTab() {
   const { allItems: budgetItems, removeItem } = useBudget()
   const { showToast } = useApp()
   const [sendingReport, setSendingReport] = useState(false)
+  const [newCatOpen, setNewCatOpen] = useState(false)
+  const newCatBtn = useRef(null)
+  // Al cerrar el formulario el foco vuelve al botón que lo abrió.
+  function closeNewCat() {
+    setNewCatOpen(false)
+    setTimeout(() => newCatBtn.current?.focus({ preventScroll: true }), 0)
+  }
 
   const customList = ['Gasto Variable', 'Gasto Fijo', 'Ingreso']
     .flatMap(tipo => (customCategories[tipo] || []).map(c => ({ ...c, tipo })))
@@ -205,8 +213,8 @@ export default function SettingsTab() {
 
       <Section title="Categorías personalizadas">
         {customList.length === 0 ? (
-          <Row icon="🏷️" label="Aún no has creado ninguna" last>
-            <span className="s-value-text" style={{ fontSize: "var(--fs-xs)" }}>Se crean desde "+ Nueva" al añadir un gasto</span>
+          <Row icon="🏷️" label="Aún no has creado ninguna">
+            <span className="s-value-text" style={{ fontSize: "var(--fs-xs)" }}>Crea la primera con el botón de abajo</span>
           </Row>
         ) : (
           customList.map((c, i) => (
@@ -214,7 +222,8 @@ export default function SettingsTab() {
               key={`${c.tipo}|${c.concepto}|${i}`}
               icon={c.emoji}
               label={c.concepto}
-              last={i === customList.length - 1}
+              cat
+              last={false}
             >
               <span className="s-value-text" style={{ fontSize: "var(--fs-xs)", marginRight: 6 }}>{TIPO_LABEL[c.tipo]}</span>
               <button
@@ -226,7 +235,13 @@ export default function SettingsTab() {
             </Row>
           ))
         )}
+        <div className="settings-add-cat">
+          <button type="button" ref={newCatBtn} className="s-add-cat-btn" onClick={() => setNewCatOpen(true)}>
+            <span aria-hidden="true">＋</span> Nueva categoría
+          </button>
+        </div>
       </Section>
+      {newCatOpen && <NewCategoryScreen onClose={closeNewCat} />}
 
       <Section title="Datos">
         <Row icon="📤" label="Exportar datos">

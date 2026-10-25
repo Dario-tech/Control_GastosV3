@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
-import { postTransaction, suggestEmoji } from '../../services/api'
-import { TYPES, EMOJI_SUGGESTIONS, combineCategories, categoryExists, categoryKey } from '../../data/categories'
+import { postTransaction } from '../../services/api'
+import { TYPES, combineCategories, categoryKey } from '../../data/categories'
 import { isUnusualAmount, fmt, todayLocal, addDaysLocal } from '../../utils'
 import { FormScreen, Field, Section, AmountInput, Chips, PrimaryButton, Icon } from './FormKit'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
@@ -11,7 +11,9 @@ import { useApp } from '../../context/AppContext'
 import { newId } from '../../utils/id'
 import { classifyTxError, txErrorMessage, enqueueTx, MSG_OFFLINE } from '../../utils/txQueue'
 
-export const DUPLICATE_CAT_MSG = 'Ya existe una categoría con ese nombre'
+import { CategoryFields, useEmojiSuggest, validateCategoryName, DUPLICATE_CAT_MSG } from './CategoryFields'
+
+export { DUPLICATE_CAT_MSG }
 
 export default function AddTransactionModal({ onClose }) {
   useLockBodyScroll()
@@ -27,10 +29,9 @@ export default function AddTransactionModal({ onClose }) {
 
   // Inline new-category form
   const [showNewCat, setShowNewCat] = useState(false)
-  const [newEmoji, setNewEmoji]     = useState('💶')
   const [newName, setNewName]       = useState('')
   const [newCatErr, setNewCatErr]   = useState('')
-  const [suggesting, setSuggesting] = useState(false)
+  const { emoji: newEmoji, setEmoji: setNewEmoji, suggesting, suggest } = useEmojiSuggest()
 
   const { refresh, data }    = useFinanceData()
   const { showToast }        = useApp()
@@ -65,24 +66,10 @@ export default function AddTransactionModal({ onClose }) {
     }
   }
 
-  async function handleSuggestEmoji() {
-    const name = newName.trim()
-    if (!name || suggesting) return
-    setSuggesting(true)
-    try {
-      const { emoji } = await suggestEmoji(name)
-      setNewEmoji(emoji)
-    } catch {
-      // silencioso: el usuario sigue pudiendo elegir emoji a mano
-    } finally {
-      setSuggesting(false)
-    }
-  }
-
   function handleAddNewCat() {
-    const name = newName.trim()
-    if (!name) { setNewCatErr('Escribe un nombre'); return }
-    if (categoryExists(allCats, name) || addCategory(tipo, { concepto: name, emoji: newEmoji }) === false) {
+    const { name, error: nameErr } = validateCategoryName(newName, allCats)
+    if (nameErr) { setNewCatErr(nameErr); return }
+    if (addCategory(tipo, { concepto: name, emoji: newEmoji }) === false) {
       setNewCatErr(DUPLICATE_CAT_MSG)
       return
     }
@@ -206,24 +193,9 @@ export default function AddTransactionModal({ onClose }) {
           {showNewCat && (
             <div className="fm-card fm-newcat">
               <span className="fm-label">Nueva categoría</span>
-              <div className="fm-emoji-scroll" role="radiogroup" aria-label="Emoji">
-                {EMOJI_SUGGESTIONS.map(e => (
-                  <button key={e} type="button" role="radio" aria-checked={newEmoji === e}
-                    className={`fm-emoji${newEmoji === e ? ' selected' : ''}`} onClick={() => setNewEmoji(e)}>{e}</button>
-                ))}
-              </div>
-              <div className="fm-newcat-row">
-                <span className="fm-newcat-emoji" aria-hidden="true">{newEmoji}</span>
-                <input className="fm-input" placeholder="Nombre de la categoría" value={newName} maxLength={32}
-                  aria-invalid={!!newCatErr || undefined} aria-label="Nombre de la categoría"
-                  onChange={e => { setNewName(e.target.value); setNewCatErr('') }}
-                  onKeyDown={e => e.key === 'Enter' && handleAddNewCat()} autoFocus />
-                <button type="button" className="fm-icon-btn" onClick={handleSuggestEmoji}
-                  disabled={!newName.trim() || suggesting} aria-label="Sugerir emoji con IA" title="Sugerir emoji con IA">
-                  {suggesting ? <span className="fm-spinner" aria-hidden="true" /> : '✨'}
-                </button>
-              </div>
-              {newCatErr && <p className="fm-error" role="alert"><Icon name="alert" size={15} />{newCatErr}</p>}
+              <CategoryFields emoji={newEmoji} onEmoji={setNewEmoji} name={newName}
+                onName={v => { setNewName(v); setNewCatErr('') }} error={newCatErr}
+                suggesting={suggesting} onSuggest={() => suggest(newName)} onEnter={handleAddNewCat} />
               <div className="fm-sheet-actions">
                 <button type="button" className="fm-secondary" onClick={() => { setShowNewCat(false); setNewName(''); setNewCatErr('') }}>Cancelar</button>
                 <button type="button" className="fm-confirm" onClick={handleAddNewCat} disabled={loading}>
