@@ -303,7 +303,8 @@ export async function discardPending(id) {
 
 // Clave personal del Atajo (modo "En segundo plano"): el Atajo la manda en el
 // cuerpo de POST /api/shortcut/pending en vez de un JWT. Respuesta: { shortcut_token }.
-// Quien la llame no debe guardarla (ni en localStorage ni en estado duradero).
+// Se pide al servidor solo al copiarla (no viene en el login ni se guarda en el
+// navegador). Quien la llame no debe guardarla en localStorage ni en estado duradero.
 export async function getShortcutToken() {
   const res = await fetch(`${BASE}/api/shortcut/token`, {
     headers: authHeaders(),

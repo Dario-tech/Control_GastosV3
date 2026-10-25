@@ -10,14 +10,18 @@ import { BASE, getShortcutToken } from '../../services/api'
    - "fondo" (En segundo plano): el Atajo manda el pago directo al servidor
      (POST /api/shortcut/pending con la clave personal) y queda PENDIENTE.
    - "manual": paso a paso sin IA, de los dos tipos.
-   La clave solo se pide al servidor al pulsar «Copiar prompt» / «Copiar mi clave»: va al
-   portapapeles y NUNCA se pinta, se guarda ni se registra. El prompt que se ve lleva el marcador.
+   La clave solo se pide al servidor al pulsar «Copiar prompt con mi clave» / «Copiar mi clave»:
+   va al portapapeles y no se pinta en pantalla ni se guarda ni se registra. Única excepción: si
+   el navegador no deja copiar, el plan de respaldo la muestra un momento dentro de un textarea
+   de solo lectura (se borra al copiar o al pulsar «Ya lo he copiado»). El prompt que se ve
+   lleva el marcador, y «Copiar prompt sin clave» copia ese mismo texto sin tocar el servidor.
    La PWA no puede leer Cartera ni instalar automatizaciones: solo guía. */
 
 // \u003c = «<» (escrito así para no confundir al test de imports que busca etiquetas JSX).
 export const KEY_PLACEHOLDER = '\u003cPEGA_AQUI_TU_CLAVE>'
 
-export const KEY_WARNING = 'El prompt copiado incluye tu clave personal: pégalo solo en Atajos y no lo compartas.'
+// Aviso ÚNICO sobre la clave: se reutiliza en todas las pantallas que la copian.
+export const KEY_WARNING = 'Este texto contiene tu clave personal. Con ella alguien puede añadirte gastos pendientes (no puede leer ni borrar nada). Si lo pegas en una IA externa, la clave queda en su historial. Por ahora la clave no se puede cambiar, así que no la compartas.'
 
 // Base del enlace del Atajo: el ORIGEN REAL donde corre la app (no la API).
 export function shortcutLinkBase(origin = window.location.origin) {
@@ -275,6 +279,7 @@ function SecretCopyFeedback({ sc, okText }) {
 function PromptBlock({ prompt, withKey = false, buildCopy }) {
   const plain = useCopy()
   const sc = useSecretCopy(buildCopy || (() => prompt))
+  const noKey = useCopy()
   return (
     <section className="fm-card sc-step" aria-label="Prompt para una IA o para Atajos">
       <div className="sc-step-head">
@@ -289,10 +294,18 @@ function PromptBlock({ prompt, withKey = false, buildCopy }) {
       {withKey ? (
         <>
           <button type="button" className="shortcut-token-copy sc-copy-btn" onClick={sc.copy} disabled={sc.busy}>
-            {sc.busy ? 'Copiando…' : sc.copied ? '✓ Copiado' : 'Copiar prompt'}
+            {sc.busy ? 'Copiando…' : sc.copied ? '✓ Copiado' : 'Copiar prompt con mi clave'}
           </button>
           <p className="sc-hint sc-key-warning">{KEY_WARNING}</p>
           <SecretCopyFeedback sc={sc} okText="Prompt copiado con tu clave. Pégalo en la IA de Atajos." />
+          <button type="button" className="fm-secondary fm-secondary--wide" onClick={() => noKey.copy(prompt)}>
+            {noKey.copied ? '✓ Copiado' : 'Copiar prompt sin clave'}
+          </button>
+          <p className="sc-hint">Sin clave: el texto lleva el marcador {KEY_PLACEHOLDER}. Sustitúyelo tú por tu clave (botón «Copiar mi clave» en la pestaña Manual).</p>
+          <p className="sr-only" role="status" aria-live="polite">{noKey.copied ? 'Copiado' : ''}</p>
+          {noKey.copyFailed && (
+            <p className="sc-warn" role="alert">No se pudo copiar automáticamente. Mantén pulsado el texto para seleccionarlo y copiarlo.</p>
+          )}
         </>
       ) : (
         <>
@@ -316,7 +329,7 @@ function KeyCopy() {
     <div className="sc-keycopy">
       <p className="sc-tip sc-tip--warn sc-tip--inline" role="note">
         <span aria-hidden="true">🔑</span>
-        <span>Es como una llave de tu cuenta solo para el Atajo. No la pegues en ninguna IA ni la compartas: pégala solo en el campo «shortcut_token» dentro del Atajo. No se muestra en pantalla: se copia directamente.</span>
+        <span>{KEY_WARNING} Pégala en el campo «shortcut_token» del Atajo. No se muestra en pantalla: se copia directamente.</span>
       </p>
       <button type="button" className="fm-secondary fm-secondary--wide" onClick={sc.copy} disabled={sc.busy}>
         {sc.busy ? 'Pidiendo la clave…' : sc.copied ? '✓ Copiada' : 'Copiar mi clave'}
@@ -437,7 +450,7 @@ function FondoActions({ api }) {
         <ActionRow k="Cabeceras" v={<><code>Content-Type</code> = <code>application/json</code></>} />
         <ActionRow k="Cuerpo" v={<strong>JSON</strong>} />
         <p className="sc-hint">Añade estos campos, todos de tipo <strong>Texto</strong>:</p>
-        <ActionRow k="shortcut_token" v="tu clave personal (botón «Copiar mi clave» de abajo)" />
+        <ActionRow k="shortcut_token" v="tu clave personal (botón «Copiar mi clave» de arriba)" />
         <ActionRow k="importe" v={<><Var>Importe</Var> de Entrada del atajo, tal cual</>} />
         <ActionRow k="comercio" v={<><Var>Comercio</Var> de Entrada del atajo</>} />
         <ActionRow k="id_externo" v={<><Var>ID</Var> (la acción 2)</>} />

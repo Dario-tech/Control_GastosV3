@@ -19,8 +19,23 @@ function friendlyAuthError(e, fallback) {
   return e instanceof Error ? e : new Error(fallback)
 }
 
+// La clave personal del Atajo (shortcut_token) nunca se guarda en el navegador:
+// se pide al servidor solo al copiarla.
+export function withoutShortcutToken(user) {
+  if (!user || typeof user !== 'object') return user
+  const { shortcut_token, ...rest } = user // eslint-disable-line no-unused-vars
+  return rest
+}
+
 function loadStored() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY)) } catch { return null }
+  let raw
+  try { raw = JSON.parse(localStorage.getItem(LS_KEY)) } catch { return null }
+  if (raw && typeof raw === 'object' && 'shortcut_token' in raw) {
+    // Sesión antigua que sí la traía: se limpia y se reescribe sin la clave.
+    raw = withoutShortcutToken(raw)
+    try { localStorage.setItem(LS_KEY, JSON.stringify(raw)) } catch { /* no-op */ }
+  }
+  return raw
 }
 
 const AuthCtx = createContext(null)
@@ -68,7 +83,7 @@ export function AuthProvider({ children }) {
       throw new Error(authErrorMessage(res, err, 'Login fallido'))
     }
     const data   = await res.json()
-    const stored = { ...data.user, sessionToken: data.session_token }
+    const stored = { ...withoutShortcutToken(data.user), sessionToken: data.session_token }
     localStorage.setItem(LS_KEY, JSON.stringify(stored))
     setUser(stored)
     return stored
@@ -90,7 +105,7 @@ export function AuthProvider({ children }) {
     if (!res.ok) {
       throw new Error(authErrorMessage(res, data, 'Error de autenticación'))
     }
-    const stored = { ...data.user, sessionToken: data.session_token }
+    const stored = { ...withoutShortcutToken(data.user), sessionToken: data.session_token }
     localStorage.setItem(LS_KEY, JSON.stringify(stored))
     setUser(stored)
     return stored

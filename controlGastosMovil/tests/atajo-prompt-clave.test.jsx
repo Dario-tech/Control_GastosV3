@@ -14,7 +14,9 @@ function setClipboard(impl) {
   Object.defineProperty(navigator, 'clipboard', { value: impl, configurable: true })
 }
 const goFondo = () => fireEvent.click(screen.getAllByRole('tab')[1])
-const copyBtn = () => screen.getByRole('button', { name: /Copiar prompt|Copiando|Copiado/ })
+const copyBtn = () => screen.getByRole('button', { name: /Copiar prompt con mi clave|Copiando|Copiado/ })
+const copyBtnApp = () => screen.getByRole('button', { name: /Copiar prompt|Copiado/ })
+const noKeyBtn = () => screen.getByRole('button', { name: /Copiar prompt sin clave|Copiado/ })
 
 beforeEach(() => {
   localStorage.clear()
@@ -119,13 +121,55 @@ describe('Copiar prompt en segundo plano', () => {
   })
 })
 
+describe('Copiar prompt sin clave (segundo plano)', () => {
+  it('copia el prompt con el marcador, sin llamar al servidor', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    setClipboard({ writeText })
+    const f = vi.fn(() => jsonRes({ shortcut_token: KEY })); vi.stubGlobal('fetch', f)
+    render(<ShortcutSetupScreen onClose={() => {}} />)
+    goFondo()
+    expect(screen.getByRole('button', { name: 'Copiar prompt con mi clave' })).toBeTruthy()
+    fireEvent.click(noKeyBtn())
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+    const copied = writeText.mock.calls[0][0]
+    expect(copied).toBe(buildPromptBackground())
+    expect(copied).toContain(KEY_PLACEHOLDER)
+    expect(f).not.toHaveBeenCalled()
+    expect(await screen.findByText('✓ Copiado')).toBeTruthy()
+    expect(screen.getAllByRole('status').some(n => n.textContent === 'Copiado')).toBe(true)
+  })
+
+  it('si el portapapeles falla avisa en español', async () => {
+    setClipboard({ writeText: vi.fn().mockRejectedValue(new Error('no')) })
+    const f = vi.fn(); vi.stubGlobal('fetch', f)
+    render(<ShortcutSetupScreen onClose={() => {}} />)
+    goFondo()
+    fireEvent.click(noKeyBtn())
+    expect(await screen.findByText(/No se pudo copiar automáticamente/)).toBeTruthy()
+    expect(f).not.toHaveBeenCalled()
+  })
+})
+
+describe('Aviso único de la clave', () => {
+  it('es el mismo texto en segundo plano y en Manual, y no promete cambiar la clave', () => {
+    render(<ShortcutSetupScreen onClose={() => {}} />)
+    goFondo()
+    expect(screen.getByText(KEY_WARNING)).toBeTruthy()
+    expect(KEY_WARNING).not.toMatch(/botón|cambiarla ahora|avísanos/i)
+    fireEvent.click(screen.getAllByRole('tab')[2])
+    expect(document.body.textContent).toContain(KEY_WARNING)
+    expect(document.body.textContent).not.toContain('No la pegues en ninguna IA')
+    expect(document.body.textContent).toContain('«Copiar mi clave» de arriba')
+  })
+})
+
 describe('Modo Abrir la app', () => {
   it('no pide clave, su prompt lleva el enlace real y los pasos completos', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     setClipboard({ writeText })
     const f = vi.fn(); vi.stubGlobal('fetch', f)
     render(<ShortcutSetupScreen onClose={() => {}} />)
-    fireEvent.click(copyBtn())
+    fireEvent.click(copyBtnApp())
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
     const text = writeText.mock.calls[0][0]
     expect(f).not.toHaveBeenCalled()

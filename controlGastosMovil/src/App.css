@@ -1610,6 +1610,10 @@ html.light .s-action-btn  { background: var(--surface2); color: var(--text2); bo
 .setting-label { font-size: var(--fs-md); font-weight: 500; color: var(--text); }
 .setting-label.danger-label { color: var(--red); }
 
+/* Fila con mucho contenido a la derecha (círculos de color): el contenido pasa
+   a su propia línea si no cabe, en vez de cortar la etiqueta o solaparse. */
+.setting-row--wrap { flex-wrap: wrap; }
+.setting-row--wrap .setting-row-right { flex: 1 1 auto; }
 .setting-row-right {
   display: flex;
   align-items: center;
@@ -1676,7 +1680,10 @@ html.light .s-action-btn  { background: var(--surface2); color: var(--text2); bo
 /* Accent swatches */
 .accent-swatches {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
+  padding: 3px;
   align-items: center;
 }
 .accent-swatch {

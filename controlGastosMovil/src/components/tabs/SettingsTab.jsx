@@ -43,9 +43,9 @@ function Section({ title, children }) {
   )
 }
 
-function Row({ icon, label, last, danger, children }) {
+function Row({ icon, label, last, danger, wrap, children }) {
   return (
-    <div className={`setting-row${last ? ' last' : ''}${danger ? ' danger-row' : ''}`}>
+    <div className={`setting-row${last ? ' last' : ''}${danger ? ' danger-row' : ''}${wrap ? ' setting-row--wrap' : ''}`}>
       <div className="setting-row-left">
         <span className="setting-icon">{icon}</span>
         <span className={`setting-label${danger ? ' danger-label' : ''}`}>{label}</span>
@@ -155,7 +155,7 @@ export default function SettingsTab() {
       </Section>
 
       <Section title="Apariencia">
-        <Row icon="🎨" label="Color de acento" last>
+        <Row icon="🎨" label="Color de acento" last wrap>
           <div className="accent-swatches">
             {ACCENTS.map(a => (
               <button
