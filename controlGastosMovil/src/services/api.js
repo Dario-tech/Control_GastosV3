@@ -35,12 +35,38 @@ export function authHeaders() {
   return {}
 }
 
+// Mensaje legible de un cuerpo de error: `detail` puede ser texto o, en los
+// 422 de validación, una lista de {msg, loc}. Nunca lanza.
+export function errorDetail(body, fallback) {
+  const d = body?.detail
+  if (typeof d === 'string' && d) return d
+  if (Array.isArray(d)) {
+    const msgs = d.map(x => (typeof x?.msg === 'string' ? x.msg : '')).filter(Boolean)
+    if (msgs.length) return msgs.join('. ')
+  }
+  return fallback
+}
+
+// Cierra la sesión en el servidor (revoca el JWT actual). Mejor esfuerzo: timeout
+// corto, nunca lanza ni bloquea. `token` se pasa explícito porque el llamador
+// borra la sesión local justo después.
+export function logoutRemote(token) {
+  if (!token) return Promise.resolve()
+  return fetch(`${BASE}/api/auth/logout`, {
+    method:  'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    signal:  AbortSignal.timeout(4000),
+    keepalive: true,
+  }).then(() => undefined, () => undefined)
+}
+
 // Único punto por el que pasan todas las respuestas autenticadas: si el
 // backend dice 401, la sesión ya no vale — se limpia y se avisa al resto de
 // la app en vez de dejar que cada llamada falle con un error genérico.
 export async function apiJson(res) {
   if (res.status === 401) {
     try { localStorage.removeItem(LS_KEY) } catch { /* no-op */ }
+    clearPhotoCache()
     window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
     const err = new Error('Tu sesión ha caducado. Vuelve a iniciar sesión.')
     err.status = 401
@@ -48,7 +74,7 @@ export async function apiJson(res) {
   }
   const body = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const err = new Error(typeof body.detail === 'string' && body.detail ? body.detail : `API ${res.status}`)
+    const err = new Error(errorDetail(body, `API ${res.status}`))
     err.status = res.status
     throw err
   }
@@ -82,12 +108,20 @@ export async function fetchRecurring() {
   return apiJson(res)
 }
 
-export async function fetchFinanceData() {
-  const res = await fetch(`${BASE}/api/finance`, {
-    headers: authHeaders(),
-    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
-  })
-  return apiJson(res)
+// `signal` (opcional) permite cancelar la petición desde fuera; el timeout se mantiene.
+export async function fetchFinanceData({ signal } = {}) {
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), WRITE_TIMEOUT_MS)
+  if (signal) {
+    if (signal.aborted) ctl.abort()
+    else signal.addEventListener('abort', () => ctl.abort(), { once: true })
+  }
+  try {
+    const res = await fetch(`${BASE}/api/finance`, { headers: authHeaders(), signal: ctl.signal })
+    return await apiJson(res)
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 // Movimientos de un solo año (más ligero que pedirlo todo de golpe).
@@ -204,7 +238,34 @@ export async function contributeToGoal(id, importe, foto = null) {
   return apiJson(res)
 }
 
+// Las fotos de las aportaciones ya no viajan en GET /api/goals (solo `tiene_foto`):
+// se piden una a una al abrirlas. Caché SOLO en memoria (por id de aportación);
+// nunca en localStorage. Se vacía al cerrar sesión.
+const photoCache = new Map()     // contributionId -> data URL
+const photoInflight = new Map()  // contributionId -> Promise
+
+export function clearPhotoCache() { photoCache.clear(); photoInflight.clear() }
+export function getCachedPhoto(contributionId) { return photoCache.get(contributionId) ?? null }
+
+export function fetchContributionPhoto(goalId, contributionId) {
+  if (photoCache.has(contributionId)) return Promise.resolve(photoCache.get(contributionId))
+  if (photoInflight.has(contributionId)) return photoInflight.get(contributionId)
+  const p = (async () => {
+    const res = await fetch(`${BASE}/api/goals/${goalId}/contributions/${contributionId}/foto`, {
+      headers: authHeaders(),
+      signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+    })
+    const body = await apiJson(res)
+    if (typeof body?.foto !== 'string' || !body.foto) throw new Error('No se pudo cargar la foto.')
+    photoCache.set(contributionId, body.foto)
+    return body.foto
+  })().finally(() => photoInflight.delete(contributionId))
+  photoInflight.set(contributionId, p)
+  return p
+}
+
 export async function deleteContribution(goalId, contributionId) {
+  photoCache.delete(contributionId)
   const res = await fetch(`${BASE}/api/goals/${goalId}/contributions/${contributionId}`, {
     method:  'DELETE',
     headers: authHeaders(),

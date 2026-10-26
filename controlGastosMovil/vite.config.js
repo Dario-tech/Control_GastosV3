@@ -40,8 +40,8 @@ export default defineConfig({
         }],
       },
       manifest: {
-        name: 'Control de Gastos 2025',
-        short_name: 'Gastos',
+        name: 'Mi Economía',
+        short_name: 'Mi Economía',
         description: 'Mi resumen financiero mensual',
         theme_color: '#1a1f2e',
         background_color: '#0f1117',

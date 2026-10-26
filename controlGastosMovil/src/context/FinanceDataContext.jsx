@@ -49,9 +49,20 @@ export function splitUnreadable(result) {
 
 const Ctx = createContext(null)
 
+// Tiempos (exportados para los tests)
+export const SSE_DEBOUNCE_MS = 2_000
+export const SSE_BACKOFF_MIN_MS = 5_000
+export const SSE_BACKOFF_MAX_MS = 60_000
+export const FINANCE_POLL_MS = 5 * 60_000
+export const FINANCE_MIN_GAP_MS = 20_000
+
+const isVisible = () => document.visibilityState !== 'hidden'
+
 export function FinanceDataProvider({ children }) {
-  const [data, setData]               = useState(() => loadCache() ?? EMPTY)
-  const [transactions, setTransactions] = useState(() => loadCache()?.transactions ?? [])
+  // La caché se lee y parsea una sola vez al montar
+  const [initial] = useState(loadCache)
+  const [data, setData]               = useState(initial ?? EMPTY)
+  const [transactions, setTransactions] = useState(initial?.transactions ?? [])
   const [status, setStatus]           = useState('idle')
   const [lastUpdated, setLastUpdated] = useState(null)
   const [errorMsg, setErrorMsg]       = useState('')
@@ -60,16 +71,26 @@ export function FinanceDataProvider({ children }) {
   // Al cerrar sesión el provider se desmonta; si había una petición en vuelo,
   // su respuesta no debe volver a escribir la caché que logout() acaba de borrar.
   const aliveRef = useRef(true)
-  useEffect(() => {
-    aliveRef.current = true
-    return () => { aliveRef.current = false }
-  }, [])
+  const ctlRef      = useRef(null)   // AbortController de la petición en vuelo
+  const seqRef      = useRef(0)      // número de la última petición lanzada
+  const queuedRef   = useRef(false)  // hay una recarga pendiente tras la actual
+  const dirtyRef    = useRef(false)  // llegó un aviso con la app oculta
+  const lastLoadRef = useRef(0)
 
+  // Carga forzada: cancela la petición anterior (puede ser anterior a un cambio
+  // del usuario) y solo la respuesta más reciente escribe el estado.
   const refresh = useCallback(async () => {
+    ctlRef.current?.abort()
+    const ctl = new AbortController()
+    ctlRef.current = ctl
+    const seq = ++seqRef.current
+    const stale = () => !aliveRef.current || seq !== seqRef.current || ctl.signal.aborted
+    lastLoadRef.current = Date.now()
+    dirtyRef.current = false
     setStatus('loading')
     try {
-      const result = await fetchFinanceData()
-      if (!aliveRef.current) return
+      const result = await fetchFinanceData({ signal: ctl.signal })
+      if (stale()) return
       if (!result.configured) {
         setStatus('idle')
         setErrorMsg(result.error || '')
@@ -84,11 +105,38 @@ export function FinanceDataProvider({ children }) {
       setErrorMsg('')
       saveCache(clean)
     } catch (err) {
-      if (!aliveRef.current) return
+      if (stale()) return
       // Mantiene los últimos datos guardados — no borra ni pone datos de ejemplo
       setStatus('offline')
       setErrorMsg(err.message)
       console.warn('[FinanceData] error al refrescar:', err.message)
+    } finally {
+      if (ctlRef.current === ctl) {
+        ctlRef.current = null
+        // Si durante la petición llegaron más avisos, UNA recarga más
+        if (queuedRef.current && aliveRef.current) {
+          queuedRef.current = false
+          requestRefreshRef.current()
+        }
+      }
+    }
+  }, [])
+
+  // Recarga "educada" (avisos SSE, sondeo, volver a primer plano): no recarga
+  // con la app oculta (marca sucio), y si ya hay una en curso encola una sola más.
+  const requestRefreshRef = useRef(() => {})
+  requestRefreshRef.current = () => {
+    if (!aliveRef.current) return
+    if (!isVisible()) { dirtyRef.current = true; return }
+    if (ctlRef.current) { queuedRef.current = true; return }
+    refresh()
+  }
+
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
+      ctlRef.current?.abort()
     }
   }, [])
 
@@ -97,42 +145,81 @@ export function FinanceDataProvider({ children }) {
   useEffect(() => {
     let closed = false
     let retryTimer = null
+    let debounceTimer = null
+    let backoff = SSE_BACKOFF_MIN_MS
+
+    function disconnect() {
+      clearTimeout(retryTimer)
+      retryTimer = null
+      const es = sseRef.current
+      sseRef.current = null
+      if (es) { es.onerror = null; es.close() }
+    }
+
     function connectSSE() {
-      if (closed) return
+      if (closed || sseRef.current || !isVisible()) return
       const es = new EventSource(SSE_URL)
       sseRef.current = es
 
+      es.onopen = () => { backoff = SSE_BACKOFF_MIN_MS }
+
       es.addEventListener('update', () => {
-        refresh()
-        // Notifica a usePendingTransaction para que refresque la campana
-        window.dispatchEvent(new Event('finance-update'))
+        // Varios avisos seguidos = una sola recarga de finanzas y una de pendientes
+        clearTimeout(debounceTimer)
+        debounceTimer = setTimeout(() => {
+          debounceTimer = null
+          if (closed) return
+          if (!isVisible()) { dirtyRef.current = true; return }
+          requestRefreshRef.current()
+          // Notifica a usePendingTransaction para que refresque la campana
+          window.dispatchEvent(new Event('finance-update'))
+        }, SSE_DEBOUNCE_MS)
       })
 
       es.onerror = () => {
         es.close()
-        // Reintento con backoff de 5s si la conexión falla
-        retryTimer = setTimeout(connectSSE, 5_000)
+        if (sseRef.current === es) sseRef.current = null
+        if (closed || !isVisible()) return
+        // Reintento con backoff exponencial 5 s → 60 s
+        const wait = backoff
+        backoff = Math.min(backoff * 2, SSE_BACKOFF_MAX_MS)
+        retryTimer = setTimeout(connectSSE, wait)
+      }
+    }
+
+    function onVisibility() {
+      if (isVisible()) {
+        backoff = SSE_BACKOFF_MIN_MS
+        connectSSE()
+      } else {
+        disconnect()   // con la app oculta no se mantiene la conexión
       }
     }
 
     connectSSE()
+    document.addEventListener('visibilitychange', onVisibility)
 
     return () => {
       // Sin esto, al cerrar sesión el reintento pendiente reabriría la conexión.
       closed = true
-      clearTimeout(retryTimer)
-      sseRef.current?.close()
+      clearTimeout(debounceTimer)
+      document.removeEventListener('visibilitychange', onVisibility)
+      disconnect()
     }
-  }, [refresh])
+  }, [])
 
   useEffect(() => {
     refresh()
     // Polling de respaldo cada 5 min (SSE es el canal principal)
-    const interval = setInterval(refresh, 5 * 60_000)
+    const interval = setInterval(() => requestRefreshRef.current(), FINANCE_POLL_MS)
 
-    // Refresca al instante cuando el usuario vuelve a abrir la app
+    // Al volver a abrir la app: recarga si llegó algo mientras estaba oculta
+    // o si los datos tienen cierta antigüedad.
     function onVisible() {
-      if (document.visibilityState === 'visible') refresh()
+      if (!isVisible()) return
+      if (dirtyRef.current || Date.now() - lastLoadRef.current > FINANCE_MIN_GAP_MS) {
+        requestRefreshRef.current()
+      }
     }
     document.addEventListener('visibilitychange', onVisible)
 

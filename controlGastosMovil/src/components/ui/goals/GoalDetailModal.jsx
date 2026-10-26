@@ -1,10 +1,61 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { fetchContributionPhoto, getCachedPhoto } from '../../../services/api'
 import { useLockBodyScroll } from '../../../hooks/useLockBodyScroll'
 import { fmt } from '../../../utils'
 import { FormScreen, Field, Section, AmountInput, Chips, DangerButton, PrimaryButton, ConfirmSheet, Sheet, Icon } from '../FormKit'
 import { GoalRing, GoalIcon } from './GoalRing'
 import { goalRemaining, formatGoalDate, formatContribDate, compressImage } from './goalUtils'
 import Amt from '../Amt'
+
+// La lista de metas ya no trae las fotos (solo `tiene_foto`): se piden al abrir
+// una aportación. Estado: loading | ready | error. Caché en memoria en api.js.
+const hasPhoto = c => !!(c?.tiene_foto || c?.foto)
+
+export function useContributionPhoto(goalId, contribution) {
+  const id = contribution?.id
+  const [state, setState] = useState({ status: 'idle', src: null })
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() => {
+    if (id == null) { setState({ status: 'idle', src: null }); return }
+    if (contribution.foto) { setState({ status: 'ready', src: contribution.foto }); return }
+    const cached = getCachedPhoto(id)
+    if (cached) { setState({ status: 'ready', src: cached }); return }
+    let alive = true
+    setState({ status: 'loading', src: null })
+    fetchContributionPhoto(goalId, id)
+      .then(src => { if (alive) setState({ status: 'ready', src }) })
+      .catch(() => { if (alive) setState({ status: 'error', src: null }) })
+    return () => { alive = false }
+  }, [goalId, id, attempt]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const retry = useCallback(() => setAttempt(n => n + 1), [])
+  return { ...state, retry }
+}
+
+function PhotoLightbox({ goalId, contribution, myEmail, onClose }) {
+  const { status, src, retry } = useContributionPhoto(goalId, contribution)
+  return (
+    <div className="fm-lightbox" role="dialog" aria-modal="true" aria-label="Foto de recuerdo" onClick={onClose}>
+      <button type="button" className="fm-icon-btn fm-lightbox-close" onClick={onClose} aria-label="Cerrar foto">
+        <Icon name="close" />
+      </button>
+      {status === 'ready' && <img className="fm-lightbox-img" src={src} alt="Recuerdo" />}
+      {status === 'loading' && (
+        <div className="fm-lightbox-caption" role="status"><span className="fm-spinner" aria-hidden="true" /> Cargando foto…</div>
+      )}
+      {status === 'error' && (
+        <div className="fm-lightbox-caption" role="alert" onClick={e => e.stopPropagation()}>
+          No se pudo cargar la foto.{' '}
+          <button type="button" className="fm-secondary" onClick={retry}>Reintentar</button>
+        </div>
+      )}
+      <div className="fm-lightbox-caption tabular">
+        {contribution.user_email === myEmail ? 'Tú' : contribution.name} · {formatContribDate(contribution.fecha)} · <Amt>+{fmt(contribution.importe)}</Amt>
+      </div>
+    </div>
+  )
+}
 
 export default function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, onShare, onEdit, onDelete, onDeleteContribution }) {
   useLockBodyScroll()
@@ -30,7 +81,7 @@ export default function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, on
   const others    = goal.members.filter(m => m !== myEmail).length
   const pct       = goal.objetivo > 0 ? Math.min(100, (goal.ahorrado / goal.objetivo) * 100) : 0
   const done      = goal.ahorrado >= goal.objetivo
-  const memories  = (goal.contributions || []).filter(c => c.foto)
+  const memories  = (goal.contributions || []).filter(hasPhoto)
   const remaining = goalRemaining(goal)
 
   async function handleFile(e) {
@@ -171,7 +222,7 @@ export default function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, on
           <div className="fm-memories">
             {memories.map(c => (
               <button key={c.id} type="button" className="fm-memory" onClick={() => setLightbox(c)} aria-label={`Ver foto de +${fmt(c.importe)}`}>
-                <img className="fm-memory-img" src={c.foto} alt="" loading="lazy" />
+                <span className="fm-memory-img" aria-hidden="true" style={{ display: 'grid', placeItems: 'center' }}><Icon name="camera" size={26} /></span>
                 <span className="fm-memory-caption tabular"><Amt>+{fmt(c.importe)}</Amt></span>
               </button>
             ))}
@@ -184,9 +235,9 @@ export default function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, on
           <div className="fm-card fm-list">
             {goal.contributions.map(c => (
               <div key={c.id} className="fm-list-row">
-                {c.foto && (
-                  <button type="button" className="fm-list-thumb-btn" onClick={() => setLightbox(c)} aria-label="Ver foto">
-                    <img className="fm-list-thumb" src={c.foto} alt="" />
+                {hasPhoto(c) && (
+                  <button type="button" className="fm-icon-btn fm-icon-btn--sm" onClick={() => setLightbox(c)} aria-label="Ver foto">
+                    <Icon name="camera" size={16} />
                   </button>
                 )}
                 <div className="fm-list-main">
@@ -216,15 +267,7 @@ export default function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, on
       )}
 
       {lightbox && (
-        <div className="fm-lightbox" role="dialog" aria-modal="true" aria-label="Foto de recuerdo" onClick={() => setLightbox(null)}>
-          <button type="button" className="fm-icon-btn fm-lightbox-close" onClick={() => setLightbox(null)} aria-label="Cerrar foto">
-            <Icon name="close" />
-          </button>
-          <img className="fm-lightbox-img" src={lightbox.foto} alt="Recuerdo" />
-          <div className="fm-lightbox-caption tabular">
-            {lightbox.user_email === myEmail ? 'Tú' : lightbox.name} · {formatContribDate(lightbox.fecha)} · <Amt>+{fmt(lightbox.importe)}</Amt>
-          </div>
-        </div>
+        <PhotoLightbox goalId={goal.id} contribution={lightbox} myEmail={myEmail} onClose={() => setLightbox(null)} />
       )}
 
       {showShare && (
