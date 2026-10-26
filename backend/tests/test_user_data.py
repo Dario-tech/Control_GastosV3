@@ -416,8 +416,10 @@ def test_middleware_corta_en_flujo(client):
     assert sent[0]["status"] == 413 and len(seen) == 2 and len(chunks) == 97  # corta al pasar el límite
 
 
-def test_otras_rutas_sin_tope_de_middleware(client, auth_headers):
-    r = client.post("/api/auth/login", content=b"x" * (200 * 1024), headers={"content-type": "application/json"})
+def test_otras_rutas_tienen_tope_global_de_64kb(client, auth_headers):
+    r = client.post("/api/auth/login", content=b"x" * (65 * 1024), headers={"content-type": "application/json"})
+    assert r.status_code == 413
+    r = client.post("/api/auth/login", content=b"x" * (60 * 1024), headers={"content-type": "application/json"})
     assert r.status_code != 413
 
 
@@ -461,8 +463,14 @@ def test_get_prefs_con_json_hondo_en_bd_no_revienta(client, repo):
 
 @pytest.mark.parametrize("bad", ["\x00", "\u200b", "\u202e", "\x07", "\ud800", "a\udc00"])
 def test_emoji_y_nombre_caracteres_raros_422(client, repo, bad):
-    assert mk(client, A, "ok", emoji="🙂" + bad).status_code == 422
-    assert mk(client, A, "no" + bad).status_code == 422
+    import json as _json
+
+    def post(concepto, **kw):  # content= con json.dumps (ASCII, escapa los sustitutos): httpx nuevo no los codifica
+        body = _json.dumps({"tipo": "Gasto Variable", "concepto": concepto, **kw})
+        return client.post("/api/categories", content=body.encode(),
+                           headers={**H(A), "content-type": "application/json"})
+    assert post("ok", emoji="🙂" + bad).status_code == 422
+    assert post("no" + bad).status_code == 422
     assert not repo.cats
 
 

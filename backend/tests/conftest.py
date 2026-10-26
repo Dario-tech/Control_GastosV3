@@ -36,3 +36,10 @@ def _reset_ratelimit():
     yield
     ratelimit._hits.clear()
     ratelimit._blocked.clear()
+
+
+@pytest.fixture(autouse=True)
+def _registro_abierto(monkeypatch):
+    """Por defecto el registro está CERRADO en producción; los tests que dan de alta
+    usuarios lo necesitan abierto. Los tests del modo cerrado hacen delenv/setenv."""
+    monkeypatch.setenv("ALLOW_REGISTER", "true")

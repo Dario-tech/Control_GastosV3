@@ -1,10 +1,13 @@
 import os
 import logging
+import secrets
+import threading
+import time
 import bcrypt
 import httpx
-from datetime import datetime, timedelta
+import jwt as pyjwt
+from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, Header
-from jose import jwt as jose_jwt, JWTError
 
 GOOGLE_CLIENT_ID  = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_TOKENINFO  = "https://oauth2.googleapis.com/tokeninfo"
@@ -55,23 +58,95 @@ async def verify_google_token(token: str) -> dict:
 
 
 def create_jwt(email: str) -> str:
+    """JWT de sesión (HS256). Lleva `jti` único para poder revocarlo (logout)."""
     payload = {
         "sub": email,
-        "exp": datetime.utcnow() + timedelta(days=JWT_EXPIRE_DAYS),
+        "exp": datetime.now(timezone.utc) + timedelta(days=JWT_EXPIRE_DAYS),
+        "jti": secrets.token_urlsafe(16),
     }
-    return jose_jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return pyjwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-def get_current_user(authorization: str = Header(default="")) -> str:
-    """Dependencia FastAPI: extrae y verifica el JWT del header Authorization."""
+# ── Sesiones revocadas (logout) ───────────────────────────────────────────────
+# Conjunto en memoria jti -> exp (epoch s). Se carga de la tabla `revoked_sessions`
+# al arrancar y NO se consulta la BD en cada petición. Es por proceso: con varias
+# instancias, un logout solo se aplica de inmediato en la que lo recibe (las demás
+# lo ven al reiniciarse). Los tokens antiguos SIN `jti` (sesiones abiertas antes de
+# esta versión) siguen siendo válidos hasta caducar y no se pueden revocar.
+_revoked: dict[str, float] = {}
+_revoked_lock = threading.Lock()
+
+
+def _purge_revoked(now: float | None = None) -> None:
+    now = time.time() if now is None else now
+    with _revoked_lock:
+        for jti in [j for j, exp in _revoked.items() if exp <= now]:
+            del _revoked[jti]
+
+
+def ensure_revoked_sessions_table() -> None:
+    """Migración aditiva e idempotente + carga en memoria de las revocaciones vigentes."""
+    from .db import db_cursor
+    with db_cursor() as cur:
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS revoked_sessions ("
+            "jti TEXT PRIMARY KEY, exp TIMESTAMPTZ NOT NULL)"
+        )
+        cur.execute("ALTER TABLE revoked_sessions ENABLE ROW LEVEL SECURITY")  # sin políticas, como el resto
+        cur.execute("DELETE FROM revoked_sessions WHERE exp < now()")
+        cur.execute("SELECT jti, EXTRACT(EPOCH FROM exp) AS exp FROM revoked_sessions")
+        rows = cur.fetchall()
+    with _revoked_lock:
+        _revoked.clear()
+        for r in rows:
+            _revoked[r["jti"]] = float(r["exp"])
+
+
+def revoke_session(jti: str, exp: float) -> None:
+    """Revoca un jti: primero en memoria (efecto inmediato) y luego se persiste."""
+    _purge_revoked()
+    with _revoked_lock:
+        _revoked[jti] = float(exp)
+    from .db import db_cursor
+    with db_cursor() as cur:
+        cur.execute(
+            "INSERT INTO revoked_sessions (jti, exp) VALUES (%s, to_timestamp(%s)) "
+            "ON CONFLICT (jti) DO NOTHING",
+            (jti, float(exp)),
+        )
+
+
+def is_revoked(jti: str) -> bool:
+    with _revoked_lock:
+        exp = _revoked.get(jti)
+    return exp is not None and exp > time.time()
+
+
+def get_current_claims(authorization: str = Header(default="")) -> dict:
+    """Dependencia FastAPI: verifica el JWT del header Authorization y devuelve sus
+    claims. Exige `exp` y `sub`; cualquier fallo de firma, caducidad o claims da 401."""
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Authorization header requerido")
     token = authorization.removeprefix("Bearer ").strip()
     try:
-        payload = jose_jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return payload["sub"]
-    except JWTError:
+        payload = pyjwt.decode(
+            token, JWT_SECRET, algorithms=[JWT_ALGORITHM],   # algoritmo fijo: sin "none"
+            options={"require": ["exp", "sub"]},
+        )
+    except Exception:  # InvalidTokenError y cualquier otro fallo de parseo: nunca 500
         raise HTTPException(status_code=401, detail="Token de sesión inválido o expirado")
+    sub = payload.get("sub")
+    if not isinstance(sub, str) or not sub:
+        raise HTTPException(status_code=401, detail="Token de sesión inválido o expirado")
+    jti = payload.get("jti")
+    if jti is not None and (not isinstance(jti, str) or is_revoked(jti)):
+        raise HTTPException(status_code=401, detail="Token de sesión inválido o expirado")
+    return payload
+
+
+def get_current_user(authorization: str = Header(default="")) -> str:
+    """Dependencia FastAPI: email del usuario autenticado por el JWT."""
+    return get_current_claims(authorization)["sub"]
 
 
 # ── Contraseñas (bcrypt) ──────────────────────────────────────────────────────

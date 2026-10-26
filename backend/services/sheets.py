@@ -203,23 +203,29 @@ async def get_finance_data(email: str, year: int | None = None) -> dict:
     """
     def _q():
         with db_cursor() as cur:
-            cur.execute(
-                "SELECT DISTINCT EXTRACT(YEAR FROM fecha)::int AS y FROM transactions WHERE user_email = %s ORDER BY y",
-                (email,),
-            )
-            years = [r["y"] for r in cur.fetchall()]
-            if year is None:
+            years = None
+            if year is not None:
+                # Con ?year= no se leen todas las filas, así que los años salen de un DISTINCT
+                # (index-only con idx_transactions_search). Sin ?year= se derivan de las filas.
                 cur.execute(
-                    "SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario FROM transactions WHERE user_email = %s ORDER BY fecha, id",
+                    "SELECT DISTINCT EXTRACT(YEAR FROM fecha)::int AS y FROM transactions WHERE user_email = %s ORDER BY y",
                     (email,),
                 )
-            else:
+                years = [r["y"] for r in cur.fetchall()]
                 cur.execute(
                     "SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario FROM transactions "
                     "WHERE user_email = %s AND fecha >= make_date(%s, 1, 1) AND fecha < make_date(%s, 1, 1) ORDER BY fecha, id",
                     (email, year, year + 1),
                 )
-            return years, cur.fetchall()
+            else:
+                cur.execute(
+                    "SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario FROM transactions WHERE user_email = %s ORDER BY fecha, id",
+                    (email,),
+                )
+            rows = cur.fetchall()
+            if years is None:  # sin ?year=: ya tenemos todas las filas, un DISTINCT extra sobra
+                years = sorted({int(r["fecha"][:4]) for r in rows})
+            return years, rows
 
     available_years, rows = await run_in_thread(_q)
 

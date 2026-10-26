@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from fastapi import HTTPException
 from .db import db_cursor, run_in_thread
-from .suggest import suggest_category
+from .suggest import suggest_category, build_category_groups, suggest_from_groups
 from .crypto import (encrypt_str, encrypt_float, decrypt_str, decrypt_float, decrypt_transaction,
                      hmac_tag, EncryptionNotConfigured)
 from .wallet import normalize_merchant
@@ -266,6 +266,10 @@ async def create_pending_dedup(email: str, importe: float, fecha: str, comercio:
 # ── Listar ────────────────────────────────────────────────────────────────────
 
 async def get_pending(email: str) -> list:
+    """Pendientes con sugerencia. Coste: descifrar el historial UNA vez (H), agruparlo
+    por (tipo, concepto) y puntuar cada pendiente solo contra los grupos (P x G), en
+    vez de recorrer todo el historial por cada pendiente (P x H). Si todos los
+    pendientes se resuelven con una regla de comercio, el historial no se toca."""
     def _q():
         with db_cursor() as cur:
             cur.execute(
@@ -274,12 +278,6 @@ async def get_pending(email: str) -> list:
                 (email,),
             )
             pending = cur.fetchall()
-            # Historial del usuario para sugerir categoría (una sola query)
-            cur.execute(
-                "SELECT id, tipo, concepto_enc, importe_enc FROM transactions WHERE user_email = %s",
-                (email,),
-            )
-            history = cur.fetchall()
             tags = list({bytes(p["comercio_hmac"]) for p in pending if p.get("comercio_hmac")})
             rules = []
             if tags:
@@ -289,11 +287,24 @@ async def get_pending(email: str) -> list:
                     (email, tags),
                 )
                 rules = cur.fetchall()
-            return pending, history, rules
+            rules_by_tag = {bytes(r["comercio_hmac"]): r for r in rules}
+            needs_history = any(
+                not (p.get("comercio_hmac") and bytes(p["comercio_hmac"]) in rules_by_tag
+                     and _rule_to_suggestion(rules_by_tag[bytes(p["comercio_hmac"])]))
+                for p in pending
+            )
+            history = None
+            if needs_history:
+                # Una sola query y un solo descifrado; el trabajo de CPU va en el hilo
+                # (antes bloqueaba el event loop).
+                cur.execute(
+                    "SELECT id, tipo, concepto_enc, importe_enc FROM transactions WHERE user_email = %s",
+                    (email,),
+                )
+                history = build_category_groups(_decrypt_history(cur.fetchall()))
+            return pending, history, rules_by_tag
 
-    pending, history, rules = await run_in_thread(_q)
-    history = _decrypt_history(history)
-    rules_by_tag = {bytes(r["comercio_hmac"]): r for r in rules}
+    pending, history, rules_by_tag = await run_in_thread(_q)
 
     result = []
     for r in pending:
@@ -311,9 +322,10 @@ async def get_pending(email: str) -> list:
         tag = r.get("comercio_hmac")
         if tag and bytes(tag) in rules_by_tag:
             suggested = _rule_to_suggestion(rules_by_tag[bytes(tag)])
-        if suggested is None:
+        if suggested is None and history is not None:
             try:
-                s = suggest_category(history, float(item["importe"]))
+                groups, total = history
+                s = suggest_from_groups(groups, total, float(item["importe"]))
                 suggested = {**s, "origen": "historial"} if s else None
             except (TypeError, ValueError):
                 suggested = None

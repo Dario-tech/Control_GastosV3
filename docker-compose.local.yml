@@ -45,6 +45,7 @@ services:
       JWT_SECRET: bshLzY-c_KNPQgx6LTUrgN1l88VJFExvcwuVzVbwGKA
       DB_ENCRYPTION_KEY: v79LpsHQ0XT0I2aCfPlhoyVV2Nw6iZrQAdLv80N2IF4=
       CORS_ORIGINS: http://localhost:5173
+      ALLOW_REGISTER: "true"   # solo local: en QA/producción el registro va cerrado
     ports:
       - "8000:8000"
     depends_on:

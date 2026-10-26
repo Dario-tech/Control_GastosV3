@@ -68,3 +68,26 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
           PGPASSWORD=t psql -h 127.0.0.1 -U t -d t -v ON_ERROR_STOP=1 -f schema.sql
       - run: python -m pytest -q
+
+  audit:
+    name: Auditoría de dependencias (informativa)
+    runs-on: ubuntu-latest
+    # Informativa por ahora: avisa de vulnerabilidades conocidas pero no rompe el CI.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: pip-audit (backend)
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          pip-audit -r backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: npm audit (frontend, solo producción)
+        continue-on-error: true
+        working-directory: controlGastosMovil
+        run: npm audit --omit=dev --audit-level=high

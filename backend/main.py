@@ -10,9 +10,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Depends, Query, Path
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, Response
 from typing import Any, Annotated
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, AfterValidator
 from dotenv import load_dotenv
 # Carga backend/.env si existe (no pisa variables ya definidas, así que en Render/Docker no cambia nada).
 # Debe ejecutarse antes de importar los servicios, que leen el entorno al importarse.
@@ -25,12 +26,13 @@ from services.sheets import (
     ensure_search_index, search_transactions, ensure_id_cliente,
 )
 from services.auth import (
-    verify_google_token, create_jwt, get_current_user,
-    hash_password, verify_password,
+    verify_google_token, create_jwt, get_current_user, get_current_claims,
+    hash_password, verify_password, ensure_revoked_sessions_table, revoke_session,
 )
 from services.users import (
     get_user, ensure_user, get_email_by_shortcut_token, get_or_create_shortcut_token,
     ensure_password_column, get_password_hash, create_user_with_password,
+    registration_open, registro_cerrado_error,
 )
 from services.db import init_pool, run_in_thread
 from services import user_data
@@ -50,7 +52,7 @@ from services.ai_categorize import suggest_emoji
 from services.email_report import send_monthly_report, send_monthly_reports_to_all
 from services.goals import (
     ensure_goals_tables, get_goals_for_user, create_goal, update_goal,
-    delete_goal, contribute, delete_contribution, share_goal,
+    delete_goal, contribute, delete_contribution, share_goal, get_contribution_foto,
 )
 from services.annual_expenses import (
     ensure_annual_expenses_table, list_for_user as list_annual_expenses,
@@ -63,6 +65,7 @@ from services.annual_expenses import (
 async def lifespan(app: FastAPI):
     init_pool()
     ensure_password_column()  # migración aditiva idempotente (columna password_hash)
+    ensure_revoked_sessions_table()  # migración aditiva idempotente (sesiones revocadas) + carga en memoria
     ensure_goals_tables()     # migración aditiva idempotente (metas de ahorro compartidas)
     ensure_comentario_column()  # migración aditiva idempotente (comentario libre en transacciones)
     ensure_encrypted_columns()  # migración aditiva idempotente (concepto/importe cifrados)
@@ -79,7 +82,18 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Control Gastos API", version="3.0.0", lifespan=lifespan)
+def _docs_enabled() -> bool:
+    """/docs, /redoc y /openapi.json solo con ENABLE_DOCS=true|1|yes (por defecto apagados)."""
+    return os.getenv("ENABLE_DOCS", "").strip().lower() in ("true", "1", "yes")
+
+
+_DOCS = _docs_enabled()
+app = FastAPI(
+    title="Control Gastos API", version="3.0.0", lifespan=lifespan,
+    docs_url="/docs" if _DOCS else None,
+    redoc_url="/redoc" if _DOCS else None,
+    openapi_url="/openapi.json" if _DOCS else None,
+)
 
 _log = logging.getLogger("uvicorn.error")
 
@@ -133,6 +147,23 @@ async def _recursion_handler(request: Request, exc: RecursionError):
 
 USERDATA_MAX_BODY = 128 * 1024
 _USERDATA_PREFIXES = ("/api/categories", "/api/prefs")
+GLOBAL_MAX_BODY = 64 * 1024        # tope por defecto en /api/*
+SHORTCUT_MAX_BODY = 4 * 1024       # atajo iOS: sin JWT, se corta antes de leer/validar el token
+CONTRIBUTE_MAX_BODY = 1_200_000    # aportación de meta con foto (≤ 800.000 caracteres de data-URL)
+_CONTRIBUTE_RE = re.compile(r"^/api/goals/[^/]+/contribute/?$")
+
+
+def _max_body_for(path: str) -> int | None:
+    """Tope de cuerpo (bytes) según la ruta; None = sin tope (fuera de /api/)."""
+    if not path.startswith("/api/"):
+        return None
+    if path.startswith(_USERDATA_PREFIXES):
+        return USERDATA_MAX_BODY
+    if path.rstrip("/") == "/api/shortcut/pending":
+        return SHORTCUT_MAX_BODY
+    if _CONTRIBUTE_RE.match(path):
+        return CONTRIBUTE_MAX_BODY
+    return GLOBAL_MAX_BODY
 
 
 class _BodyTooLarge(Exception):
@@ -140,23 +171,31 @@ class _BodyTooLarge(Exception):
 
 
 class BodySizeLimitMiddleware:
-    """Tope de tamaño de cuerpo en /api/categories* y /api/prefs*. Mira Content-Length
-    y además cuenta los bytes según llegan (cubre `Transfer-Encoding: chunked`),
-    cortando en cuanto se supera el límite, sin acumular el cuerpo en memoria."""
+    """Tope de tamaño de cuerpo en /api/* (64 KB por defecto; 4 KB en el atajo; 128 KB
+    en categorías/prefs; ~1,2 MB en aportaciones con foto). Mira Content-Length y además
+    cuenta los bytes según llegan (cubre `Transfer-Encoding: chunked`), cortando en
+    cuanto se supera el límite, sin acumular el cuerpo en memoria."""
 
-    def __init__(self, app, max_bytes: int = USERDATA_MAX_BODY):
+    def __init__(self, app, max_bytes: int | None = None):
         self.app = app
-        self.max_bytes = max_bytes
+        self.max_bytes = max_bytes   # fuerza un tope único en /api/* (pruebas)
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or not scope["path"].startswith(_USERDATA_PREFIXES):
+        limit = _max_body_for(scope["path"]) if scope["type"] == "http" else None
+        if limit is not None and self.max_bytes:
+            limit = self.max_bytes
+        if limit is None:
             return await self.app(scope, receive, send)
-        too_big = JSONResponse(status_code=413, content={"detail": "Cuerpo demasiado grande (máx. 128 KB)"})
+        self_max = limit
+        too_big = JSONResponse(
+            status_code=413,
+            content={"detail": f"Cuerpo demasiado grande (máx. {limit // 1024} KB)"},
+        )
         try:
             declared = int(dict(scope["headers"]).get(b"content-length") or 0)
         except ValueError:
             declared = 0
-        if declared > self.max_bytes:
+        if declared > self_max:
             return await too_big(scope, receive, send)
 
         seen = 0
@@ -168,7 +207,7 @@ class BodySizeLimitMiddleware:
             msg = await receive()
             if msg["type"] == "http.request":
                 seen += len(msg.get("body", b""))
-                if seen > self.max_bytes:
+                if seen > self_max:
                     # Se responde 413 aquí mismo: FastAPI convierte cualquier fallo al leer
                     # el cuerpo en un 400, así que no se puede confiar en que la excepción llegue.
                     if not started:
@@ -191,8 +230,80 @@ class BodySizeLimitMiddleware:
                 raise
 
 
-# Va antes que CORS para quedar por dentro: así el 413 también lleva cabeceras CORS.
+class SecurityHeadersMiddleware:
+    """Cabeceras de seguridad en todas las respuestas (incluidos 4xx y el 413 del tope
+    de cuerpo, que pasan por aquí) y `Cache-Control: no-store` en /api/* salvo
+    /api/health y el stream /api/events, que conservan el suyo. También convierte un
+    error no controlado en el 500 genérico DENTRO de la cadena, para que ese 500 lleve
+    CORS y estas cabeceras (el handler de Exception de Starlette queda fuera de ambos)."""
+
+    _FIJAS = ((b"x-content-type-options", b"nosniff"),
+              (b"referrer-policy", b"no-referrer"),
+              (b"x-frame-options", b"DENY"))
+    _SIN_NOSTORE = ("/api/health", "/api/events")
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        path = scope["path"]
+        no_store = path.startswith("/api/") and path.rstrip("/") not in self._SIN_NOSTORE
+        started = False
+
+        async def send_wrapper(message):
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+                # Una ruta puede declarar su propia caché PRIVADA (p. ej. la foto de una
+                # aportación: private, max-age=3600); esa se respeta. Todo lo demás: no-store.
+                propia = any(k.lower() == b"cache-control" and v.lower().startswith(b"private")
+                             for k, v in message.get("headers", []))
+                pisar = no_store and not propia
+                nombres = {n for n, _ in self._FIJAS} | ({b"cache-control"} if pisar else set())
+                headers = [(k, v) for k, v in message.get("headers", []) if k.lower() not in nombres]
+                headers += list(self._FIJAS)
+                if pisar:
+                    headers.append((b"cache-control", b"no-store"))
+                message = {**message, "headers": headers}
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
+        except Exception as exc:
+            if started:
+                raise
+            _log.error("Error no controlado en %s %s", scope.get("method"), path, exc_info=exc)
+            resp = JSONResponse(status_code=500, content={"detail": "Error interno del servidor"})
+            await resp(scope, receive, send_wrapper)
+
+
+# Orden (de fuera adentro): CORS > GZip > cabeceras de seguridad > tope de cuerpo > app.
+# Así el 413 y cualquier 4xx/5xx llevan cabeceras de seguridad y CORS.
 app.add_middleware(BodySizeLimitMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+
+
+class GZipExceptSSE:
+    """GZip para las respuestas JSON grandes (/api/finance, /api/goals...), SALVO el
+    stream SSE: GZipMiddleware acumula bytes en su compresor y no los vacía hasta
+    cerrar, lo que retendría los eventos indefinidamente. /api/events pasa tal cual.
+    Orden: va por dentro de CORS (se añade antes), así la respuesta comprimida sale
+    con las cabeceras CORS; y por fuera del tope de cuerpo (el 413 también se comprime
+    si procede). nivel 5: 9 es mucha CPU para el plan gratuito y apenas gana tamaño."""
+
+    def __init__(self, app, minimum_size: int = 1024):
+        self.app = app
+        self._gzip = GZipMiddleware(app, minimum_size=minimum_size, compresslevel=5)
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["path"] == "/api/events":
+            return await self.app(scope, receive, send)
+        return await self._gzip(scope, receive, send)
+
+
+app.add_middleware(GZipExceptSSE)
 
 app.add_middleware(
     CORSMiddleware,
@@ -206,8 +317,23 @@ _sse_clients: set[asyncio.Queue] = set()
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
+def _has_surrogates(s: str) -> bool:
+    """Sustitutos Unicode sueltos (\\ud800-\\udfff): JSON los admite pero no se pueden
+    codificar en UTF-8 (cifrado, SQL) y acabarían en un 500."""
+    return any(0xD800 <= ord(ch) <= 0xDFFF for ch in s)
+
+
+def _texto_valido(v: str) -> str:
+    if _has_surrogates(v):
+        raise ValueError("Texto con caracteres no válidos")
+    return v
+
+
+Txt = Annotated[str, AfterValidator(_texto_valido)]  # str sin sustitutos sueltos
+
+
 class GoogleLoginIn(BaseModel):
-    token: str
+    token: Txt = Field(max_length=4096)
 
 
 @app.post("/api/auth/login")
@@ -237,21 +363,36 @@ async def auth_me(email: str = Depends(get_current_user)):
     return {"email": email, "name": (user or {}).get("name", "")}
 
 
+@app.post("/api/auth/logout")
+async def auth_logout(claims: dict = Depends(get_current_claims)):
+    """Revoca la sesión (jti) del JWT actual: desde ese momento ese token da 401.
+    Responde 200 {"status": "ok"}. Un token antiguo sin jti no se puede revocar: se
+    responde igualmente 200 (el cliente debe olvidarlo) con "revoked": false."""
+    jti = claims.get("jti")
+    if not isinstance(jti, str) or not jti:
+        return {"status": "ok", "revoked": False}
+    await run_in_thread(lambda: revoke_session(jti, float(claims["exp"])))
+    return {"status": "ok", "revoked": True}
+
+
 # ── Auth por email + contraseña ───────────────────────────────────────────────
 
-import re
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_EMAIL_MAX = 254
+_NAME_MAX = 100
+_PASSWORD_MIN, _PASSWORD_MAX = 10, 128
 
 
 class RegisterIn(BaseModel):
-    email:    str
-    name:     str
-    password: str
+    # Tope de transporte generoso; los topes reales (con mensaje) se validan en el endpoint.
+    email:    Txt = Field(max_length=1024)
+    name:     Txt = Field(max_length=1024)
+    password: Txt = Field(max_length=1024)
 
 
 class EmailLoginIn(BaseModel):
-    email:    str
-    password: str
+    email:    Txt = Field(max_length=1024)
+    password: Txt = Field(max_length=1024)  # sin el máximo de 128 del alta: no bloquear cuentas antiguas
 
 
 def _session_response(email: str, name: str) -> dict:
@@ -269,17 +410,25 @@ def _session_response(email: str, name: str) -> dict:
 
 @app.post("/api/auth/register")
 async def auth_register(body: RegisterIn, request: Request):
+    """Alta con email + contraseña. Con el registro cerrado (ALLOW_REGISTER no es
+    true/1/yes, lo habitual) responde 403 siempre, exista o no el email."""
+    # 5 registros/10 min por IP (bloqueo 15 min); 3/10 min por email
+    enforce("reg-ip", [client_ip(request)], limit=5, window=600, block=900)
+    if not registration_open():
+        raise registro_cerrado_error()
+
     email = body.email.strip().lower()
     name  = body.name.strip() or email.split("@")[0]
 
-    # 5 registros/10 min por IP (bloqueo 15 min); 3/10 min por email
-    enforce("reg-ip", [client_ip(request)], limit=5, window=600, block=900)
-    enforce("reg-email", [email], limit=3, window=600, block=900)
-
-    if not _EMAIL_RE.match(email):
+    if len(email) > _EMAIL_MAX or not _EMAIL_RE.match(email):
         raise HTTPException(status_code=422, detail="Email no válido")
-    if len(body.password) < 10:
+    if len(name) > _NAME_MAX:
+        raise HTTPException(status_code=422, detail=f"El nombre no puede superar {_NAME_MAX} caracteres")
+    if len(body.password) < _PASSWORD_MIN:
         raise HTTPException(status_code=422, detail="La contraseña debe tener al menos 10 caracteres")
+    if len(body.password) > _PASSWORD_MAX:
+        raise HTTPException(status_code=422, detail=f"La contraseña no puede superar {_PASSWORD_MAX} caracteres")
+    enforce("reg-email", [email], limit=3, window=600, block=900)
 
     pw_hash = await asyncio.to_thread(hash_password, body.password)  # bcrypt fuera del event loop
     created = await create_user_with_password(email, name, pw_hash)
@@ -401,9 +550,9 @@ class TransactionIn(BaseModel):
     tipo:       str
     concepto:   str
     fecha:      str | None = None  # YYYY-MM-DD; si no se pasa, usa CURRENT_DATE
-    source:     str = "shortcut"
+    source:     Txt = Field(default="shortcut", max_length=32)
     comentario: str | None = None
-    id_cliente: str | None = None  # opcional, idempotencia (ver add_transaction)
+    id_cliente: str | None = Field(default=None, max_length=64)  # opcional, idempotencia (ver add_transaction)
 
 
 _ID_CLIENTE_RE = re.compile(r"^[A-Za-z0-9_.:-]{8,64}$")
@@ -439,11 +588,19 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
         _err422("El importe debe ser mayor que 0 y no superar 1.000.000")
     if tx.id_cliente is not None and not _ID_CLIENTE_RE.match(tx.id_cliente):
         _err422("id_cliente inválido")
+    # tipo (3 valores), concepto 1..60, comentario ≤500, fecha real entre 2000-01-01 y
+    # hoy+1 año y sin sustitutos Unicode: las mismas reglas (y mensajes 422) que el PATCH.
+    campos = {"tipo": tx.tipo, "concepto": tx.concepto}
+    if tx.fecha is not None:
+        campos["fecha"] = tx.fecha
+    if tx.comentario is not None:
+        campos["comentario"] = tx.comentario
+    ok = _validate_tx_patch(campos)
 
     try:
         result = await post_transaction(
-            importe, tx.tipo, tx.concepto, email, tx.source, tx.fecha,
-            (tx.comentario or "").strip() or None, id_cliente=tx.id_cliente,
+            importe, ok["tipo"], ok["concepto"], email, tx.source, ok.get("fecha"),
+            ok.get("comentario") or None, id_cliente=tx.id_cliente,
         )
     except HTTPException:
         raise
@@ -456,15 +613,16 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
 
 
 class CommentIn(BaseModel):
-    comentario: str
+    comentario: str = Field(max_length=4 * 500)  # transporte; el tope real (500, tras strip) lo valida el endpoint
 
 
 @app.patch("/api/transactions/{row_index}/comment")
 async def update_transaction_comment_endpoint(
     row_index: int, body: CommentIn, email: str = Depends(get_current_user)
 ):
+    comentario = _validate_tx_patch({"comentario": body.comentario})["comentario"]  # ≤500, sin sustitutos
     try:
-        result = await update_transaction_comment(row_index, email, body.comentario.strip())
+        result = await update_transaction_comment(row_index, email, comentario)
     except HTTPException:
         raise
     except Exception:
@@ -502,8 +660,10 @@ def _validate_tx_patch(data) -> dict:
             d = date_type.fromisoformat(f.strip())
         except ValueError:
             _err422("La fecha no es válida")
-        if d.year < 2000 or d.year > date_type.today().year + 1:
-            _err422(f"El año de la fecha debe estar entre 2000 y {date_type.today().year + 1}")
+        # Hasta el fin del año que viene (como antes); nunca 2000-01-01 hacia atrás.
+        limite = date_type(date_type.today().year + 1, 12, 31)
+        if d < date_type(2000, 1, 1) or d > limite:
+            _err422(f"La fecha debe estar entre 2000-01-01 y {limite.isoformat()}")
         changes["fecha"] = d.isoformat()
 
     if "importe" in data:
@@ -539,6 +699,8 @@ def _validate_tx_patch(data) -> dict:
         c = c.strip()
         if len(c) > _CONCEPTO_MAX:
             _err422(f"El concepto no puede superar {_CONCEPTO_MAX} caracteres")
+        if _has_surrogates(c):
+            _err422("El concepto contiene caracteres no válidos")
         changes["concepto"] = c
 
     if "comentario" in data:
@@ -550,6 +712,8 @@ def _validate_tx_patch(data) -> dict:
         cm = cm.strip()
         if len(cm) > _COMENTARIO_MAX:
             _err422(f"El comentario no puede superar {_COMENTARIO_MAX} caracteres")
+        if _has_surrogates(cm):
+            _err422("El comentario contiene caracteres no válidos")
         changes["comentario"] = cm
 
     if not changes:
@@ -605,7 +769,7 @@ async def create_pending_tx(request: Request, email: str = Depends(get_current_u
             data = json_lib.loads(data)
     except Exception:
         data = None
-    if not isinstance(data, dict):
+    if not isinstance(data, dict) or _dict_has_surrogates(data):
         _err422("Body inválido")
 
     try:
@@ -644,20 +808,21 @@ async def get_pending_txs(email: str = Depends(get_current_user)):
 
 
 class CategorizeIn(BaseModel):
-    tipo:       str
-    concepto:   str
+    tipo:       str = Field(max_length=64)
+    concepto:   str = Field(max_length=1024)   # transporte; el tope real (60) lo valida el endpoint
     recordar:   bool = True         # aprender la regla comercio → categoría
-    comentario: str | None = None   # ≤ 500, se guarda en la transacción creada
+    comentario: str | None = Field(default=None, max_length=4 * 500)   # ≤ 500, se guarda en la transacción creada
 
 
 @app.post("/api/pending/{pending_id}/categorize")
 async def categorize_pending_tx(pending_id: int, body: CategorizeIn, email: str = Depends(get_current_user)):
-    comentario = (body.comentario or "").strip() or None
-    if comentario and len(comentario) > _COMENTARIO_MAX:
-        _err422(f"El comentario no puede superar {_COMENTARIO_MAX} caracteres")
+    campos = {"tipo": body.tipo, "concepto": body.concepto}
+    if body.comentario is not None:
+        campos["comentario"] = body.comentario
+    ok = _validate_tx_patch(campos)   # tipo válido, concepto 1..60, comentario ≤500, sin sustitutos
     result = await categorize_pending(
-        pending_id, email, body.tipo, body.concepto,
-        recordar=body.recordar, comentario=comentario,
+        pending_id, email, ok["tipo"], ok["concepto"],
+        recordar=body.recordar, comentario=ok.get("comentario") or None,
     )
     await _broadcast()
     return result
@@ -674,6 +839,11 @@ async def delete_pending_tx(pending_id: int, email: str = Depends(get_current_us
 # ── Atajo iOS (token permanente, sin JWT) ────────────────────────────────────
 
 SHORTCUT_MAX_IMPORTE = IMPORTE_MAX  # services/importes.py
+_SHORTCUT_TOKEN_MAX = 128
+
+
+def _dict_has_surrogates(data: dict) -> bool:
+    return any(isinstance(v, str) and _has_surrogates(v) for v in data.values())
 
 @app.get("/api/shortcut/token")
 async def shortcut_get_token(email: str = Depends(get_current_user)):
@@ -716,6 +886,11 @@ async def shortcut_create_pending(request: Request):
     token = data.get("shortcut_token") or data.get("token")
     if not token:
         raise HTTPException(status_code=401, detail="shortcut_token requerido")
+    # Tipo/longitud ANTES de limitar y consultar la BD: nunca un 500 por un token raro.
+    if not isinstance(token, str) or len(token) > _SHORTCUT_TOKEN_MAX or _has_surrogates(token):
+        raise HTTPException(status_code=401, detail="Token inválido")
+    if _dict_has_surrogates(data):
+        raise HTTPException(status_code=422, detail="Body inválido")
     # Se cuenta ANTES de consultar la BD: por IP del cliente (frena el tanteo de tokens
     # distintos desde un mismo origen) y por token (30/min; frena un Atajo en bucle).
     # Con token inválido también cuenta, porque el límite se aplica antes de validarlo.
@@ -824,12 +999,53 @@ async def send_all_monthly_reports(request: Request):
 
 # ── Metas de ahorro (compartibles entre usuarios) ────────────────────────────
 
+_GOAL_NOMBRE_MAX = 60
+_GOAL_EMOJI_MAX = 16
+_GOAL_URL_MAX = 2048
+_GOAL_OBJETIVO_MAX = 100_000_000
+
+
 class GoalIn(BaseModel):
-    nombre:     str
+    # Topes de transporte generosos; los reales (con mensaje claro) los aplica _validate_goal.
+    nombre:     Txt = Field(max_length=1024)
     objetivo:   float
-    emoji:      str = "🎯"
-    fecha:      str | None = None
-    imagen_url: str | None = None  # gif/imagen personalizada, alternativa al emoji
+    emoji:      Txt = Field(default="🎯", max_length=1024)
+    fecha:      str | None = Field(default=None, max_length=64)
+    imagen_url: Txt | None = Field(default=None, max_length=8192)  # gif/imagen personalizada, alternativa al emoji
+
+
+def _validate_goal(body: "GoalIn") -> tuple[str, float, str, str | None, str | None]:
+    """Valida y normaliza nombre (1..60), objetivo (finito, >0, ≤100.000.000), emoji
+    (≤16), fecha (AAAA-MM-DD real, 2000..2100; vacía = sin fecha) e imagen_url
+    (≤2048, http/https). 422 con mensaje; devuelve (nombre, objetivo, emoji, fecha, url)."""
+    nombre = body.nombre.strip()
+    if not nombre:
+        _err422("Escribe un nombre")
+    if len(nombre) > _GOAL_NOMBRE_MAX:
+        _err422(f"El nombre no puede superar {_GOAL_NOMBRE_MAX} caracteres")
+    try:
+        objetivo = redondear_importe(body.objetivo)   # finito; céntimos
+    except ValueError:
+        _err422("El objetivo debe ser un número finito")
+    if objetivo <= 0:
+        _err422("El objetivo debe ser mayor que 0")
+    if objetivo > _GOAL_OBJETIVO_MAX:
+        _err422("El objetivo no puede superar 100.000.000")
+    emoji = body.emoji.strip() or "🎯"
+    if len(emoji) > _GOAL_EMOJI_MAX:
+        _err422(f"El emoji no puede superar {_GOAL_EMOJI_MAX} caracteres")
+    fecha = (body.fecha or "").strip() or None
+    if fecha is not None:
+        if not _FECHA_RE.match(fecha):
+            _err422("La fecha debe tener el formato AAAA-MM-DD")
+        try:
+            d = date_type.fromisoformat(fecha)
+        except ValueError:
+            _err422("La fecha no es válida")
+        if not (2000 <= d.year <= 2100):
+            _err422("El año de la fecha debe estar entre 2000 y 2100")
+        fecha = d.isoformat()
+    return nombre, objetivo, emoji, fecha, _clean_imagen_url(body.imagen_url)
 
 
 class ContributeIn(BaseModel):
@@ -854,7 +1070,7 @@ def _clean_foto(raw: str | None) -> str | None:
 
 
 class ShareIn(BaseModel):
-    email: str
+    email: Txt = Field(max_length=_EMAIL_MAX)
 
 
 @app.get("/api/goals")
@@ -868,27 +1084,21 @@ def _clean_imagen_url(raw: str | None) -> str | None:
         return None
     if not (url.startswith("http://") or url.startswith("https://")):
         raise HTTPException(status_code=422, detail="La URL de la imagen debe empezar por http:// o https://")
+    if len(url) > _GOAL_URL_MAX:
+        raise HTTPException(status_code=422, detail=f"La URL de la imagen no puede superar {_GOAL_URL_MAX} caracteres")
     return url
 
 
 @app.post("/api/goals")
 async def create_goal_endpoint(body: GoalIn, email: str = Depends(get_current_user)):
-    if not body.nombre.strip():
-        raise HTTPException(status_code=422, detail="Escribe un nombre")
-    if body.objetivo <= 0:
-        raise HTTPException(status_code=422, detail="El objetivo debe ser mayor que 0")
-    imagen_url = _clean_imagen_url(body.imagen_url)
-    return await create_goal(email, body.nombre.strip(), body.objetivo, body.emoji, body.fecha, imagen_url)
+    nombre, objetivo, emoji, fecha, imagen_url = _validate_goal(body)
+    return await create_goal(email, nombre, objetivo, emoji, fecha, imagen_url)
 
 
 @app.patch("/api/goals/{goal_id}")
 async def update_goal_endpoint(goal_id: int, body: GoalIn, email: str = Depends(get_current_user)):
-    if not body.nombre.strip():
-        raise HTTPException(status_code=422, detail="Escribe un nombre")
-    if body.objetivo <= 0:
-        raise HTTPException(status_code=422, detail="El objetivo debe ser mayor que 0")
-    imagen_url = _clean_imagen_url(body.imagen_url)
-    return await update_goal(goal_id, email, body.nombre.strip(), body.objetivo, body.emoji, body.fecha, imagen_url)
+    nombre, objetivo, emoji, fecha, imagen_url = _validate_goal(body)
+    return await update_goal(goal_id, email, nombre, objetivo, emoji, fecha, imagen_url)
 
 
 @app.delete("/api/goals/{goal_id}")
@@ -907,6 +1117,18 @@ async def delete_contribution_endpoint(goal_id: int, contribution_id: int, email
     return await delete_contribution(goal_id, contribution_id, email)
 
 
+@app.get("/api/goals/{goal_id}/contributions/{contribution_id}/foto")
+async def contribution_foto_endpoint(goal_id: int, contribution_id: int, email: str = Depends(get_current_user)):
+    """Foto de una aportación (fuera de GET /api/goals por su tamaño). Solo miembros
+    de la meta; 404 uniforme si no existe o no se es miembro. Convención de caché:
+    esta ruta fija su propio Cache-Control (private: es contenido de un usuario; 1 h:
+    una foto de aportación no cambia, y si se borra la aportación el id ya no se pide).
+    Una cabecera global no-store en /api/* debe respetar un Cache-Control ya presente
+    (setdefault), no pisarlo."""
+    foto = await get_contribution_foto(goal_id, contribution_id, email)
+    return JSONResponse({"foto": foto}, headers={"Cache-Control": "private, max-age=3600"})
+
+
 @app.post("/api/goals/{goal_id}/share")
 async def share_goal_endpoint(goal_id: int, body: ShareIn, email: str = Depends(get_current_user)):
     return await share_goal(goal_id, email, body.email)
@@ -914,12 +1136,15 @@ async def share_goal_endpoint(goal_id: int, body: ShareIn, email: str = Depends(
 
 # ── Gastos fijos anuales (IBI, seguro del coche…) ────────────────────────────
 
+_ANNUAL_NOMBRE_MAX = 60
+
+
 class AnnualExpenseIn(BaseModel):
-    nombre:        str
+    nombre:        Txt = Field(max_length=1024)   # tope real (60) en _validate_annual_expense
     importe:       float
     mes:           int
     dia:           int = 1
-    meses_reparto: list[int] | None = None
+    meses_reparto: list[int] | None = Field(default=None, max_length=64)
     avisar:        bool = True
     dias_aviso:    int = 15
 
@@ -927,6 +1152,10 @@ class AnnualExpenseIn(BaseModel):
 def _validate_annual_expense(body: "AnnualExpenseIn"):
     if not body.nombre.strip():
         raise HTTPException(status_code=422, detail="Escribe un nombre")
+    if len(body.nombre.strip()) > _ANNUAL_NOMBRE_MAX:
+        raise HTTPException(status_code=422, detail=f"El nombre no puede superar {_ANNUAL_NOMBRE_MAX} caracteres")
+    if not (0 <= body.dias_aviso <= 365):
+        raise HTTPException(status_code=422, detail="Los días de aviso deben estar entre 0 y 365")
     try:
         body.importe = validar_importe(body.importe)  # > 0, ≤ 1.000.000, céntimos
     except ValueError:

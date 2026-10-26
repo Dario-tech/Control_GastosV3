@@ -25,14 +25,11 @@ def _normalize_tipo(raw: str) -> str:
     return TIPO_VARIABLE
 
 
-def suggest_category(history: list[dict], importe: float) -> dict | None:
-    """Devuelve la (tipo, concepto) más probable para un importe dado.
-
-    Puntúa cada categoría del historial combinando:
-      - frecuencia de uso (cuánto aparece la categoría)
-      - cercanía del importe al importe medio de esa categoría
-    Devuelve None si no hay historial suficiente.
-    """
+def build_category_groups(history: list[dict]) -> tuple[list[tuple[str, str, int, float]], int]:
+    """Agrupa el historial UNA vez: [(tipo, concepto, nº de movimientos, importe medio)]
+    en orden de primera aparición (importante: el desempate del mejor gana el primero)
+    y el total de movimientos válidos. Coste H; luego cada sugerencia cuesta solo G
+    (nº de categorías distintas), no H."""
     groups: dict[tuple[str, str], list[float]] = defaultdict(list)
     for r in history:
         tipo     = _normalize_tipo(r.get("tipo"))
@@ -45,29 +42,38 @@ def suggest_category(history: list[dict], importe: float) -> dict | None:
             continue
         groups[(tipo, concepto)].append(amt)
 
+    total = sum(len(v) for v in groups.values())
+    return [(t, c, len(v), sum(v) / len(v)) for (t, c), v in groups.items()], total
+
+
+def suggest_from_groups(groups: list[tuple[str, str, int, float]], total: int, importe: float) -> dict | None:
+    """Misma puntuación que siempre, sobre grupos ya construidos."""
     if not groups:
         return None
-
-    total = sum(len(v) for v in groups.values())
-    best_key = None
+    best = None
     best_score = -1.0
-
-    for key, amounts in groups.items():
-        freq = len(amounts) / total
-        mean = sum(amounts) / len(amounts)
+    for tipo, concepto, n, mean in groups:
+        freq = n / total
         rel_diff = abs(mean - importe) / (mean + 1e-6)
         closeness = 1.0 / (1.0 + rel_diff)
         score = 0.6 * freq + 0.4 * closeness
         if score > best_score:
             best_score = score
-            best_key = key
-
-    if best_key is None:
+            best = (tipo, concepto)
+    if best is None:
         return None
+    return {"tipo": best[0], "concepto": best[1], "confidence": round(best_score, 2)}
 
-    tipo, concepto = best_key
-    return {
-        "tipo":       tipo,
-        "concepto":   concepto,
-        "confidence": round(best_score, 2),
-    }
+
+def suggest_category(history: list[dict], importe: float) -> dict | None:
+    """Devuelve la (tipo, concepto) más probable para un importe dado.
+
+    Puntúa cada categoría del historial combinando:
+      - frecuencia de uso (cuánto aparece la categoría)
+      - cercanía del importe al importe medio de esa categoría
+    Devuelve None si no hay historial suficiente.
+    Para varias sugerencias sobre el mismo historial, usa build_category_groups una
+    vez y suggest_from_groups por cada importe.
+    """
+    groups, total = build_category_groups(history)
+    return suggest_from_groups(groups, total, importe)

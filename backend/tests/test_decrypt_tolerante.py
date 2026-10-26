@@ -135,7 +135,7 @@ def test_finance_sin_year_cuenta_ilegibles_de_todos_los_anos(monkeypatch, caplog
         _bad_row(3, "2026-05-02"),
         _ok_row(4, "2026-05-06", "Gasto Variable", "Comida", 32.4),
     ]
-    fake_db(monkeypatch, sheets_mod, [[{"y": 2025}, {"y": 2026}], rows])
+    fake_db(monkeypatch, sheets_mod, [rows])  # sin ?year=: los años se derivan de las filas, sin DISTINCT
     r = client.get("/api/finance", headers=auth_headers)
     assert r.status_code == 200
     body = r.json()
@@ -145,7 +145,7 @@ def test_finance_sin_year_cuenta_ilegibles_de_todos_los_anos(monkeypatch, caplog
 
 
 def test_finance_sin_transacciones_unreadable_cero(monkeypatch, client, auth_headers):
-    fake_db(monkeypatch, sheets_mod, [[], []])
+    fake_db(monkeypatch, sheets_mod, [[]])
     r = client.get("/api/finance", headers=auth_headers)
     assert r.status_code == 200
     assert r.json()["configured"] is False
