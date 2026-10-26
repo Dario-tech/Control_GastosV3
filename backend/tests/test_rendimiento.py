@@ -208,8 +208,6 @@ def test_foto_ruta_fija_su_propio_cache_control(monkeypatch):
     assert resp.headers["cache-control"] == "private, max-age=3600"
 
 
-@pytest.mark.xfail(reason="SecurityHeadersMiddleware (Backend A) fuerza no-store en todo /api/* y pisa el "
-                          "Cache-Control de la ruta; debe respetar uno ya presente", strict=False)
 def test_foto_ruta_cache_control_de_extremo_a_extremo(client, auth_headers, monkeypatch):
     _fake_foto(monkeypatch, [])
     r = client.get("/api/goals/3/contributions/5/foto", headers=auth_headers)

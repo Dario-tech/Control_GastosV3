@@ -317,19 +317,35 @@ _sse_clients: set[asyncio.Queue] = set()
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
-def _has_surrogates(s: str) -> bool:
-    """Sustitutos Unicode sueltos (\\ud800-\\udfff): JSON los admite pero no se pueden
-    codificar en UTF-8 (cifrado, SQL) y acabarían en un 500."""
-    return any(0xD800 <= ord(ch) <= 0xDFFF for ch in s)
+def _has_surrogates(s: str, multiline: bool = False) -> bool:
+    """Texto no apto: sustitutos Unicode sueltos (U+D800-U+DFFF; JSON los admite pero no se
+    pueden codificar en UTF-8) o caracteres de control C0/DEL (sobre todo NUL, que Postgres
+    no admite en columnas de texto). Con multiline=True se permiten salto de línea,
+    retorno de carro y tabulador."""
+    permitidos = (9, 10, 13) if multiline else ()
+    for ch in s:
+        o = ord(ch)
+        if 0xD800 <= o <= 0xDFFF or ((o < 32 or o == 127) and o not in permitidos):
+            return True
+    return False
 
 
 def _texto_valido(v: str) -> str:
     if _has_surrogates(v):
-        raise ValueError("Texto con caracteres no válidos")
+        raise ValueError("Texto inválido")
     return v
 
 
-Txt = Annotated[str, AfterValidator(_texto_valido)]  # str sin sustitutos sueltos
+def _password_valida(v: str) -> str:
+    # Contraseñas: solo se rechaza lo que rompería (NUL y sustitutos); no se bloquean
+    # cuentas antiguas cuya contraseña tenga un tabulador u otro control.
+    if "\x00" in v or any(0xD800 <= ord(ch) <= 0xDFFF for ch in v):
+        raise ValueError("Texto inválido")
+    return v
+
+
+Txt = Annotated[str, AfterValidator(_texto_valido)]  # str sin sustitutos sueltos ni controles
+TxtPw = Annotated[str, AfterValidator(_password_valida)]
 
 
 class GoogleLoginIn(BaseModel):
@@ -387,12 +403,12 @@ class RegisterIn(BaseModel):
     # Tope de transporte generoso; los topes reales (con mensaje) se validan en el endpoint.
     email:    Txt = Field(max_length=1024)
     name:     Txt = Field(max_length=1024)
-    password: Txt = Field(max_length=1024)
+    password: TxtPw = Field(max_length=1024)
 
 
 class EmailLoginIn(BaseModel):
     email:    Txt = Field(max_length=1024)
-    password: Txt = Field(max_length=1024)  # sin el máximo de 128 del alta: no bloquear cuentas antiguas
+    password: TxtPw = Field(max_length=1024)  # sin el máximo de 128 del alta: no bloquear cuentas antiguas
 
 
 def _session_response(email: str, name: str) -> dict:
@@ -700,7 +716,7 @@ def _validate_tx_patch(data) -> dict:
         if len(c) > _CONCEPTO_MAX:
             _err422(f"El concepto no puede superar {_CONCEPTO_MAX} caracteres")
         if _has_surrogates(c):
-            _err422("El concepto contiene caracteres no válidos")
+            _err422("Texto inválido")
         changes["concepto"] = c
 
     if "comentario" in data:
@@ -712,8 +728,8 @@ def _validate_tx_patch(data) -> dict:
         cm = cm.strip()
         if len(cm) > _COMENTARIO_MAX:
             _err422(f"El comentario no puede superar {_COMENTARIO_MAX} caracteres")
-        if _has_surrogates(cm):
-            _err422("El comentario contiene caracteres no válidos")
+        if _has_surrogates(cm, multiline=True):
+            _err422("Texto inválido")
         changes["comentario"] = cm
 
     if not changes:
@@ -843,7 +859,10 @@ _SHORTCUT_TOKEN_MAX = 128
 
 
 def _dict_has_surrogates(data: dict) -> bool:
-    return any(isinstance(v, str) and _has_surrogates(v) for v in data.values())
+    # multiline=True: el nombre de un comercio de Apple Pay puede traer saltos de línea
+    # o tabuladores; clean_comercio los colapsa después. Rechazar la petición entera
+    # por eso perdería el pago. NUL, sustitutos y el resto de controles siguen fuera.
+    return any(isinstance(v, str) and _has_surrogates(v, multiline=True) for v in data.values())
 
 @app.get("/api/shortcut/token")
 async def shortcut_get_token(email: str = Depends(get_current_user)):
@@ -1131,6 +1150,15 @@ async def contribution_foto_endpoint(goal_id: int, contribution_id: int, email: 
 
 @app.post("/api/goals/{goal_id}/share")
 async def share_goal_endpoint(goal_id: int, body: ShareIn, email: str = Depends(get_current_user)):
+    """Comparte una meta con otra cuenta por email.
+
+    Limitación conocida: el invitado se añade sin aceptación y `members` lo incluye, así que
+    la respuesta permite saber si un email tiene cuenta (enumeración). Mitigación actual:
+    límite por usuario (10/hora y 30/día, 429). La solución completa es un flujo de
+    invitaciones con aceptación (respuesta uniforme, el invitado entra al aceptar).
+    """
+    enforce("share-hour", [email], limit=10, window=3600, block=3600)
+    enforce("share-day", [email], limit=30, window=86400, block=3600)
     return await share_goal(goal_id, email, body.email)
 
 
