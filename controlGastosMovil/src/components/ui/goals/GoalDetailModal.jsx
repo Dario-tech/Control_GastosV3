@@ -35,8 +35,24 @@ export function useContributionPhoto(goalId, contribution) {
 
 function PhotoLightbox({ goalId, contribution, myEmail, onClose }) {
   const { status, src, retry } = useContributionPhoto(goalId, contribution)
+  const ref = useRef(null)
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+  // Escape cierra solo el visor (capa superior): se atiende en captura y se
+  // corta la propagación para que no llegue a la pantalla de la meta. Al
+  // cerrar, el foco vuelve a donde estaba (el botón «Ver foto»).
+  useEffect(() => {
+    const prev = document.activeElement
+    ref.current?.focus({ preventScroll: true })
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); closeRef.current() } }
+    window.addEventListener('keydown', onKey, true)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      if (prev && prev.isConnected) prev.focus({ preventScroll: true })
+    }
+  }, [])
   return (
-    <div className="fm-lightbox" role="dialog" aria-modal="true" aria-label="Foto de recuerdo" onClick={onClose}>
+    <div className="fm-lightbox" role="dialog" aria-modal="true" aria-label="Foto de recuerdo" ref={ref} tabIndex={-1} onClick={onClose}>
       <button type="button" className="fm-icon-btn fm-lightbox-close" onClick={onClose} aria-label="Cerrar foto">
         <Icon name="close" />
       </button>
@@ -130,7 +146,9 @@ export default function GoalDetailModal({ goal, myEmail, onClose, onAddMoney, on
       setShareEmail('')
       setShowShare(false)
     } catch (e) {
-      setShareErr(e.message || 'No se pudo compartir')
+      setShareErr(e.status === 429
+        ? 'Has compartido demasiadas veces. Inténtalo más tarde.'
+        : (e.message || 'No se pudo compartir'))
     } finally {
       setSharing(false)
     }

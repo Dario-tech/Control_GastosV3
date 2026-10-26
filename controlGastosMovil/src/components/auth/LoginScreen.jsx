@@ -39,8 +39,8 @@ export default function LoginScreen() {
           try {
             await loginWithGoogle(credential)
           } catch (e) {
-            setError(e.message || 'Error al iniciar sesión')
-            noteClosed(e.message)
+            if (e.message === REGISTRO_CERRADO) noteClosed(e.message)
+            else setError(e.message || 'Error al iniciar sesión')
           } finally {
             setLoading(false)
           }
@@ -75,9 +75,13 @@ export default function LoginScreen() {
         await loginWithEmail(email.trim(), password)
       }
     } catch (err) {
-      setError(err.message || 'Error de autenticación')
-      if (mode === 'register') noteClosed(err.message)
-      if (err.message === REGISTRO_CERRADO) setMode('login')
+      // Registro cerrado: lo dice solo la nota gris (sin alerta roja duplicada)
+      if (err.message === REGISTRO_CERRADO) {
+        noteClosed(err.message)
+        setMode('login')
+      } else {
+        setError(err.message || 'Error de autenticación')
+      }
     } finally {
       setLoading(false)
     }

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from 'react'
 import { useSavingsGoals } from '../../hooks/useSavingsGoals'
 import { useAuth } from '../../context/AuthContext'
+import { useApp } from '../../context/AppContext'
 import { fmt } from '../../utils'
 import { GoalRing, GoalIcon } from './goals/GoalRing'
 import { goalRemaining, formatGoalDate } from './goals/goalUtils'
@@ -20,6 +21,7 @@ export default function SavingsGoals({ compact = false }) {
   const rightAligned = compact
   const { goals, status, addGoal, editGoal, removeGoal, addMoney, share, removeContribution } = useSavingsGoals()
   const { user } = useAuth()
+  const showToast = useApp()?.showToast ?? (() => {})
   const [showForm, setShowForm]     = useState(false)
   const [formGoal, setFormGoal]     = useState(null)
   const [detailGoal, setDetailGoal] = useState(null)
@@ -126,7 +128,10 @@ export default function SavingsGoals({ compact = false }) {
             myEmail={user?.email}
             onClose={() => setDetailGoal(null)}
             onAddMoney={(amt, foto) => addMoney(liveDetail.id, amt, foto)}
-            onShare={email => share(liveDetail.id, email)}
+            onShare={async email => {
+              const msg = await share(liveDetail.id, email)
+              showToast(typeof msg === 'string' && msg ? msg : 'Si la cuenta existe, se ha compartido la meta')
+            }}
             onEdit={() => openEditForm(liveDetail)}
             onDelete={handleDelete}
             onDeleteContribution={contribId => removeContribution(liveDetail.id, contribId)}

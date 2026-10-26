@@ -58,9 +58,10 @@ describe('registro cerrado', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'n@n.es' } })
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'una-clave-larga-1' } })
     fireEvent.click(screen.getByText('Crear cuenta'))
-    expect((await screen.findByRole('alert')).textContent).toBe(REGISTRO_CERRADO)
+    await screen.findByText(/El registro está cerrado/, { selector: 'p.login-switch' })
+    expect(screen.queryByRole('alert')).toBeNull()                      // sin alerta roja duplicada
+    expect(screen.getAllByText(REGISTRO_CERRADO)).toHaveLength(1)        // el texto sale una sola vez
     expect(screen.queryByText(/Regístrate/)).toBeNull()
-    expect(screen.getByText(/El registro está cerrado/, { selector: 'p.login-switch' })).toBeTruthy()
     expect(screen.getByText('Entrar')).toBeTruthy() // vuelve al formulario de acceso
   })
 

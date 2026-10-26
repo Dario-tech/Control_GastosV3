@@ -194,12 +194,25 @@ export async function updateTransaction(rowIndex, changes) {
 
 // ── Metas de ahorro (compartibles entre usuarios) ──────────────────────────
 
-export async function fetchGoals() {
-  const res = await fetch(`${BASE}/api/goals`, { headers: authHeaders(), signal: AbortSignal.timeout(15000) })
-  return apiJson(res)
+// Petición en vuelo compartida: dos pantallas que piden las metas a la vez
+// (p. ej. Planificación) hacen una sola llamada. Toda escritura de metas la
+// invalida para que una lectura posterior nunca reciba datos anteriores.
+let goalsInflight = null
+export function fetchGoals() {
+  if (goalsInflight) return goalsInflight
+  const p = (async () => {
+    const res = await fetch(`${BASE}/api/goals`, { headers: authHeaders(), signal: AbortSignal.timeout(15000) })
+    return apiJson(res)
+  })()
+  goalsInflight = p
+  const clear = () => { if (goalsInflight === p) goalsInflight = null }
+  p.then(clear, clear)
+  return p
 }
+const invalidateGoals = () => { goalsInflight = null }
 
 export async function createGoal(nombre, objetivo, emoji, fecha, imagen_url) {
+  invalidateGoals()
   const res = await fetch(`${BASE}/api/goals`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -210,6 +223,7 @@ export async function createGoal(nombre, objetivo, emoji, fecha, imagen_url) {
 }
 
 export async function updateGoal(id, nombre, objetivo, emoji, fecha, imagen_url) {
+  invalidateGoals()
   const res = await fetch(`${BASE}/api/goals/${id}`, {
     method:  'PATCH',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -220,6 +234,7 @@ export async function updateGoal(id, nombre, objetivo, emoji, fecha, imagen_url)
 }
 
 export async function deleteGoal(id) {
+  invalidateGoals()
   const res = await fetch(`${BASE}/api/goals/${id}`, {
     method:  'DELETE',
     headers: authHeaders(),
@@ -229,6 +244,7 @@ export async function deleteGoal(id) {
 }
 
 export async function contributeToGoal(id, importe, foto = null) {
+  invalidateGoals()
   const res = await fetch(`${BASE}/api/goals/${id}/contribute`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -265,6 +281,7 @@ export function fetchContributionPhoto(goalId, contributionId) {
 }
 
 export async function deleteContribution(goalId, contributionId) {
+  invalidateGoals()
   photoCache.delete(contributionId)
   const res = await fetch(`${BASE}/api/goals/${goalId}/contributions/${contributionId}`, {
     method:  'DELETE',
@@ -275,6 +292,7 @@ export async function deleteContribution(goalId, contributionId) {
 }
 
 export async function shareGoal(id, email) {
+  invalidateGoals()
   const res = await fetch(`${BASE}/api/goals/${id}/share`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
