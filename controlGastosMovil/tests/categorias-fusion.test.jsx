@@ -207,23 +207,23 @@ describe('Ajustes: categorías personalizadas', () => {
       'Gasto Fijo': [],
       'Ingreso': [{ id: '2', tipo: 'Ingreso', concepto: 'Freelance', emoji: '💻' }],
     }
-    render(<SettingsTab />)
+    render(<SettingsTab initialScreen="categories" />)
     expect(screen.getByText('Freelance')).toBeTruthy()
     expect(screen.getByText('Ingreso')).toBeTruthy()
     expect(screen.getByText('Clínica')).toBeTruthy()
-    expect(screen.queryByText('Aún no has creado ninguna')).toBeNull()
+    expect(screen.queryByText(/Aún no has creado ninguna/)).toBeNull()
   })
 
   it('solo con propias de Ingreso ya no dice que no hay ninguna', () => {
     settingsState.customCategories = { 'Gasto Variable': [], 'Gasto Fijo': [], 'Ingreso': [{ id: '2', tipo: 'Ingreso', concepto: 'Freelance', emoji: '💻' }] }
-    render(<SettingsTab />)
-    expect(screen.queryByText('Aún no has creado ninguna')).toBeNull()
+    render(<SettingsTab initialScreen="categories" />)
+    expect(screen.queryByText(/Aún no has creado ninguna/)).toBeNull()
     expect(screen.getByText('Freelance')).toBeTruthy()
   })
 
   it('nombres repetidos en la lista no provocan claves duplicadas', () => {
     settingsState.customCategories = GIM_DUP
-    render(<SettingsTab />)
+    render(<SettingsTab initialScreen="categories" />)
     expect(keyWarnings()).toEqual([])
   })
 })

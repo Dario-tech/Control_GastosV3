@@ -1,6 +1,6 @@
 // Ajustes: el motivo por el que «Ocultar» está deshabilitado se ve como texto, no solo en title.
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { DEFAULT_CATEGORIES } from '../src/data/categories'
 
 const settingsState = {
@@ -21,7 +21,9 @@ afterEach(cleanup)
 
 describe('última categoría visible', () => {
   it('muestra el motivo como texto y enlazado al botón deshabilitado', () => {
-    render(<SettingsTab />)
+    render(<SettingsTab initialScreen="categories" />)
+    // Los grupos de categorías por defecto vienen plegados
+    fireEvent.click(screen.getByRole('button', { name: /Ingresos/ }))
     const note = screen.getByText('Debe quedar al menos una categoría visible de este tipo')
     expect(note.tagName).toBe('P')
     const btn = screen.getByRole('button', { name: `Ocultar la categoría ${DEFAULT_CATEGORIES['Ingreso'][0].concepto}` })

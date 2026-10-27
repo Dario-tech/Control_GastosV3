@@ -441,16 +441,7 @@ export function SettingsProvider({ children }) {
     }
   }, [settings.theme])
 
-  // Sincroniza <meta name="theme-color"> con el fondo del tema activo
-  useEffect(() => {
-    const meta = document.querySelector('meta[name="theme-color"]')
-    if (!meta) return
-    const id = requestAnimationFrame(() => {
-      const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()
-      if (bg) meta.setAttribute('content', bg)
-    })
-    return () => cancelAnimationFrame(id)
-  }, [settings.theme])
+  // <meta name="theme-color"> lo sincroniza useThemeColorMeta (App.jsx)
 
   // Apply accent color as CSS variable
   useEffect(() => {

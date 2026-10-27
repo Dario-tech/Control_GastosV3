@@ -32,7 +32,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 describe('moneda', () => {
   it('avisa de que solo cambia el símbolo', () => {
-    render(<SettingsTab />)
+    render(<SettingsTab initialScreen="appearance" />)
     expect(screen.getByText('Solo cambia el símbolo; no convierte importes.')).toBeTruthy()
   })
 })
@@ -41,8 +41,8 @@ describe('exportar', () => {
   it('CSV: estado «Preparando…», descarga con fecha y toast', async () => {
     let done
     exportMocks.fetchAllTransactions.mockReturnValue(new Promise(r => { done = r }))
-    render(<SettingsTab />)
-    fireEvent.click(within(screen.getByText('Exportar movimientos (CSV)').closest('.setting-row')).getByRole('button'))
+    render(<SettingsTab initialScreen="data" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar movimientos en CSV' }))
     expect((await screen.findAllByText('Preparando…')).length).toBe(1)
     done({ transactions: [{ fecha: '2025-01-02', bucket: 'income', concepto: 'Nómina', importe: 10 }], years: [2025], unreadable: 0 })
     await waitFor(() => expect(exportMocks.downloadText).toHaveBeenCalled())
@@ -55,8 +55,8 @@ describe('exportar', () => {
   it('JSON: incluye movimientos y extras', async () => {
     exportMocks.fetchAllTransactions.mockResolvedValue({ transactions: [{ fecha: '2025-01-02', bucket: 'income', concepto: 'X', importe: 1 }], years: [2025], unreadable: 0 })
     exportMocks.fetchExtras.mockResolvedValue({ goals: [{ id: 1 }], annualExpenses: [] })
-    render(<SettingsTab />)
-    fireEvent.click(within(screen.getByText('Exportar datos').closest('.setting-row')).getByRole('button'))
+    render(<SettingsTab initialScreen="data" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar datos (JSON)' }))
     await waitFor(() => expect(exportMocks.downloadText).toHaveBeenCalled())
     const data = JSON.parse(exportMocks.downloadText.mock.calls[0][0])
     expect(data.transactions).toHaveLength(1)
@@ -65,16 +65,22 @@ describe('exportar', () => {
   })
   it('un fallo muestra un mensaje claro y no descarga', async () => {
     exportMocks.fetchAllTransactions.mockRejectedValue(new TypeError('network'))
-    render(<SettingsTab />)
-    fireEvent.click(within(screen.getByText('Exportar movimientos (CSV)').closest('.setting-row')).getByRole('button'))
+    render(<SettingsTab initialScreen="data" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar movimientos en CSV' }))
     expect((await screen.findByRole('alert')).textContent).toMatch(/servidor/)
     expect(exportMocks.downloadText).not.toHaveBeenCalled()
   })
 })
 
+const renderCats = () => {
+  render(<SettingsTab initialScreen="categories" />)
+  // Los grupos vienen plegados: se despliegan los tres
+  screen.getAllByRole('button', { expanded: false }).forEach(b => fireEvent.click(b))
+}
+
 describe('categorías por defecto', () => {
   it('oculta una categoría con botón accesible', () => {
-    render(<SettingsTab />)
+    renderCats()
     const btn = screen.getByRole('button', { name: 'Ocultar la categoría Ocio' })
     expect(btn.getAttribute('aria-pressed')).toBe('false')
     fireEvent.click(btn)
@@ -83,7 +89,7 @@ describe('categorías por defecto', () => {
   })
   it('muestra contador y permite mostrar una o todas', () => {
     settingsState.hiddenCategories = [{ tipo: 'Gasto Variable', concepto: 'Ocio' }, { tipo: 'Gasto Fijo', concepto: 'Luz' }]
-    render(<SettingsTab />)
+    renderCats()
     expect(screen.getByText('2 ocultas')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Mostrar la categoría Ocio' }))
     expect(setHiddenCategories).toHaveBeenLastCalledWith([{ tipo: 'Gasto Fijo', concepto: 'Luz' }])
@@ -92,7 +98,7 @@ describe('categorías por defecto', () => {
   })
   it('no deja ocultar la última visible de un tipo', () => {
     settingsState.hiddenCategories = [{ tipo: 'Ingreso', concepto: 'Nómina' }]
-    render(<SettingsTab />)
+    renderCats()
     const last = screen.getByRole('button', { name: 'Ocultar la categoría Otros motivos' })
     expect(last.disabled).toBe(true)
     fireEvent.click(last)
@@ -101,14 +107,14 @@ describe('categorías por defecto', () => {
   it('una categoría propia cuenta como visible del tipo', () => {
     settingsState.hiddenCategories = [{ tipo: 'Ingreso', concepto: 'Nómina' }]
     settingsState.customCategories = { ...settingsState.customCategories, Ingreso: [{ concepto: 'Freelance', emoji: '💻' }] }
-    render(<SettingsTab />)
+    renderCats()
     expect(screen.getByRole('button', { name: 'Ocultar la categoría Otros motivos' }).disabled).toBe(false)
   })
 })
 
 describe('Nueva categoría', () => {
   it('se abre sobre el body (portal) con fondo sólido y ayuda de la IA', () => {
-    const { container } = render(<SettingsTab />)
+    const { container } = render(<SettingsTab initialScreen="categories" />)
     fireEvent.click(screen.getByRole('button', { name: /nueva categoría/i }))
     const dlg = screen.getByRole('dialog', { name: 'Nueva categoría' })
     expect(dlg.className).toContain('fm-screen--solid')

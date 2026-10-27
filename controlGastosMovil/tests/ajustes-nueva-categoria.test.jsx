@@ -35,7 +35,7 @@ import SettingsTab from '../src/components/tabs/SettingsTab'
 function Harness() {
   const [, force] = useReducer(x => x + 1, 0)
   bump = force
-  return <SettingsTab />
+  return <SettingsTab initialScreen="categories" />
 }
 
 beforeEach(() => {
@@ -55,7 +55,7 @@ const alertText = () => screen.getAllByRole('alert').map(a => a.textContent).joi
 describe('Ajustes: nueva categoría', () => {
   it('el texto vacío ya no menciona «+ Nueva»', () => {
     render(<Harness />)
-    expect(screen.getByText('Aún no has creado ninguna')).toBeTruthy()
+    expect(screen.getByText(/Aún no has creado ninguna/)).toBeTruthy()
     expect(document.body.textContent).not.toContain('"+ Nueva"')
   })
 
@@ -130,6 +130,6 @@ describe('Ajustes: nueva categoría', () => {
   it('la fila de una categoría de nombre largo marca la etiqueta como encogible', () => {
     settingsState.customCategories = { ...settingsState.customCategories, 'Gasto Variable': [{ concepto: 'A'.repeat(32), emoji: '🐾' }] }
     render(<Harness />)
-    expect(document.querySelector('.setting-row--cat')).toBeTruthy()
+    expect(document.querySelector('.pf-cat-name')).toBeTruthy()
   })
 })

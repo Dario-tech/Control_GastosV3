@@ -4,9 +4,11 @@
     <meta charset="UTF-8" />
     <!-- Zoom desactivado a propósito: evita que la PWA se amplíe sola en iPhone.
          Es un compromiso de accesibilidad pendiente de revisar. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#1a1f2e" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- black-translucent: la app pinta bajo la barra de estado/isla (viewport-fit=cover);
+         la cabecera lleva su propio fondo del tema en esa zona. iOS solo lee este valor al instalar. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Gastos" />
     <link rel="preload" as="font" type="font/woff2" crossorigin href="/node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2" />

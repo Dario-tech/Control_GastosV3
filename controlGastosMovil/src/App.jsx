@@ -13,6 +13,8 @@ import { TabSkeleton, FormSkeleton } from './components/ui/Skeleton'
 import { usePendingTransaction } from './hooks/usePendingTransaction'
 import { useShortcutIntake } from './hooks/useShortcutIntake'
 import { useTxQueue } from './hooks/useTxQueue'
+import { useThemeColorMeta } from './hooks/useThemeColorMeta'
+import { useViewportInsets } from './hooks/useViewportInsets'
 import LoginScreen from './components/auth/LoginScreen'
 import IntakeLoginBanner from './components/auth/IntakeLoginBanner'
 import YearTab from './components/tabs/YearTab'
@@ -187,6 +189,9 @@ export default function App() {
   // Despierta el backend en segundo plano en cuanto se abre la app, antes de
   // que el usuario intente guardar algo (Render free tier duerme el servicio).
   useEffect(() => { wakeBackend() }, [])
+  // Zonas seguras: theme-color según el tema y altura del teclado virtual
+  useThemeColorMeta()
+  useViewportInsets()
 
   return (
     <AuthProvider>
