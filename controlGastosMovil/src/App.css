@@ -4324,3 +4324,6 @@ body::after, html.light body::after, html.pastel body::after { display: none !im
 
 /* Perfil: barra superior más arriba (la isla ocupa ~48 px; el botón «atrás» queda bajo ella). */
 .profile-topbar { height: calc(44px + max(calc(var(--safe-top) - 22px), 0px)); padding-top: max(calc(var(--safe-top) - 22px), 0px); }
+
+/* PWA en iPhone con franja sin pintar abajo: la app se estira ese hueco (--vp-gap, medido en JS). */
+.app { bottom: calc(-1 * var(--vp-gap, 0px)); }
