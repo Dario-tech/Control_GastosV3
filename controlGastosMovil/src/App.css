@@ -4240,3 +4240,37 @@ body::before {
 .st-tone-alert { color: var(--red); }
 .st-tone-good { color: var(--green); }
 .st-tone-neutral { color: var(--text2); }
+
+/* ===== SHELL ROBUSTO PARA TODOS LOS MÓVILES (iOS y Android) =====
+   La PWA instalada en iOS (y algunos Android) informa de 100vh / 100dvh / 100lvh distintos
+   de la pantalla real: el shell medía menos que la pantalla, la barra inferior «colgaba»
+   y debajo quedaba una banda de otro color. En vez de medir en vh, la app se ancla con
+   position:fixed a los 4 bordes REALES del área visible (top/right/bottom/left = 0), que
+   es siempre exacto. Este bloque va al final a propósito y sustituye a las reglas
+   anteriores basadas en vh/dvh. */
+html, body { height: 100%; min-height: 0; overflow: hidden; }
+#root { position: fixed; top: 0; right: 0; bottom: 0; left: 0; height: auto; min-height: 0; }
+.app {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0;
+  height: auto; min-height: 0; width: 100%; max-width: var(--shell-max); margin: 0 auto;
+}
+.login-screen { position: fixed; top: 0; right: 0; bottom: 0; left: 0; height: auto; min-height: 0; }
+.profile-screen, .profile-screen:not(.open) { height: auto; top: 0; bottom: 0; }
+.modal-overlay { height: auto; top: 0; right: 0; bottom: 0; left: 0; }
+.tour-root { height: auto; top: 0; bottom: 0; }
+/* Los orbes de fondo ya desbordan con top/bottom negativos: sin altura en lvh. */
+body::before { height: auto; }
+
+/* Arriba, integrado: en los temas OSCUROS el fondo ya es oscuro y la hora/batería blancas
+   se leen sin ningún oscurecimiento: sin banda ni degradado sobre la isla. Solo claro y
+   pastel conservan su degradado para que la hora blanca siga siendo legible. */
+html:not(.light):not(.pastel) body::after { background: none !important; }
+
+/* Cabecera INTEGRADA de verdad: sin capa de tinte/blur propia (era lo que oscurecía el
+   fondo y daba el aspecto «difuminado»). El fondo de la app se ve limpio detrás del título
+   y es el CONTENIDO el que se desvanece al subir por debajo de la cabecera. */
+.header::before { display: none !important; }
+.main {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--header-h) - 30px), #000 calc(var(--header-h) + 6px));
+  mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--header-h) - 30px), #000 calc(var(--header-h) + 6px));
+}
