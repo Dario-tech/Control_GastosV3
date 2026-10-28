@@ -72,7 +72,7 @@ function Home({ go, onOpenShortcut, onLogout }) {
         </div>
       )}
       </div>
-      <p className="build-marker-inline">build {__BUILD_SHA__} · {__BUILD_TIME__.slice(0, 16).replace('T', ' ')}</p>
+      <p className="build-marker-inline" onClick={() => { window.location.href = "/?diag=1" }}>build {__BUILD_SHA__} · {__BUILD_TIME__.slice(0, 16).replace('T', ' ')}</p>
     </div>
   )
 }
