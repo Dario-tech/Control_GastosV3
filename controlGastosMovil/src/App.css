@@ -4301,3 +4301,26 @@ html:not(.light):not(.pastel) body::after { background: none !important; }
 }
 .app::after { display: none !important; }
 .bottom-nav { position: fixed; }
+
+/* ===== SIN HUECOS: cabecera y perfil pegados arriba, barra pegada abajo ===== */
+:root {
+  --header-base: 48px;
+  --safe-top-use: max(calc(var(--safe-top) - 14px), 0px);
+  --nav-gap: max(4px, calc(var(--safe-bottom) - 28px));
+  --nav-h: calc(66px + var(--nav-gap) + 8px);
+}
+.profile-topbar { padding-top: var(--safe-top-use); }
+
+/* Tema claro/pastel: la sombra tras la hora/batería llega solo hasta el final de la isla,
+   sin invadir el título (antes bajaba 16 px más y se veía una mancha gris sobre la cabecera). */
+@media (max-width: 500px) {
+  body::after { height: max(var(--safe-top), 24px); }
+  html.light body::after { background: linear-gradient(to bottom, rgba(24,24,56,0.62) 0, rgba(24,24,56,0.5) 55%, transparent 100%); }
+  html.pastel body::after { background: linear-gradient(to bottom, rgba(77,21,53,0.62) 0, rgba(77,21,53,0.5) 55%, transparent 100%); }
+}
+
+/* Sin sombra/difuminado arriba en ningún tema (petición del usuario). */
+body::after, html.light body::after, html.pastel body::after { display: none !important; background: none !important; }
+
+/* Perfil: barra superior más arriba (la isla ocupa ~48 px; el botón «atrás» queda bajo ella). */
+.profile-topbar { height: calc(44px + max(calc(var(--safe-top) - 22px), 0px)); padding-top: max(calc(var(--safe-top) - 22px), 0px); }
