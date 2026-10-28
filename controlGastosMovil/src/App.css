@@ -4274,3 +4274,20 @@ html:not(.light):not(.pastel) body::after { background: none !important; }
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--header-h) - 30px), #000 calc(var(--header-h) + 6px));
   mask-image: linear-gradient(to bottom, transparent 0, transparent calc(var(--header-h) - 30px), #000 calc(var(--header-h) + 6px));
 }
+
+/* ===== MENOS ESPACIO SOBRANTE ARRIBA Y ABAJO (todos los móviles) =====
+   Arriba: la cabecera empezaba 59 px (isla) + 60 px de barra útil, dejando ~70 px vacíos
+   antes del título. Ahora la franja de la isla se recorta 8 px (la isla mide menos que
+   safe-top) y la barra útil baja a 52 px. Abajo: la píldora flotaba a 10 px + safe-bottom
+   (44 px de vacío en un iPhone con barra de inicio); ahora queda 16 px más cerca del
+   borde y nunca a menos de 8 px. Todo derivado de las variables --safe-*, válido para
+   iPhone con isla, iPhone SE y Android (safe = 0). */
+:root {
+  --header-base: 52px;
+  --safe-top-use: max(calc(var(--safe-top) - 8px), 0px);
+  --header-h: calc(var(--header-base) + var(--safe-top-use));
+  --nav-gap: max(8px, calc(var(--safe-bottom) - 16px));
+  --nav-h: calc(66px + var(--nav-gap) + 12px);
+}
+.header { padding-top: var(--safe-top-use); }
+.bottom-nav { bottom: var(--nav-gap); }
