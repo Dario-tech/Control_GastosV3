@@ -27,7 +27,11 @@ export function useViewportInsets() {
       // y queda una franja sin pintar abajo. Se publica el hueco (--vp-gap) para estirar la app.
       const standalone = window.navigator.standalone === true || window.matchMedia?.('(display-mode: standalone)').matches
       const gap = Math.round(window.screen.height - window.innerHeight)
-      root.style.setProperty('--vp-gap', standalone && kb === 0 && gap > 4 && gap < 120 ? gap + 'px' : '0px')
+      const stretch = standalone && kb === 0 && gap > 4 && gap < 160
+      root.style.setProperty('--vp-gap', stretch ? gap + 'px' : '0px')
+      // altura real de la pantalla (portrait): la app se pinta con ella aunque iOS declare menos
+      root.style.setProperty('--screen-h', stretch ? Math.max(window.screen.height, window.screen.width) + 'px' : 'auto')
+      root.classList.toggle('vp-stretch', stretch)
     }
     update()
     vv.addEventListener('resize', update)
@@ -37,6 +41,8 @@ export function useViewportInsets() {
       vv.removeEventListener('scroll', update)
       root.style.removeProperty('--kb-h')
       root.style.removeProperty('--vp-gap')
+      root.style.removeProperty('--screen-h')
+      root.classList.remove('vp-stretch')
       root.classList.remove('kb-open')
     }
   }, [])

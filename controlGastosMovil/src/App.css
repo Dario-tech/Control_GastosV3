@@ -4327,3 +4327,7 @@ body::after, html.light body::after, html.pastel body::after { display: none !im
 
 /* PWA en iPhone con franja sin pintar abajo: la app se estira ese hueco (--vp-gap, medido en JS). */
 .app { bottom: calc(-1 * var(--vp-gap, 0px)); }
+
+/* Si iOS declara menos altura que la pantalla (PWA instalada), la app mide la altura real. */
+html.vp-stretch #root, html.vp-stretch .app { bottom: auto; height: var(--screen-h); }
+html.vp-stretch, html.vp-stretch body { background: var(--island-bg); }
