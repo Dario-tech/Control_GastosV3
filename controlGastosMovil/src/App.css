@@ -4325,9 +4325,11 @@ body::after, html.light body::after, html.pastel body::after { display: none !im
 /* Perfil: barra superior más arriba (la isla ocupa ~48 px; el botón «atrás» queda bajo ella). */
 .profile-topbar { height: calc(44px + max(calc(var(--safe-top) - 22px), 0px)); padding-top: max(calc(var(--safe-top) - 22px), 0px); }
 
-/* PWA en iPhone con franja sin pintar abajo: la app se estira ese hueco (--vp-gap, medido en JS). */
-.app { bottom: calc(-1 * var(--vp-gap, 0px)); }
-
-/* Si iOS declara menos altura que la pantalla (PWA instalada), la app mide la altura real. */
-html.vp-stretch #root, html.vp-stretch .app { bottom: auto; height: var(--screen-h); }
-html.vp-stretch, html.vp-stretch body { background: var(--island-bg); }
+/* App instalada (pantalla de inicio): la app mide siempre la pantalla completa (100vh/100lvh),
+   no la altura que iOS declara en innerHeight/100dvh, que puede ser menor y dejar una franja
+   vacía abajo. Solo con CSS y sin depender del modelo de móvil; en una pestaña del navegador
+   no aplica y sigue anclada a los bordes visibles. */
+@media (display-mode: standalone) {
+  #root, .app { bottom: auto; height: 100vh; height: 100lvh; }
+  html, body { background: var(--island-bg); }
+}
