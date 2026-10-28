@@ -4291,3 +4291,13 @@ html:not(.light):not(.pastel) body::after { background: none !important; }
 }
 .header { padding-top: var(--safe-top-use); }
 .bottom-nav { bottom: var(--nav-gap); }
+
+/* ===== SIN DIFUMINADO ARRIBA / BARRA INFERIOR FIJA =====
+   Arriba: el contenido ya no se desvanece; se corta limpio justo bajo la cabecera.
+   Abajo: sin velo y la barra queda fija al borde de la pantalla (no se mueve al hacer scroll). */
+.main {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent var(--header-h), #000 var(--header-h));
+  mask-image: linear-gradient(to bottom, transparent 0, transparent var(--header-h), #000 var(--header-h));
+}
+.app::after { display: none !important; }
+.bottom-nav { position: fixed; }
