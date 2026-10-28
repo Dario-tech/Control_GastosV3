@@ -27,6 +27,7 @@ export function medir(doc = document, win = window) {
     `alturas CSS: 100vh ${hOf('.diag-h-vh')}  100dvh (= .app) ${hOf('.diag-h-dvh')}  100lvh ${hOf('.diag-h-lvh')}  100svh ${hOf('.diag-h-svh')}  100% ${hOf('.diag-h-pct')}`,
     `#root: ${hOf('#root')}   body: ${hOf('body')}   html: ${hOf('html')}   .app: ${hOf('.app')}`,
     `display-mode standalone: ${mm('(display-mode: standalone)')}   navigator.standalone: ${String(win.navigator.standalone)}`,
+    `build: ${__BUILD_SHA__} ${__BUILD_TIME__.slice(0, 16)} UTC`,
     `devicePixelRatio: ${win.devicePixelRatio}`,
     `UA: ${ua ? ua.join(' | ') : win.navigator.userAgent}`,
     `.header: ${rect(doc.querySelector('.header'))}`,
@@ -66,6 +67,7 @@ export default function DiagScreen() {
       ))}
       <div className="diag-band top">ROJO: top:0 del viewport fijo</div>
       <div className="diag-band bottom">AZUL: bottom:0 del viewport fijo</div>
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: window.screen.height, borderBottom: '6px solid #0f0', pointerEvents: 'none', zIndex: 5002, color: '#0f0', font: '700 12px monospace', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>VERDE: altura = pantalla completa ({window.screen.height})</div>
       <div className="diag-side l" /><div className="diag-side r" />
       <div className="diag-lvh" />
       <h1>Diagnóstico de pantalla</h1>
