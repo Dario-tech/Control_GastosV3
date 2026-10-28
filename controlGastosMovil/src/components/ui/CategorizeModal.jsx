@@ -55,7 +55,8 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip, 
     setLoading(true)
     setError(null)
     try {
-      await onCategorize(pending.id, tipoValue, concepto, { recordar })
+      // El nombre del comercio (p. ej. «jamon supermercado») se guarda como nota del movimiento.
+      await onCategorize(pending.id, tipoValue, concepto, { recordar, ...(comercio ? { comentario: comercio } : {}) })
       refresh()
       setStep(1)
       setTipo(null)

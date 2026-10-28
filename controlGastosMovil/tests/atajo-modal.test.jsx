@@ -49,14 +49,20 @@ describe('CategorizeModal con comercio', () => {
     const { onCategorize } = renderModal({ ...base, comercio: 'Mercadona', suggested: sug('comercio') })
     expect(screen.getByLabelText('Recordar para este comercio').checked).toBe(true)
     fireEvent.click(screen.getByText('✨ Como la última vez en Mercadona').closest('button'))
-    await waitFor(() => expect(onCategorize).toHaveBeenCalledWith(5, 'Gasto Variable', 'Supermercado', { recordar: true }))
+    await waitFor(() => expect(onCategorize).toHaveBeenCalledWith(5, 'Gasto Variable', 'Supermercado', { recordar: true, comentario: 'Mercadona' }))
+  })
+
+  it('el nombre del comercio viaja como nota del movimiento (y sin comercio no hay nota)', async () => {
+    const a = renderModal({ ...base, comercio: '  jamon supermercado ', suggested: sug('comercio') })
+    fireEvent.click(screen.getByText(/Como la última vez en/).closest('button'))
+    await waitFor(() => expect(a.onCategorize).toHaveBeenCalledWith(5, 'Gasto Variable', 'Supermercado', { recordar: true, comentario: 'jamon supermercado' }))
   })
 
   it('desmarcar "Recordar para este comercio" envía recordar: false', async () => {
     const { onCategorize } = renderModal({ ...base, comercio: 'Mercadona', suggested: sug('comercio') })
     fireEvent.click(screen.getByLabelText('Recordar para este comercio'))
     fireEvent.click(screen.getByText('✨ Como la última vez en Mercadona').closest('button'))
-    await waitFor(() => expect(onCategorize).toHaveBeenCalledWith(5, 'Gasto Variable', 'Supermercado', { recordar: false }))
+    await waitFor(() => expect(onCategorize).toHaveBeenCalledWith(5, 'Gasto Variable', 'Supermercado', { recordar: false, comentario: 'Mercadona' }))
   })
 
   it('"Descartar" pide confirmación y luego llama a onDiscard', async () => {
@@ -98,7 +104,7 @@ describe('hoja "Gasto recibido" (variant="received")', () => {
     expect(screen.queryByText('Gasto Fijo')).toBeNull()   // no enseña la rejilla de tipos aún
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
-    await waitFor(() => expect(onCategorize).toHaveBeenCalledWith(41, 'Gasto Variable', 'Supermercado', { recordar: true }))
+    await waitFor(() => expect(onCategorize).toHaveBeenCalledWith(41, 'Gasto Variable', 'Supermercado', { recordar: true, comentario: 'Mercadona' }))
   })
 
   it('"Cambiar categoría" abre tipos y la rejilla de conceptos de CategorizeModal', async () => {
@@ -108,7 +114,7 @@ describe('hoja "Gasto recibido" (variant="received")', () => {
     fireEvent.click(screen.getByText('Gasto Fijo').closest('button'))
     const concepto = DEFAULT_CATEGORIES['Gasto Fijo'][0].concepto
     fireEvent.click(screen.getByText(concepto).closest('button'))
-    await waitFor(() => expect(onCategorize).toHaveBeenCalledWith(41, 'Gasto Fijo', concepto, { recordar: true }))
+    await waitFor(() => expect(onCategorize).toHaveBeenCalledWith(41, 'Gasto Fijo', concepto, { recordar: true, comentario: 'Mercadona' }))
   })
 
   it('"Descartar" con confirmación llama a onDiscard', async () => {
