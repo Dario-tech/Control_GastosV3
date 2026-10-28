@@ -4324,9 +4324,3 @@ body::after, html.light body::after, html.pastel body::after { display: none !im
 
 /* Perfil: barra superior más arriba (la isla ocupa ~48 px; el botón «atrás» queda bajo ella). */
 .profile-topbar { height: calc(44px + max(calc(var(--safe-top) - 22px), 0px)); padding-top: max(calc(var(--safe-top) - 22px), 0px); }
-
-/* Cabecera lo más arriba posible (petición del usuario): título y botones casi al borde. */
-:root {
-  --header-base: 50px;
-  --safe-top-use: max(calc(var(--safe-top) - 53px), 0px);
-}
