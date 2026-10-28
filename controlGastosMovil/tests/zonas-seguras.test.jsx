@@ -102,10 +102,10 @@ describe('ronda 2: pantallas completas, isla, campana y ejes', () => {
   it('fm-body sin pie reserva la barra de inicio', () => {
     expect(ronda2).toMatch(/\.fm-body:last-child \{ padding-bottom: calc\(24px \+ var\(--safe-bottom\)\)/)
   })
-  it('la franja de la isla tiene color por tema y degradado, y theme-color la usa', () => {
-    expect(ronda2).toMatch(/html\.light\s+\{ --island-bg: #/)
-    expect(ronda2).toMatch(/html\.pastel\s+\{ --island-bg: #/)
-    expect(ronda2).toMatch(/var\(--island-bg\) var\(--safe-top\), transparent calc\(var\(--safe-top\) \+ 14px\)/)
+  it('--island-bg es el color base del fondo por tema, sin franja sólida, y theme-color lo usa', () => {
+    expect(ronda2).toMatch(/html\.light\s+\{ --island-bg: #eef2fb/)
+    expect(ronda2).toMatch(/html\.pastel\s+\{ --island-bg: #fff0f7/)
+    expect(ronda2).not.toMatch(/var\(--island-bg\) var\(--safe-top\)/)
     expect(read('src/hooks/useThemeColorMeta.js')).toContain('--island-bg')
   })
   it('la campana es circular de 36px con insignia y para el pulso con reducir movimiento', () => {
@@ -124,5 +124,46 @@ describe('ronda 2: pantallas completas, isla, campana y ejes', () => {
     expect(ratio('#d3d9ec', '#000000')).toBeGreaterThan(4.5)
     expect(ratio('#2c2c48', '#F2F2F7')).toBeGreaterThan(4.5)
     expect(ratio('#7c0f44', '#fff0f7')).toBeGreaterThan(4.5)
+  })
+})
+
+describe('ronda 3: integración arriba/abajo', () => {
+  const r3 = css.slice(css.lastIndexOf('INTEGRACIÓN ARRIBA/ABAJO (agente A, ronda 3)'))
+  it('el fondo desborda el viewport y el velo inferior no es opaco', () => {
+    expect(r3).toMatch(/html::before \{[^}]*position: fixed[^}]*top: -80px; bottom: -80px/)
+    expect(r3).toMatch(/body::before \{[^}]*top: -80px; bottom: -80px/)
+    const velo = css.match(/\.app::after \{[^}]*\}/)[0]
+    expect(velo).toMatch(/transparent\)\)/)
+    expect(velo).not.toMatch(/,\s*var\(--bg\)\)/)
+  })
+  it('la cabecera es transparente, sin píldora ni sombra, con blur enmascarado', () => {
+    expect(r3).toMatch(/\.header \{\s*background: transparent;\s*border: 0; border-radius: 0; box-shadow: none;/)
+    expect(r3).toMatch(/\.header::before \{[\s\S]*?mask-image: linear-gradient\(to bottom, #000 0, #000 85%, transparent 100%\)/)
+  })
+  it('scrim en degradado bajo la isla en todos los temas, también en claro y pastel', () => {
+    expect(r3).toMatch(/body::after \{[\s\S]*?height: calc\(var\(--safe-top\) \+ 16px\)[\s\S]*?transparent 100%/)
+    expect(r3).toMatch(/html\.light body::after, html\.pastel body::after/)
+  })
+})
+
+describe('?diag=1', () => {
+  it('main.jsx monta la pantalla de diagnóstico solo con diag=1', () => {
+    const m = read('src/main.jsx')
+    expect(m).toContain("get('diag') === '1'")
+    expect(m).toContain('DiagScreen')
+  })
+})
+
+describe('ronda 3: legibilidad (cabecera y scrim)', () => {
+  const r3 = css.slice(css.lastIndexOf('INTEGRACIÓN ARRIBA/ABAJO (agente A, ronda 3)'))
+  it('el scrim de claro y pastel mantiene 0,66 hasta 0,62 al 60 % y se funde', () => {
+    expect(r3).toContain('rgba(24,24,56,0.66) 0, rgba(24,24,56,0.62) 60%, transparent 100%')
+    expect(r3).toContain('rgba(77,21,53,0.66) 0, rgba(77,21,53,0.62) 60%, transparent 100%')
+  })
+  it('el tinte de la cabecera sube a 85 % hacia abajo', () => {
+    expect(r3).toMatch(/var\(--bg\) 62%, transparent\) 0, color-mix\(in srgb, var\(--bg\) 85%, transparent\) 85%/)
+  })
+  it('los botones de la hoja de categorizar tienen zona táctil de 44px', () => {
+    expect(r3).toMatch(/\.catmodal-back::after, \.catmodal-cancel::after \{[^}]*height: 44px/)
   })
 })

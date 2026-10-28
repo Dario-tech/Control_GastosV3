@@ -13,6 +13,7 @@ import { useHideAmounts } from '../../hooks/useHideAmounts'
 import {
   FormScreen, Field, Section, AmountInput, Chips, Segmented, PrimaryButton, DangerButton, ConfirmSheet, Icon,
 } from './FormKit'
+import NewCategorySheet, { NewCategoryButton } from './NewCategorySheet'
 
 const TIPO_OPTIONS = [
   { id: 'Gasto Variable', label: 'Variable' },
@@ -46,6 +47,7 @@ export default function TransactionEditModal({ tx, emoji, onClose, onSaved, onDe
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState(null)
   const [confirmDel, setConfirmDel] = useState(false)
+  const [showNewCat, setShowNewCat] = useState(false)
 
   const { customCategories = {} } = useSettings() || {}
   const DEFAULT_CATEGORIES = useCategories()
@@ -168,6 +170,7 @@ export default function TransactionEditModal({ tx, emoji, onClose, onSaved, onDe
         </Section>
 
         <Section title="Categoría">
+          <NewCategoryButton onClick={() => setShowNewCat(true)} disabled={saving} />
           <div className="fm-grid fm-grid--3" role="radiogroup" aria-label="Categoría">
             {cats.map(c => {
               const sel = sameName(draft.concepto, c.concepto)
@@ -198,6 +201,11 @@ export default function TransactionEditModal({ tx, emoji, onClose, onSaved, onDe
           <DangerButton onClick={() => setConfirmDel(true)} disabled={saving}>Eliminar movimiento</DangerButton>
         </div>
       </FormScreen>
+
+      {showNewCat && (
+        <NewCategorySheet tipo={draft.tipo} existing={cats}
+          onCreated={name => set('concepto', name)} onClose={() => setShowNewCat(false)} />
+      )}
 
       {confirmDel && (
         <ConfirmSheet

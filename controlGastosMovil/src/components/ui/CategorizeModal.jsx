@@ -5,6 +5,7 @@ import { TYPES, combineCategories, categoryKey } from '../../data/categories'
 import { useCategories } from '../../hooks/useCategories'
 import { isUnusualAmount, fmt } from '../../utils'
 import { useFocusTrap, ConfirmSheet } from './FormKit'
+import NewCategorySheet, { NewCategoryButton } from './NewCategorySheet'
 
 const DATE_FMT = new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
 
@@ -31,6 +32,7 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip, 
   const [error, setError]     = useState(null)
   const [recordar, setRecordar] = useState(true)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const [showNewCat, setShowNewCat] = useState(false)
   const { refresh, data }     = useFinanceData()
   const { customCategories }  = useSettings()
   const DEFAULT_CATEGORIES = useCategories()
@@ -156,6 +158,10 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip, 
         )}
 
         {step === 2 && (
+          <NewCategoryButton onClick={() => setShowNewCat(true)} disabled={loading} />
+        )}
+
+        {step === 2 && (
           <div className="catmodal-grid">
             {allCats.map(c => {
               const unusual = isUnusualAmount(data, c.concepto, pending.importe)
@@ -194,6 +200,10 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip, 
           <button className="catmodal-cancel" onClick={onSkip}>Dejar para luego</button>
         </div>
       </div>
+      {showNewCat && (
+        <NewCategorySheet tipo={tipo} existing={allCats} confirmLabel="Crear y categorizar"
+          onCreated={name => handleConcepto(name)} onClose={() => setShowNewCat(false)} />
+      )}
       {confirmDiscard && (
         <ConfirmSheet
           title="¿Descartar este pago?"

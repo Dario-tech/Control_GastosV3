@@ -280,7 +280,8 @@ export function Sheet({ title, onClose, children, label }) {
   closeRef.current = onClose
   useFocusTrap(ref)
   useEffect(() => {
-    ref.current?.focus({ preventScroll: true })
+    // Si un campo de dentro ya tiene el foco (autoFocus), no se lo quitamos.
+    if (!ref.current?.contains(document.activeElement)) ref.current?.focus({ preventScroll: true })
     const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); closeRef.current() } }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)

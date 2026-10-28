@@ -158,7 +158,7 @@ describe('alta de una categoría repetida', () => {
     render(<AddTransactionModal onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('Gasto Variable'))
     fireEvent.change(screen.getByPlaceholderText('0,00'), { target: { value: '12' } })
-    fireEvent.click(screen.getByText('Nueva'))
+    fireEvent.click(screen.getByRole('button', { name: /nueva categoría/i }))
   }
   const typeName = (v) => fireEvent.change(screen.getByLabelText('Nombre de la categoría'), { target: { value: v } })
   const alertText = () => screen.getAllByRole('alert').map(a => a.textContent).join(' ')
@@ -166,7 +166,7 @@ describe('alta de una categoría repetida', () => {
   it('con el nombre de una por defecto (otra forma) avisa y no crea ni guarda nada', () => {
     openNewCat()
     typeName('  GIMNÁSIO ')
-    fireEvent.click(screen.getByText('Añadir y guardar'))
+    fireEvent.click(screen.getByRole('button', { name: 'Crear' }))
     expect(alertText()).toContain(DUPLICATE_CAT_MSG)
     expect(settingsState.addCategory).not.toHaveBeenCalled()
     expect(postTransaction).not.toHaveBeenCalled()
@@ -176,7 +176,7 @@ describe('alta de una categoría repetida', () => {
     settingsState.customCategories = { ...settingsState.customCategories, 'Gasto Variable': [{ id: '9', tipo: 'Gasto Variable', concepto: 'Clínica', emoji: '🏥' }] }
     openNewCat()
     typeName('clinica')
-    fireEvent.click(screen.getByText('Añadir y guardar'))
+    fireEvent.click(screen.getByRole('button', { name: 'Crear' }))
     expect(alertText()).toContain(DUPLICATE_CAT_MSG)
     expect(settingsState.addCategory).not.toHaveBeenCalled()
   })
@@ -185,18 +185,17 @@ describe('alta de una categoría repetida', () => {
     settingsState.addCategory = vi.fn(() => false)
     openNewCat()
     typeName('Mascotas')
-    fireEvent.click(screen.getByText('Añadir y guardar'))
+    fireEvent.click(screen.getByRole('button', { name: 'Crear' }))
     expect(alertText()).toContain(DUPLICATE_CAT_MSG)
     expect(postTransaction).not.toHaveBeenCalled()
   })
 
-  it('una nueva de verdad se crea y se guarda el movimiento con ella', () => {
+  it('una nueva de verdad se crea y queda elegida, sin guardar el movimiento', () => {
     openNewCat()
     typeName('Mascotas')
-    fireEvent.click(screen.getByText('Añadir y guardar'))
+    fireEvent.click(screen.getByRole('button', { name: 'Crear' }))
     expect(settingsState.addCategory).toHaveBeenCalledWith('Gasto Variable', { concepto: 'Mascotas', emoji: '💶' })
-    expect(postTransaction).toHaveBeenCalledTimes(1)
-    expect(postTransaction.mock.calls[0][2]).toBe('Mascotas')
+    expect(postTransaction).not.toHaveBeenCalled()
   })
 })
 

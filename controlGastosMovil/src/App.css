@@ -3776,16 +3776,12 @@ html { background-color: var(--bg); overscroll-behavior: none; }
 body { background-color: var(--bg); overscroll-behavior: none; }
 html, body, #root { min-height: 100vh; min-height: 100dvh; }
 
-/* Cabecera: ocupa la isla (altura = 60px + safe-top). Bajo la isla el fondo es
-   sólido (nada de cristal lechoso); debajo, cristal con blur contenido. */
+/* Cabecera: ocupa la isla (altura = 60px + safe-top); el título y los botones
+   empiezan bajo safe-top. Sin franja sólida: el aspecto (transparente + difuminado
+   progresivo) está en el bloque INTEGRACIÓN ARRIBA/ABAJO del final. */
 .header {
   height: var(--header-h);
   padding: var(--safe-top) max(20px, var(--safe-right)) 0 max(20px, var(--safe-left));
-  background: var(--glass-solid);
-  background:
-    linear-gradient(to bottom, var(--glass-solid) 0, var(--glass-solid) var(--safe-top), transparent var(--safe-top)),
-    color-mix(in srgb, var(--glass-solid) 80%, transparent);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.16), inset 0 -1px 0 var(--glass-highlight);
 }
 
 /* Contenido principal: nunca queda bajo la cabecera ni bajo la barra.
@@ -3801,12 +3797,11 @@ html, body, #root { min-height: 100vh; min-height: 100dvh; }
   bottom: calc(10px + var(--safe-bottom));
   box-shadow: 0 4px 14px rgba(0,0,0,0.26), inset 0 1px 0 var(--glass-highlight), inset 0 -1px 0 var(--glass-lowlight);
 }
-/* Velo bajo la píldora: el contenido que se desliza no se ve nítido bajo la barra de inicio */
+/* Velo MUY sutil bajo la píldora (parte del propio fondo, nunca var(--bg) opaco) */
 .app::after {
-  content: ''; position: fixed; left: 0; right: 0; bottom: 0; z-index: 55; pointer-events: none;
-  height: calc(var(--safe-bottom) + 6px);
-  background: linear-gradient(to bottom, transparent, var(--bg));
-  opacity: 0.85;
+  content: ''; position: fixed; left: 0; right: 0; bottom: -80px; z-index: 55; pointer-events: none;
+  height: calc(var(--safe-bottom) + 104px);
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--bg) 38%, transparent));
 }
 
 /* Pantalla de perfil: cubre TODO (isla y barra inferior), sin que asome lo de atrás */
@@ -4026,29 +4021,17 @@ html, body, #root { min-height: 100vh; min-height: 100dvh; }
 }
 
 /* Franja de la isla / barra de estado.
-   Con black-translucent iOS dibuja hora, batería y señal SIEMPRE en blanco.
-   COMPROMISO: en los temas oscuros la franja es el propio fondo del tema
-   (--island-bg = --glass-solid) con un degradado de 14 px hacia el cristal de la
-   cabecera (sin costura). En claro y pastel se pinta una franja oscura
-   (--island-bg propio) sobre TODA la app, también sobre formularios y modales,
-   que se funde en 16 px con lo de debajo; es el precio de no cambiar el estilo
-   de instalación. <meta theme-color> usa --island-bg (ver useThemeColorMeta). */
-:root { --island-bg: var(--glass-solid); }
-html.light   { --island-bg: #262a44; }
-html.pastel  { --island-bg: #4d1535; }
-.header {
-  background: var(--glass-solid);
-  background:
-    linear-gradient(to bottom, var(--island-bg) 0, var(--island-bg) var(--safe-top), transparent calc(var(--safe-top) + 14px)),
-    color-mix(in srgb, var(--glass-solid) 80%, transparent);
-}
-@media (max-width: 500px) {
-  html.light body::after, html.pastel body::after {
-    content: ''; position: fixed; top: 0; left: 0; right: 0; z-index: 2000; pointer-events: none;
-    height: calc(var(--safe-top) + 16px);
-    background: linear-gradient(to bottom, var(--island-bg) 0, var(--island-bg) var(--safe-top), transparent 100%);
-  }
-}
+   Con black-translucent iOS dibuja hora, batería y señal SIEMPRE en blanco, así que
+   no hay franja sólida: un scrim en degradado (bloque INTEGRACIÓN) las mantiene
+   legibles. --island-bg es el color base del fondo en la parte superior de cada
+   tema; <meta theme-color> lo usa (ver useThemeColorMeta). */
+:root         { --island-bg: #05060d; }
+html.light    { --island-bg: #eef2fb; }
+html.pastel   { --island-bg: #fff0f7; }
+html.ocean    { --island-bg: #02101c; }
+html.sunset   { --island-bg: #1c0a1e; }
+html.forest   { --island-bg: #03100a; }
+html.midnight { --island-bg: #000000; }
 
 /* Etiquetas de los ejes de los gráficos: color por tema (>= 4,5:1 sobre el fondo)
    que sigue la clase de <html>, no el ajuste guardado (el modo auto cambia solo). */
@@ -4067,3 +4050,193 @@ html.pastel { --chart-tick: #7c0f44; }
 @media (max-width: 340px) {
   .header-actions { gap: 10px; }
 }
+
+/* ===== CATEGORÍA AL AÑADIR GASTO (agente B) ===== */
+.fm-newcat-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; box-sizing: border-box;
+  margin: 0 0 10px; padding: 0 16px; border-radius: 16px; cursor: pointer; font: inherit; font-size: var(--fs-md, 1rem); font-weight: 700;
+  color: var(--accent); background: var(--accent-dim); border: 1.5px dashed var(--accent);
+  -webkit-tap-highlight-color: transparent; transition: transform 0.15s ease, background 0.15s ease;
+}
+.fm-newcat-btn:active { transform: scale(0.98); }
+.fm-newcat-btn:disabled { opacity: 0.5; cursor: default; }
+.fm-newcat-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fm-newcat-btn-plus { font-size: 1.25em; line-height: 1; }
+.catmodal .fm-newcat-btn { margin: 0 0 12px; }
+.fm-sheet .fm-newcat-row { min-width: 0; }
+.fm-sheet .fm-secondary { min-height: 44px; }
+@media (prefers-reduced-motion: reduce) { .fm-newcat-btn { transition: none; } }
+
+
+/* ===== INTEGRACIÓN ARRIBA/ABAJO (agente A, ronda 3) =====
+   El fondo del tema se pinta en TODO el viewport (también bajo la isla y la barra
+   de inicio, y aunque iOS informe de una altura de página menor): html lleva el
+   degradado, html::before lo repite en una capa fixed que desborda 80px por arriba
+   y por abajo, y body::before pinta los orbes con el mismo desborde. */
+html {
+  background: var(--bg-grad, var(--bg));
+  background-color: var(--bg);
+  min-height: 100vh; min-height: -webkit-fill-available;
+}
+body { background: transparent; min-height: 100vh; min-height: -webkit-fill-available; }
+html::before {
+  content: ''; position: fixed; z-index: 0; pointer-events: none;
+  top: -80px; bottom: -80px; left: -40px; right: -40px;
+  background: var(--bg-grad, var(--bg)); background-color: var(--bg);
+}
+body::before {
+  top: -80px; bottom: -80px; left: -6%; right: -6%;
+  height: calc(100lvh + 160px);
+}
+@supports not (height: 100lvh) { body::before { height: auto; } }
+
+/* Cabecera integrada: transparente sobre el fondo; el contenido que sube por debajo
+   se difumina con una capa de blur cuya máscara se desvanece hacia abajo. */
+.header {
+  background: transparent;
+  border: 0; border-radius: 0; box-shadow: none;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.header::after { display: none; }
+.header::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  left: 0; right: 0; top: 0; bottom: -18px;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 62%, transparent) 0, color-mix(in srgb, var(--bg) 85%, transparent) 85%, color-mix(in srgb, var(--bg) 85%, transparent) 100%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 14px)) saturate(var(--glass-saturate, 140%));
+  backdrop-filter: blur(var(--glass-blur, 14px)) saturate(var(--glass-saturate, 140%));
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 85%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0, #000 85%, transparent 100%);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .header { background: transparent; }
+  .header::before { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 92%, transparent), transparent); }
+}
+
+/* Scrim suave tras la hora/batería (blancas en iOS): degradado, sin franja sólida,
+   sobre TODA la app (formularios y perfil incluidos). */
+@media (max-width: 500px) {
+  body::after {
+    content: ''; position: fixed; top: 0; left: 0; right: 0; z-index: 2000; pointer-events: none;
+    height: calc(var(--safe-top) + 16px);
+    background: linear-gradient(to bottom, rgba(0,0,0,0.45) 0, rgba(0,0,0,0.3) 55%, transparent 100%);
+  }
+  html.light body::after, html.pastel body::after {
+    background: linear-gradient(to bottom, rgba(24,24,56,0.66) 0, rgba(24,24,56,0.62) 60%, transparent 100%);
+  }
+  html.pastel body::after {
+    background: linear-gradient(to bottom, rgba(77,21,53,0.66) 0, rgba(77,21,53,0.62) 60%, transparent 100%);
+  }
+}
+
+/* ===== Diagnóstico (?diag=1) ===== */
+.diag { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 5000; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: #1b1b22; color: #fff; font: 600 17px/1.45 ui-monospace, Menlo, monospace; padding: 12px; }
+.diag-band { position: fixed; left: 0; right: 0; height: 24px; z-index: 5001; pointer-events: none; font: 700 12px/24px monospace; color: #fff; text-align: center; }
+.diag-band.top { top: 0; background: #e11; }
+.diag-band.bottom { bottom: 0; background: #14f; }
+.diag-lvh { position: fixed; left: 0; right: 0; top: 0; height: 100lvh; border: 4px solid #ff0; z-index: 5001; pointer-events: none; }
+.diag-side { position: fixed; top: 0; bottom: 0; width: 10px; z-index: 5001; pointer-events: none; }
+.diag-side.l { left: 0; background: #0c3; } .diag-side.r { right: 0; background: #f0f; }
+.diag h1 { font-size: 22px; margin: 34px 0 10px; }
+.diag pre { white-space: pre-wrap; word-break: break-word; font: inherit; margin: 0 0 14px; }
+.diag button { font: 700 20px system-ui; padding: 14px 24px; border-radius: 12px; border: 0; background: #fff; color: #000; margin: 0 8px 14px 0; }
+
+/* ===== ESTADÍSTICAS (agente C) ===== */
+.st-panel { display: flex; flex-direction: column; }
+.st-card { margin-bottom: 12px; min-width: 0; }
+.st-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 16px 0; min-height: 34px; }
+.st-title { margin: 0; font-size: var(--fs-xs); font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.09em; }
+.st-body { padding: 10px 16px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.st-kpi-label { margin: 0; font-size: var(--fs-sm); color: var(--text2); }
+.st-kpi { margin: 0; font-size: var(--fs-hero); font-weight: 800; line-height: 1.05; color: var(--text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.st-kpi.st-pos { color: var(--green); }
+.st-kpi.st-neg { color: var(--red); }
+.st-empty, .st-muted { margin: 0; font-size: var(--fs-sm); color: var(--text2); line-height: 1.4; }
+.st-hint { font-size: var(--fs-xs); color: var(--text3); }
+.st-neg-text { color: var(--red); }
+.st-compare { margin: 0; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: var(--fs-sm); color: var(--text2); }
+.st-delta { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.st-delta-up { color: var(--red); }
+.st-delta-down { color: var(--green); }
+.st-delta-flat { color: var(--text2); }
+.st-delta-slot { display: inline-block; min-width: 3.4em; }
+
+.st-budget { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.st-row { margin: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: var(--fs-sm); color: var(--text2); min-width: 0; }
+.st-row > :last-child { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; text-align: right; }
+.st-row dt, .st-row dd { margin: 0; }
+.st-neg-text > :last-child { color: var(--red); }
+.st-row-total { padding-top: 8px; border-top: 1px solid var(--border); color: var(--text); }
+.st-dl { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.st-bar { position: relative; height: 10px; background: var(--surface2); border-radius: 20px; overflow: hidden; }
+.st-bar.thin { height: 6px; }
+.st-bar-fill { height: 100%; border-radius: 20px; background: var(--accent); }
+.st-bar-fill.over { background: var(--red); }
+.st-bar-base { position: absolute; top: 0; bottom: 0; left: 0; background: var(--text3); border-radius: 20px; opacity: 0.85; }
+
+.st-cats, .st-days, .st-usual, .st-upcoming, .st-legend, .st-rates { list-style: none; margin: 0; padding: 0; }
+.st-cats, .st-usual { display: flex; flex-direction: column; gap: 14px; }
+.st-cat, .st-usual li { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.st-cat-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; }
+.st-cat-name { font-size: var(--fs-sm); color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-cat-vals { display: flex; align-items: baseline; gap: 8px; flex-shrink: 0; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.st-cat-vals > .amt:first-child { font-weight: 700; color: var(--text); }
+.st-cat-pct { color: var(--text3); font-size: var(--fs-xs); min-width: 2.4em; text-align: right; }
+.st-cat-vals .st-delta { font-size: var(--fs-xs); min-width: 3.4em; text-align: right; }
+
+.st-stack { display: flex; height: 16px; border-radius: 20px; overflow: hidden; background: var(--surface2); }
+.st-seg.fixed, .st-dot.fixed { background: var(--accent); }
+.st-seg.variable, .st-dot.variable { background: var(--orange); }
+.st-seg.saving, .st-dot.saving { background: var(--green); }
+.st-dot.inc { background: var(--green); }
+.st-dot.exp { background: var(--red); }
+.st-dot.bal { background: var(--accent); }
+.st-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: baseline; }
+.st-legend { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-sm); color: var(--text2); }
+.st-legend .amt { color: var(--text); font-weight: 700; margin-left: 4px; }
+.st-legend-inline { display: flex; gap: 10px; font-size: var(--fs-xs); color: var(--text2); flex-wrap: wrap; justify-content: flex-end; }
+.st-legend-inline .st-dot { margin-right: 4px; }
+
+.st-chart { margin: 0 -6px; min-width: 0; }
+.st-rates { display: flex; justify-content: space-between; gap: 4px; font-size: var(--fs-xs); color: var(--text2); }
+.st-rates li { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.st-rates strong { color: var(--text); font-variant-numeric: tabular-nums; }
+
+.st-days { display: flex; flex-direction: column; gap: 8px; }
+.st-days li { display: grid; grid-template-columns: 5.6em 1fr auto; align-items: center; gap: 10px; font-size: var(--fs-sm); color: var(--text2); }
+.st-days li .amt { color: var(--text); font-variant-numeric: tabular-nums; min-width: 4.2em; text-align: right; }
+.st-days li.top { color: var(--text); font-weight: 700; }
+.st-days li.top .st-bar-fill { background: var(--orange); }
+.st-day-name { text-transform: capitalize; }
+.st-biggest { padding-top: 10px; border-top: 1px solid var(--border); align-items: flex-start; }
+.st-biggest > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+
+.st-upcoming { display: flex; flex-direction: column; gap: 10px; }
+.st-upcoming li { display: grid; grid-template-columns: 3.6em 1fr auto; gap: 10px; align-items: baseline; font-size: var(--fs-sm); color: var(--text); }
+.st-up-date { color: var(--text2); font-variant-numeric: tabular-nums; }
+.st-up-name { min-width: 0; overflow-wrap: anywhere; }
+.st-upcoming .amt { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.st-info-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.st-info-btn {
+  width: 44px; height: 44px; margin: -10px -10px -10px 0; background: transparent; border: 0; color: var(--text2);
+  cursor: pointer; display: grid; place-items: center;
+}
+.st-info-dot {
+  width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--text3);
+  display: grid; place-items: center; font: italic 700 var(--fs-xs) Georgia, serif;
+}
+.st-info-btn[aria-expanded="true"] .st-info-dot { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.st-info {
+  position: absolute; right: 0; top: 100%; z-index: 5; width: min(300px, calc(100vw - 56px)); padding: 10px 12px;
+  background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius-xs); color: var(--text);
+  font-size: var(--fs-xs); line-height: 1.45; text-transform: none; letter-spacing: 0; font-weight: 400; box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+
+/* Zona táctil >= 44 px en los botones de texto de la hoja de categorizar, sin cambiar su aspecto */
+.catmodal-back, .catmodal-cancel { position: relative; }
+.catmodal-back::after, .catmodal-cancel::after { content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: 44px; transform: translateY(-50%); }
+.st-tone-alert { color: var(--red); }
+.st-tone-good { color: var(--green); }
+.st-tone-neutral { color: var(--text2); }
