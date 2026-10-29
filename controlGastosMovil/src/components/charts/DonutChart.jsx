@@ -18,7 +18,7 @@ const CustomTooltip = ({ active, payload, hide }) => {
 
 const RADIAN = Math.PI / 180
 const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
-  if (percent < 0.05) return null
+  if (percent < 0.05 || percent > 0.99) return null
   const r = innerRadius + (outerRadius - innerRadius) * 0.5
   const x = cx + r * Math.cos(-midAngle * RADIAN)
   const y = cy + r * Math.sin(-midAngle * RADIAN)
@@ -36,6 +36,8 @@ export default function DonutChart({ fixed, variable }) {
     { name: 'Gastos Fijos',     value: fixed },
     { name: 'Gastos Variables', value: variable },
   ]
+  // Tramos a 0 no se dibujan: con paddingAngle dejan una rendija en el anillo
+  const slices = data.map((d, i) => ({ ...d, i })).filter(d => d.value > 0)
 
   return (
     <div className="donut-container">
@@ -51,17 +53,17 @@ export default function DonutChart({ fixed, variable }) {
               ))}
             </defs>
             <Pie
-              data={data}
+              data={slices}
               cx="50%"
               cy="50%"
               innerRadius={58}
               outerRadius={88}
-              paddingAngle={3}
+              paddingAngle={slices.length > 1 ? 3 : 0}
               dataKey="value"
               labelLine={false}
               label={renderCustomLabel}
             >
-              {data.map((_, i) => (
+              {slices.map(({ i }) => (
                 <Cell key={i} fill={`url(#donutGrad${i})`} stroke={COLORS[i]} strokeOpacity={0.5} strokeWidth={1} style={{ filter: `drop-shadow(0 0 6px ${COLORS[i]})` }} />
               ))}
             </Pie>
