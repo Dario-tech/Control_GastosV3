@@ -2168,7 +2168,7 @@ html.light .s-action-btn  { background: var(--surface2); color: var(--text2); bo
 html, body { background: var(--bg-grad, var(--bg)); background-color: var(--bg); }
 body::before {
   content: '';
-  position: fixed; inset: -6%; z-index: 0; pointer-events: none;
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
     radial-gradient(52vmax 52vmax at 12% 8%,  var(--orb-1), transparent 62%),
     radial-gradient(46vmax 46vmax at 92% 38%, var(--orb-2), transparent 62%),
@@ -2177,8 +2177,8 @@ body::before {
   animation: orbDrift 32s ease-in-out infinite alternate;
 }
 @keyframes orbDrift {
-  from { transform: translate3d(0,0,0) scale(1); }
-  to   { transform: translate3d(2%,-3%,0) scale(1.06); }
+  from { transform: translate3d(0,0,0); }
+  to   { transform: translate3d(1%,-1.5%,0); }
 }
 html.light body, html.light #root,
 html.pastel body, html.pastel #root,
@@ -4076,19 +4076,12 @@ html.pastel { --chart-tick: #7c0f44; }
 html {
   background: var(--bg-grad, var(--bg));
   background-color: var(--bg);
-  min-height: 100vh; min-height: -webkit-fill-available;
-}
-body { background: transparent; min-height: 100vh; min-height: -webkit-fill-available; }
-html::before {
-  content: ''; position: fixed; z-index: 0; pointer-events: none;
-  top: -80px; bottom: -80px; left: -40px; right: -40px;
-  background: var(--bg-grad, var(--bg)); background-color: var(--bg);
-}
-body::before {
-  top: -80px; bottom: -80px; left: -6%; right: -6%;
-  height: calc(100lvh + 160px);
-}
-@supports not (height: 100lvh) { body::before { height: auto; } }
+  }
+body { background: transparent; }
+/* Capas fijas SIN desborde: una capa fixed más grande que la pantalla hace que iOS deje
+   desplazar el documento (todo sube, arriba se difumina y abajo queda vacío). */
+html::before { content: none; }
+body::before { top: 0; right: 0; bottom: 0; left: 0; inset: 0; height: auto; }
 
 /* Cabecera integrada: transparente sobre el fondo; el contenido que sube por debajo
    se difumina con una capa de blur cuya máscara se desvanece hacia abajo. */
@@ -4330,6 +4323,5 @@ body::after, html.light body::after, html.pastel body::after { display: none !im
    vacía abajo. Solo con CSS y sin depender del modelo de móvil; en una pestaña del navegador
    no aplica y sigue anclada a los bordes visibles. */
 @media (display-mode: standalone) {
-  #root, .app { bottom: auto; height: 100vh; height: 100lvh; }
   html, body { background: var(--island-bg); }
 }

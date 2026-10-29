@@ -129,9 +129,13 @@ describe('ronda 2: pantallas completas, isla, campana y ejes', () => {
 
 describe('ronda 3: integración arriba/abajo', () => {
   const r3 = css.slice(css.lastIndexOf('INTEGRACIÓN ARRIBA/ABAJO (agente A, ronda 3)'))
-  it('el fondo desborda el viewport y el velo inferior no es opaco', () => {
-    expect(r3).toMatch(/html::before \{[^}]*position: fixed[^}]*top: -80px; bottom: -80px/)
-    expect(r3).toMatch(/body::before \{[^}]*top: -80px; bottom: -80px/)
+  it('el fondo NO desborda el viewport (si no, iOS deja desplazar el documento) y el velo inferior no es opaco', () => {
+    expect(r3).toMatch(/html::before \{ content: none; \}/)
+    expect(r3).toMatch(/body::before \{ top: 0; right: 0; bottom: 0; left: 0;/)
+    // ninguna capa fixed de html/body con desplazamientos negativos
+    expect(css).not.toMatch(/(html|body)::before \{[^}]*(top|bottom|left|right): -\d/)
+    expect(css).not.toMatch(/(html|body)::before \{[^}]*inset: -/)
+    expect(css).not.toMatch(/@media \(display-mode: standalone\) \{[^}]*height: 100lvh/)
     const velo = css.match(/\.app::after \{[^}]*\}/)[0]
     expect(velo).toMatch(/transparent\)\)/)
     expect(velo).not.toMatch(/,\s*var\(--bg\)\)/)

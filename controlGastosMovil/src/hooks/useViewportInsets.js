@@ -23,20 +23,19 @@ export function useViewportInsets() {
       // al cerrarse el teclado iOS puede dejar la página desplazada
       if (open && kb === 0) window.scrollTo(0, 0)
       open = kb > 0
-      // PWA instalada en iPhone: a veces la altura de maquetación es menor que la pantalla
-      // y queda una franja sin pintar abajo. Se publica el hueco (--vp-gap) para estirar la app.
-      const standalone = window.navigator.standalone === true || window.matchMedia?.('(display-mode: standalone)').matches
-      const gap = Math.round(window.screen.height - window.innerHeight)
-      root.style.setProperty('--vp-gap', standalone && kb === 0 && gap > 4 && gap < 120 ? gap + 'px' : '0px')
     }
+    // El documento no debe desplazarse nunca (todo el scroll es interno de .main y las hojas):
+    // si iOS lo mueve, la app sube, la cabecera queda bajo la isla y abajo asoma el vacío.
+    const anclar = () => { if (!open && (window.scrollY || window.scrollX)) window.scrollTo(0, 0) }
     update()
+    window.addEventListener('scroll', anclar, { passive: true })
     vv.addEventListener('resize', update)
     vv.addEventListener('scroll', update)
     return () => {
       vv.removeEventListener('resize', update)
       vv.removeEventListener('scroll', update)
+      window.removeEventListener('scroll', anclar)
       root.style.removeProperty('--kb-h')
-      root.style.removeProperty('--vp-gap')
       root.classList.remove('kb-open')
     }
   }, [])
