@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { safeTopFloor } from '../utils/safeAreaFloor'
 
 // Teclado virtual: en iOS el teclado no reduce el viewport de maquetación, así
 // que los formularios con pie fijo quedaban tapados. Se mide con visualViewport,
@@ -15,6 +16,17 @@ export function useViewportInsets() {
     const vv = window.visualViewport
     if (!vv) return
     const root = document.documentElement
+    // Mínimo de zona segura superior cuando iOS declara 0 (ver utils/safeAreaFloor.js)
+    const probe = document.createElement('div')
+    probe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;padding-top:env(safe-area-inset-top,0px)'
+    document.body.appendChild(probe)
+    const declared = parseFloat(getComputedStyle(probe).paddingTop) || 0
+    probe.remove()
+    const floor = safeTopFloor({
+      declared, screenW: window.screen.width, screenH: window.screen.height,
+      ua: window.navigator.userAgent, touch: (window.navigator.maxTouchPoints || 0) > 0,
+    })
+    if (floor) root.style.setProperty('--safe-top-floor', floor + 'px')
     let open = false
     function update() {
       const kb = computeKeyboardHeight(window.innerHeight, vv)
@@ -36,6 +48,7 @@ export function useViewportInsets() {
       vv.removeEventListener('scroll', update)
       window.removeEventListener('scroll', anclar)
       root.style.removeProperty('--kb-h')
+      root.style.removeProperty('--safe-top-floor')
       root.classList.remove('kb-open')
     }
   }, [])
