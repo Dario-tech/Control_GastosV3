@@ -96,9 +96,9 @@ function AppContent() {
       />
       <main className="main">
         {syncWarnings?.map(msg => (
-          <div key={msg} className="sync-warning" role="alert">⚠️ {msg}</div>
+          <div key={msg} className="sync-warning" role="alert"><span aria-hidden="true">⚠️</span><span>{msg}</span></div>
         ))}
-        {txWarning && <div className="sync-warning" role="alert">⚠️ {txWarning}</div>}
+        {txWarning && <div className="sync-warning" role="alert"><span aria-hidden="true">⚠️</span><span>{txWarning}</span></div>}
         {/* key con la moneda: al cambiarla se repintan las pantallas con el nuevo símbolo */}
         <ErrorBoundary key={`${activeTab}-${settings.currency}`} variant="inline">
           <Suspense fallback={<TabSkeleton />}>

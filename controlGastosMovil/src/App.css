@@ -4341,3 +4341,24 @@ body::after, html.light body::after, html.pastel body::after { display: none !im
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent var(--header-h), #000 var(--header-h), #000 calc(100% - var(--nav-gap) - 56px), transparent calc(100% - var(--nav-gap) - 56px));
   mask-image: linear-gradient(to bottom, transparent 0, transparent var(--header-h), #000 var(--header-h), #000 calc(100% - var(--nav-gap) - 56px), transparent calc(100% - var(--nav-gap) - 56px));
 }
+
+/* ===== ARRIBA: aviso de sincronización y subcabecera de sección más cuidados =====
+   Aviso: tarjeta de cristal con tinte ámbar (en vez de la caja morada de acento),
+   alineada con las tarjetas y con el icono en su propia columna. Subcabecera:
+   el título puede ocupar el ancho libre sin partirse en dos líneas sueltas y el
+   botón de mes no se encoge. Todo con variables del tema (oscuro, claro, pastel). */
+.sync-warning {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 10px 16px 0; padding: 12px 14px;
+  border-radius: 18px;
+  font-size: var(--fs-sm); line-height: 1.4; font-weight: 550;
+  color: var(--text);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--orange) 18%, transparent), color-mix(in srgb, var(--orange) 8%, transparent)), var(--glass-bg);
+  border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent);
+  box-shadow: var(--depth-1-shadow, none), inset 0 1px 0 var(--glass-highlight);
+}
+.main > .sync-warning:first-child { margin-top: calc(var(--header-h) + 10px); }
+.sync-warning + .sync-warning { margin-top: 8px; }
+.bgt-subheader { gap: 12px; margin-bottom: 16px; }
+.bgt-subheader-title { flex: 1; min-width: 0; font-size: var(--fs-lg); font-weight: 750; line-height: 1.2; }
+.bgt-month-btn { flex-shrink: 0; }
