@@ -4325,3 +4325,19 @@ body::after, html.light body::after, html.pastel body::after { display: none !im
 @media (display-mode: standalone) {
   html, body { background: var(--island-bg); }
 }
+
+/* ===== BARRA INFERIOR: centrada en la app y sin transparencia =====
+   Antes iba position:fixed a la ventana: en pantallas anchas se salía del cuadro de la app
+   (left/right:12px del navegador) y el contenido se veía por debajo y por los lados.
+   Ahora va anclada al .app (que ya es fixed y tiene max-width), centrada y opaca; el
+   contenido de .main se corta justo bajo el borde superior de la píldora. */
+.bottom-nav {
+  position: absolute;
+  left: max(12px, var(--safe-left)); right: max(12px, var(--safe-right));
+  margin: 0 auto;
+  background: var(--glass-solid);
+}
+.main {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent var(--header-h), #000 var(--header-h), #000 calc(100% - var(--nav-gap) - 56px), transparent calc(100% - var(--nav-gap) - 56px));
+  mask-image: linear-gradient(to bottom, transparent 0, transparent var(--header-h), #000 var(--header-h), #000 calc(100% - var(--nav-gap) - 56px), transparent calc(100% - var(--nav-gap) - 56px));
+}
