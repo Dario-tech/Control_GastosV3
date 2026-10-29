@@ -4392,3 +4392,13 @@ body::after, html.light body::after, html.pastel body::after { display: none !im
 }
 .header { padding-top: var(--safe-top-use); }
 .profile-topbar { height: var(--header-h); padding-top: var(--safe-top-use); }
+
+/* ===== FONDO HASTA EL BORDE REAL DE LA PANTALLA (Safari/Chrome iOS) =====
+   Safari pinta la página hasta el borde físico (también bajo su barra inferior), pero el
+   degradado de <html> y los orbes de body::before se medían con la altura «dinámica» y
+   terminaban ~60 pt antes: debajo se veía el color plano del tema (en claro, #F2F2F7).
+   - El degradado de <html> pasa a background-attachment: fixed (cubre toda la pantalla).
+   - Los orbes miden 100lvh (viewport grande = pantalla completa), sin desbordar la
+     pantalla, así que el documento tampoco se puede desplazar. */
+html { background-attachment: fixed; background-repeat: no-repeat; background-size: 100% 100%; }
+body::before { top: 0; bottom: auto; right: 0; left: 0; height: 100vh; height: 100lvh; }
