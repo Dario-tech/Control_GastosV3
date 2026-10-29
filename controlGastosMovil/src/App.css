@@ -4379,3 +4379,16 @@ body::after, html.light body::after, html.pastel body::after { display: none !im
   box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 .pf-home .build-marker-inline { margin-top: 18px; text-align: center; }
+
+/* ===== CABECERA FUERA DE LA FRANJA QUE DIFUMINA iOS =====
+   iOS (Safari/Chrome/web app) difumina por su cuenta lo que queda bajo la hora y la isla
+   (~80 pt desde arriba en un iPhone con isla). Las rondas de «menos hueco» restaban 14-22 px
+   a la zona segura y metían el título y los botones dentro de esa franja (borrosos). Ahora
+   la cabecera y la barra del perfil empiezan DEBAJO de la zona segura completa. */
+:root {
+  --header-base: 48px;
+  --safe-top-use: var(--safe-top);
+  --header-h: calc(var(--header-base) + var(--safe-top-use));
+}
+.header { padding-top: var(--safe-top-use); }
+.profile-topbar { height: var(--header-h); padding-top: var(--safe-top-use); }
