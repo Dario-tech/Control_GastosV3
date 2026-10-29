@@ -50,11 +50,8 @@ export default defineConfig({
         scope: '/',
         start_url: '/',
         icons: [
-          {
-            src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="40" fill="%235b7cff"/><text x="96" y="135" font-size="110" text-anchor="middle" fill="white">💰</text></svg>',
-            sizes: '192x192',
-            type: 'image/svg+xml',
-          },
+          { src: '/pwa/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/pwa/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
         ],
       },
     }),
