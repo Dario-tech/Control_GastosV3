@@ -11,9 +11,9 @@ const css = read('src/App.css')
 const cssSinComentarios = css.replace(/\/\*[\s\S]*?\*\//g, '')
 
 describe('viewport e index.html', () => {
-  it('usa viewport-fit=cover y mantiene el zoom desactivado documentado', () => {
+  it('no usa viewport-fit=cover (el hueco de abajo apareció con él) y mantiene el zoom desactivado', () => {
     const html = read('index.html')
-    expect(html).toMatch(/<meta name="viewport" content="[^"]*viewport-fit=cover[^"]*"/)
+    expect(html).not.toContain('viewport-fit=cover')
     expect(html).toContain('user-scalable=no')
     expect(html).toContain('apple-mobile-web-app-status-bar-style')
     expect(html).toContain('name="theme-color"')
