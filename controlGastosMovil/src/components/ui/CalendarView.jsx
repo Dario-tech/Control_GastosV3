@@ -14,7 +14,17 @@ const DOW_LONG = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes
 
 const NO_SUMS = { income: 0, expense: 0 }
 
-export default function CalendarView({ monthIndex, year, annualExpenses = [] }) {
+// Qué buckets de transacción entran según el filtro de tipo (ingresos solo con «todo»).
+export const BUCKETS_POR_TIPO = {
+  fijo: ['fixedExpenses'],
+  variable: ['variableExpenses'],
+}
+export function txVisible(t, tipo) {
+  const ok = BUCKETS_POR_TIPO[tipo]
+  return !ok || ok.includes(t.bucket)
+}
+
+export default function CalendarView({ monthIndex, year, annualExpenses = [], tipo = 'todo' }) {
   const { transactions } = useFinanceData()
   const [sel, setSel] = useState(null)
   useEffect(() => { setSel(null) }, [monthIndex, year])
@@ -25,7 +35,7 @@ export default function CalendarView({ monthIndex, year, annualExpenses = [] }) 
     const byDay = {}
     const daySums = {}
     transactions.forEach(t => {
-      if (t.month !== monthIndex) return
+      if (t.month !== monthIndex || !txVisible(t, tipo)) return
       const [y, , d] = String(t.fecha).split('-').map(Number)
       if (y !== year || isNaN(d)) return
       ;(byDay[d] = byDay[d] || []).push(t)
@@ -34,9 +44,9 @@ export default function CalendarView({ monthIndex, year, annualExpenses = [] }) 
       else s.expense += t.importe
     })
     return { byDay, daySums }
-  }, [transactions, monthIndex, year])
+  }, [transactions, monthIndex, year, tipo])
   const sums = day => daySums[day] || NO_SUMS
-  const dueOn = day => annualExpenses.filter(e => e.mes - 1 === monthIndex && Number(e.dia) === day)
+  const dueOn = day => tipo === 'variable' ? [] : annualExpenses.filter(e => e.mes - 1 === monthIndex && Number(e.dia) === day)
 
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
   const offset = (new Date(year, monthIndex, 1).getDay() + 6) % 7

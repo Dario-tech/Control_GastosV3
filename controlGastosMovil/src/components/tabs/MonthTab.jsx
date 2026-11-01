@@ -14,10 +14,22 @@ const CalendarView        = lazy(() => import('../ui/CalendarView'))
 const MonthYearSheet      = lazy(() => import('../ui/MonthYearSheet'))
 const TransactionLogModal = lazy(() => import('../ui/TransactionLogModal'))
 
+const TIPOS = [
+  { id: 'todo', label: 'Todo' },
+  { id: 'fijo', label: 'Gastos fijos' },
+  { id: 'variable', label: 'Gastos variables' },
+]
+const TIPO_TITULO = {
+  todo: 'Distribución de gastos',
+  fijo: 'Gastos fijos por concepto',
+  variable: 'Gastos variables por concepto',
+}
+
 export default function MonthTab() {
   const { selectedMonth, setSelectedMonth, selectedYear, setSelectedYear } = useApp()
   const { data: finance } = useFinanceData()
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [tipo, setTipo] = useState('todo')
   // El backend agrega por índice de mes (sin año): el año elegido se resuelve
   // aquí filtrando `transactions` (ver filterDataByYear).
   const rawData = filterDataByYear(finance, selectedYear)
@@ -110,8 +122,17 @@ export default function MonthTab() {
       </div>
 
       {/* Distribución */}
-      <Card title="Distribución de gastos" noPad>
-        <DonutChart fixed={stats.fixed} variable={stats.variable} />
+      <div className="s-segmented month-tipo-filter" role="group" aria-label="Filtrar gráficas por tipo de gasto">
+        {TIPOS.map(t => (
+          <button key={t.id} type="button" className={`s-seg-btn${tipo === t.id ? ' active' : ''}`}
+            aria-pressed={tipo === t.id} onClick={() => setTipo(t.id)}>{t.label}</button>
+        ))}
+      </div>
+      <Card title={TIPO_TITULO[tipo]} noPad>
+        <DonutChart
+          fixed={stats.fixed} variable={stats.variable} tipo={tipo} monthIndex={selectedMonth}
+          items={tipo === 'fijo' ? data.fixedExpenses : data.variableExpenses}
+        />
       </Card>
 
       {/* Actividad diaria — plegable */}
@@ -122,7 +143,7 @@ export default function MonthTab() {
         </button>
         {heatmapOpen && (
           <Suspense fallback={<ChartSkeleton height={280} />}>
-            <CalendarView monthIndex={selectedMonth} year={selectedYear} annualExpenses={annualExpenses} />
+            <CalendarView monthIndex={selectedMonth} year={selectedYear} annualExpenses={annualExpenses} tipo={tipo} />
           </Suspense>
         )}
       </div>

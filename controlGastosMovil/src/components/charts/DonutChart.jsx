@@ -1,9 +1,12 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import Amt from '../ui/Amt'
 import { fmt } from '../../utils'
 import { fmtAmount } from '../../utils/amounts'
 import { useHideAmounts } from '../../hooks/useHideAmounts'
+import { groupConceptsForMonth } from '../../utils/conceptBreakdown'
 
 const COLORS = ['#5b7cff', '#ff9f43']
+const CONCEPT_COLORS = ['#5b7cff', '#ff9f43', '#2ec4b6', '#e05fa8', '#a78bfa', '#8a93a6']
 const LABELS = ['Gastos Fijos', 'Gastos Variables']
 
 const CustomTooltip = ({ active, payload, hide }) => {
@@ -29,13 +32,21 @@ const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent
   )
 }
 
-export default function DonutChart({ fixed, variable }) {
+export default function DonutChart({ fixed, variable, tipo = 'todo', items, monthIndex }) {
   const hide = useHideAmounts()
-  const total = fixed + variable
-  const data = [
-    { name: 'Gastos Fijos',     value: fixed },
-    { name: 'Gastos Variables', value: variable },
-  ]
+  const byConcept = tipo !== 'todo'
+  const rows = byConcept ? groupConceptsForMonth(items, monthIndex) : null
+  const total = byConcept ? rows.reduce((s, r) => s + r.value, 0) : fixed + variable
+  const colors = byConcept ? CONCEPT_COLORS : COLORS
+  const data = byConcept
+    ? rows.map(r => ({ name: r.name, value: r.value }))
+    : [
+      { name: 'Gastos Fijos',     value: fixed },
+      { name: 'Gastos Variables', value: variable },
+    ]
+  if (byConcept && rows.length === 0) {
+    return <p className="donut-empty">{tipo === 'fijo' ? 'Sin gastos fijos este mes.' : 'Sin gastos variables este mes.'}</p>
+  }
   // Tramos a 0 no se dibujan: con paddingAngle dejan una rendija en el anillo
   const slices = data.map((d, i) => ({ ...d, i })).filter(d => d.value > 0)
 
@@ -45,7 +56,7 @@ export default function DonutChart({ fixed, variable }) {
         <ResponsiveContainer width="100%" height={190}>
           <PieChart>
             <defs>
-              {COLORS.map((c, i) => (
+              {colors.map((c, i) => (
                 <linearGradient key={i} id={`donutGrad${i}`} x1="0" y1="0" x2="1" y2="1">
                   <stop offset="0%"   stopColor={c} stopOpacity={0.95} />
                   <stop offset="100%" stopColor={c} stopOpacity={0.55} />
@@ -64,7 +75,7 @@ export default function DonutChart({ fixed, variable }) {
               label={renderCustomLabel}
             >
               {slices.map(({ i }) => (
-                <Cell key={i} fill={`url(#donutGrad${i})`} stroke={COLORS[i]} strokeOpacity={0.5} strokeWidth={1} style={{ filter: `drop-shadow(0 0 6px ${COLORS[i]})` }} />
+                <Cell key={i} fill={`url(#donutGrad${i})`} stroke={colors[i]} strokeOpacity={0.5} strokeWidth={1} style={{ filter: `drop-shadow(0 0 6px ${colors[i]})` }} />
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip hide={hide} />} />
@@ -72,7 +83,7 @@ export default function DonutChart({ fixed, variable }) {
         </ResponsiveContainer>
         <div className="donut-center">
           <span className="donut-label">Total</span>
-          <span className="donut-value">{fmt(total)}</span>
+          <span className="donut-value"><Amt>{fmt(total)}</Amt></span>
         </div>
       </div>
 
@@ -81,10 +92,10 @@ export default function DonutChart({ fixed, variable }) {
           const pct = total > 0 ? Math.round((item.value / total) * 100) : 0
           return (
             <div key={i} className="legend-row">
-              <span className="legend-dot" style={{ background: COLORS[i] }} />
-              <span className="legend-name">{LABELS[i]}</span>
+              <span className="legend-dot" style={{ background: colors[i] }} />
+              <span className="legend-name">{byConcept ? `${rows[i].emoji ? rows[i].emoji + ' ' : ''}${item.name}` : LABELS[i]}</span>
               <span className="legend-pct">{pct}%</span>
-              <span className="legend-amount">{fmt(item.value)}</span>
+              <span className="legend-amount"><Amt>{fmt(item.value)}</Amt></span>
             </div>
           )
         })}

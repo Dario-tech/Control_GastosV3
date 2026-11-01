@@ -4451,3 +4451,11 @@ html, body, #root, .app { height: 100vh; min-height: 100vh; }
 :root { --safe-top-use: calc(var(--safe-top) + min(var(--safe-top), 1px) * 18); }
 
 .sc-open-shortcuts { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+
+/* ===== FILTRO DE TIPO (pestaña Mes) ===== */
+.month-tipo-filter { margin: 0 0 12px; border-radius: 12px; }
+.month-tipo-filter .s-seg-btn { border-radius: 9px; min-height: 36px; }
+.month-tipo-filter .s-seg-btn.active { background: var(--accent-dim); color: var(--accent-fg); }
+html.light .month-tipo-filter .s-seg-btn.active, html.pastel .month-tipo-filter .s-seg-btn.active { background: white; color: var(--text); }
+.donut-empty { padding: 28px 16px; text-align: center; color: var(--text3); font-size: var(--fs-sm); }
+.legend-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
