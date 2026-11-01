@@ -1020,6 +1020,9 @@ img.goal-square-emoji { width: 1.25rem; height: 1.25rem; border-radius: 6px; obj
   to   { transform: translateY(0); }
 }
 .catmodal-counter { font-size: var(--fs-xs); font-weight: 600; color: var(--accent-fg); text-align: center; text-transform: uppercase; letter-spacing: 0.05em; }
+.catmodal-counter { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.catmodal-nav { background: none; border: none; color: var(--text2); font-size: 1.4rem; line-height: 1; padding: 0 8px; cursor: pointer; }
+.catmodal-nav:disabled { opacity: 0.4; }
 .catmodal-date    { font-size: var(--fs-sm); color: var(--text2); text-align: center; margin-top: -8px; }
 .catmodal-amount {
   font-size: var(--fs-hero); font-weight: 800;
