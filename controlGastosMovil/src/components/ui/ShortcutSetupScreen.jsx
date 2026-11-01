@@ -24,6 +24,9 @@ export const KEY_PLACEHOLDER = '\u003cPEGA_AQUI_TU_CLAVE>'
 export const KEY_WARNING = 'Este texto lleva tu clave personal. Con ella alguien podría añadirte gastos pendientes, pero no ver ni borrar nada. No la compartas.'
 
 // Base del enlace del Atajo: el ORIGEN REAL donde corre la app (no la API).
+// Abre la app Atajos en la pantalla de «nuevo atajo» (esquema oficial de iOS).
+export const SHORTCUTS_URL = 'shortcuts://create-shortcut'
+
 export function shortcutLinkBase(origin = window.location.origin) {
   return `${origin}/?atajo=1`
 }
@@ -284,10 +287,10 @@ function PromptBlock({ prompt, withKey = false, buildCopy }) {
     <section className="fm-card sc-step" aria-label="Prompt para una IA o para Atajos">
       <div className="sc-step-head">
         <span className="sc-step-num" aria-hidden="true">🤖</span>
-        <h2 className="sc-step-title">Texto para una IA</h2>
+        <h2 className="sc-step-title">Texto para pegar en la IA</h2>
       </div>
       <p className="sc-text">
-        ¿Quieres que te lo monte una IA (ChatGPT, Claude…)? Copia este texto y pégaselo.
+        Cópialo y pégalo cuando la IA de Atajos te pregunte.
       </p>
       <pre className="sc-prompt" data-testid="sc-prompt" tabIndex={0} aria-label="Texto del prompt">{prompt}</pre>
       {withKey ? (
@@ -478,21 +481,6 @@ function FondoActions({ api }) {
   )
 }
 
-function AutomationSteps({ n, shortcutName }) {
-  return (
-    <section className="fm-card sc-step" aria-labelledby={`sc-step-${n}`}>
-      <StepHead n={n} title="Crea la automatización" />
-      <ol className="sc-sublist">
-        <li>En Atajos, pestaña <strong>Automatización</strong> → <strong>Nueva automatización</strong> (o <strong>+</strong>).</li>
-        <li>Elige <strong>Transacción</strong>.</li>
-        <li>Marca tus tarjetas de Cartera.</li>
-        <li>Elige <strong>Ejecutar inmediatamente</strong>.</li>
-        <li>Toca <strong>Siguiente</strong> y elige el atajo <strong>{shortcutName}</strong>.</li>
-      </ol>
-    </section>
-  )
-}
-
 // Modo Manual: los dos tipos, paso a paso y sin IA.
 function ManualMode({ link, api }) {
   const url = `${api}/api/shortcut/pending`
@@ -547,12 +535,10 @@ function ManualMode({ link, api }) {
   )
 }
 
-export default function ShortcutSetupScreen({ onClose, navigate = url => window.location.assign(url) }) {
+export default function ShortcutSetupScreen({ onClose }) {
   const link = shortcutLinkBase()
   const [mode, setMode] = useState('app')
-  const { copied, copyFailed, copy } = useCopy()
-  const copyLink = () => copy(link)
-  const fondo = mode === 'fondo'
+    const fondo = mode === 'fondo'
   const manual = mode === 'manual'
 
   return (
@@ -600,81 +586,17 @@ export default function ShortcutSetupScreen({ onClose, navigate = url => window.
 
       {manual ? (
         <ManualMode link={link} api={BASE} />
-      ) : fondo ? (
-        <>
-          <section className="fm-card sc-step" aria-labelledby="sc-step-1">
-            <StepHead n={1} title="Crea el Atajo" />
-            <p className="sc-text">
-              Es largo de montar a mano. Lo más fácil: copia el texto de abajo y dáselo a una IA. Si lo haces tú, usa la pestaña «Manual».
-            </p>
-            <div className="sc-actions" aria-label="Resumen de acciones del Atajo">
-              <ActionBlock n={1} icon="💳" tone="accent" name="Recibir">
-                <ActionRow k="Recibir" v={<><strong>Transacciones</strong> de <strong>Cartera</strong></>} />
-              </ActionBlock>
-              <ActionBlock n={2} icon="📝" tone="green" name="Texto (el ID del pago)">
-                <p className="sc-hint">Fecha + comercio + importe.</p>
-              </ActionBlock>
-              <ActionBlock n={3} icon="🔁" tone="orange" name="Repetir 3 veces">
-                <p className="sc-hint">Envía el pago al servidor. Si falla, espera 20 segundos y reintenta.</p>
-              </ActionBlock>
-              <ActionBlock n={4} icon="🔔" tone="red" name="Mostrar notificación">
-                <p className="sc-hint">Si falla 3 veces: «No se pudo guardar. Añádelo a mano.»</p>
-              </ActionBlock>
-            </div>
-          </section>
-          <AutomationSteps n={2} shortcutName="Mi Economía (segundo plano)" />
-          <section className="fm-card sc-step" aria-labelledby="sc-step-3">
-            <StepHead n={3} title="Pruébalo" />
-            <p className="sc-text">
-              Paga algo pequeño con Apple Pay. En unos segundos, la <strong>campana</strong> de la app mostrará un pago pendiente.
-            </p>
-          </section>
-        </>
       ) : (
-        <>
-          {/* Paso 1 */}
-          <section className="fm-card sc-step" aria-labelledby="sc-step-1">
-            <StepHead n={1} title="Copia el enlace" />
-            <div className="sc-copy">
-              <span className="sc-copy-label">Enlace del atajo</span>
-              <code className="sc-copy-value" data-testid="sc-link">{link}</code>
-              <button type="button" className="shortcut-token-copy sc-copy-btn" onClick={copyLink}>
-                {copied ? '✓ Copiado' : 'Copiar enlace del atajo'}
-              </button>
-            </div>
-            <p className="sr-only" role="status" aria-live="polite">{copied ? 'Copiado' : ''}</p>
-            {copyFailed && (
-              <p className="sc-warn" role="alert">No se pudo copiar automáticamente. Mantén pulsado el enlace para copiarlo.</p>
-            )}
-          </section>
-
-          {/* Paso 2 */}
-          <section className="fm-card sc-step" aria-labelledby="sc-step-2">
-            <StepHead n={2} title="Crea el Atajo" />
-            <ol className="sc-sublist">
-              <li>Abre la app <strong>Atajos</strong>, pestaña <strong>Atajos</strong>, y toca <strong>+</strong>.</li>
-              <li>Ponle de nombre <strong>Mi Economía</strong>.</li>
-              <li>Añade estas acciones, en este orden:</li>
-            </ol>
-            <AppActions link={link} />
-          </section>
-
-          <AutomationSteps n={3} shortcutName="Mi Economía" />
-
-          {/* Paso 4 */}
-          <section className="fm-card sc-step" aria-labelledby="sc-step-4">
-            <StepHead n={4} title="Pruébalo" />
-            <p className="sc-text">
-              «Probar ahora» abre la app como si hubieras pagado 1,00 €. Luego lo descartas.
-            </p>
-            <button type="button" className="fm-secondary fm-secondary--wide" onClick={() => navigate(shortcutTestLink())}>
-              Probar ahora
-            </button>
-            <p className="sc-hint">
-              ¿No se abre la app al pagar? Revisa que la automatización esté en «Ejecutar inmediatamente».
-            </p>
-          </section>
-        </>
+        <section className="fm-card sc-step" aria-labelledby="sc-step-1">
+          <StepHead n={1} title="Crea el atajo con la IA" />
+          <p className="sc-text">
+            Abre Atajos y crea un atajo nuevo. Cuando la IA te pregunte qué quieres crear, pégale el texto de abajo.
+          </p>
+          <a className="shortcut-token-copy sc-copy-btn sc-open-shortcuts" href={SHORTCUTS_URL} data-testid="sc-open-shortcuts">
+            Abrir Atajos
+          </a>
+          <p className="sc-hint">¿No se abre? Abre la app Atajos tú mismo y toca <strong>+</strong>.</p>
+        </section>
       )}
 
       {mode === 'app' && <PromptBlock key="app" prompt={buildPromptApp(link)} />}
