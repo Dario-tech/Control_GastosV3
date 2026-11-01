@@ -5,11 +5,11 @@ import { fmtAmount } from '../../utils/amounts'
 import { useHideAmounts } from '../../hooks/useHideAmounts'
 import { groupConceptsForMonth } from '../../utils/conceptBreakdown'
 
-const COLORS = ['#5b7cff', '#ff9f43']
-// Por concepto: un color distinto por categoría (tonos espaciados en el círculo
-// cromático, con la misma viveza que el azul/naranja del donut "Todo") para que
-// se distingan a simple vista. El gris es para "Otros".
-const CONCEPT_COLORS = ['#5b7cff', '#ff9f43', '#2ec4b6', '#ff6b8b', '#a78bfa', '#8a93a6']
+// Los colores salen del tema que ha elegido el usuario (--chart-N en App.css),
+// no van fijos: en pastel el gráfico es pastel, en oscuro/ocean/etc. usa los
+// tonos de ese tema. «Todo» usa los dos primeros; por concepto, en orden.
+const COLORS = ['var(--chart-1)', 'var(--chart-2)']
+const CONCEPT_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)', 'var(--chart-other)']
 const LABELS = ['Gastos Fijos', 'Gastos Variables']
 
 const CustomTooltip = ({ active, payload, hide }) => {
@@ -61,8 +61,8 @@ export default function DonutChart({ fixed, variable, tipo = 'todo', items, mont
             <defs>
               {colors.map((c, i) => (
                 <linearGradient key={i} id={`donutGrad${i}`} x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%"   stopColor={c} stopOpacity={0.95} />
-                  <stop offset="100%" stopColor={c} stopOpacity={0.55} />
+                  <stop offset="0%"   style={{ stopColor: c }} stopOpacity={0.95} />
+                  <stop offset="100%" style={{ stopColor: c }} stopOpacity={0.55} />
                 </linearGradient>
               ))}
             </defs>
@@ -78,7 +78,7 @@ export default function DonutChart({ fixed, variable, tipo = 'todo', items, mont
               label={renderCustomLabel}
             >
               {slices.map(({ i }) => (
-                <Cell key={i} fill={`url(#donutGrad${i})`} stroke={colors[i]} strokeOpacity={0.5} strokeWidth={1} style={{ filter: `drop-shadow(0 0 6px ${colors[i]})` }} />
+                <Cell key={i} fill={`url(#donutGrad${i})`} strokeOpacity={0.5} strokeWidth={1} style={{ stroke: colors[i], filter: `drop-shadow(0 0 6px color-mix(in srgb, ${colors[i]} 60%, transparent))` }} />
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip hide={hide} />} />

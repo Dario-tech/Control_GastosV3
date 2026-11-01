@@ -4462,3 +4462,21 @@ html, body, #root, .app { height: 100vh; min-height: 100vh; }
 html.light .month-tipo-filter .s-seg-btn.active, html.pastel .month-tipo-filter .s-seg-btn.active { background: white; color: var(--text); }
 .donut-empty { padding: 28px 16px; text-align: center; color: var(--text3); font-size: var(--fs-sm); }
 .legend-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ===== Paleta de gráficas (donut): sale del tema elegido ===== */
+:root {
+  --chart-1: var(--accent);
+  --chart-2: var(--orange);
+  --chart-3: var(--green);
+  --chart-4: var(--purple);
+  --chart-5: var(--red);
+  --chart-other: var(--text3);
+}
+html.pastel {
+  --chart-1: #f4a6cd;
+  --chart-2: #fdc08a;
+  --chart-3: #8fdcc4;
+  --chart-4: #c4b0f5;
+  --chart-5: #f9a1b0;
+  --chart-other: #d6c6d3;
+}
