@@ -4402,3 +4402,18 @@ body::after, html.light body::after, html.pastel body::after { display: none !im
      pantalla, así que el documento tampoco se puede desplazar. */
 html { background-attachment: fixed; background-repeat: no-repeat; background-size: 100% 100%; }
 body::before { top: 0; bottom: auto; right: 0; left: 0; height: 100vh; height: 100lvh; }
+
+/* ===== CORTE LIMPIO SIN MÁSCARA =====
+   Una máscara sobre .main hacía transparente la parte alta de todo lo que va dentro, incluidos
+   los formularios a pantalla completa (se veía la pantalla de atrás y quedaban bajo la cabecera
+   y la barra). Ahora .main empieza justo bajo la cabecera y acaba justo sobre la píldora, así el
+   contenido se corta limpio sin máscara y los formularios cubren toda la pantalla. */
+.main {
+  -webkit-mask-image: none; mask-image: none;
+  position: absolute; left: 0; right: 0; top: var(--header-h); bottom: calc(var(--nav-gap) + 66px);
+  scroll-padding: 0;
+}
+.tab-panel { padding-top: 12px; padding-bottom: 28px; }
+.main > .sync-warning:first-child { margin-top: 10px; }
+.main:has(> .sync-warning) .tab-panel { padding-top: 12px; }
+.eb-inline { padding-top: 12px; }
