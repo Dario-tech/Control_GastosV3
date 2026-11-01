@@ -46,6 +46,12 @@ def pg(monkeypatch):
             user_email TEXT, comercio_hmac BYTEA, tipo TEXT, concepto_enc BYTEA,
             hits INT NOT NULL DEFAULT 1, updated_at TIMESTAMPTZ DEFAULT now(),
             PRIMARY KEY (user_email, comercio_hmac))""")
+        c.execute(f"""CREATE TABLE {schema}.user_categories (
+            id BIGSERIAL PRIMARY KEY, user_email TEXT NOT NULL, tipo TEXT NOT NULL,
+            concepto_enc BYTEA NOT NULL, concepto_hmac BYTEA, emoji TEXT NOT NULL DEFAULT '')""")
+        c.execute(f"""CREATE TABLE {schema}.user_prefs (
+            user_email TEXT NOT NULL, kind TEXT NOT NULL, data_enc BYTEA NOT NULL,
+            updated_at TIMESTAMPTZ DEFAULT now(), PRIMARY KEY (user_email, kind))""")
     from services import db, legacy_plain
     monkeypatch.setenv("DATABASE_URL", _url(PG_URL, schema))
     monkeypatch.setattr(db, "_pool", None)
