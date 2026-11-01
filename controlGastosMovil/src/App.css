@@ -4424,3 +4424,8 @@ body::before { top: 0; bottom: auto; right: 0; left: 0; height: 100vh; height: 1
    sí mide la pantalla real. Sin media queries: vale igual en cualquier móvil. */
 html, body, #root, .app { height: 100vh; min-height: 100vh; }
 .login-screen { min-height: 100vh; }
+
+/* Cabecera y barra del perfil algo más abajo: iOS difumina por su cuenta ~80 pt desde arriba
+   (hora e isla) y con solo --safe-top los primeros píxeles del título quedaban borrosos. Se suman
+   18 px únicamente si el móvil declara zona segura arriba (en móviles sin ella no cambia nada). */
+:root { --safe-top-use: calc(var(--safe-top) + min(var(--safe-top), 1px) * 18); }
