@@ -59,6 +59,10 @@ Optional backend env vars (features degrade gracefully when unset): `ANTHROPIC_A
 - The app shell is fixed-width, mobile-only (`max-width: 430px`, see `.app` in `App.css`) — there's no responsive/desktop layout to preserve.
 - `vite-plugin-pwa` handles the PWA manifest/service worker (config in `vite.config.js`); there's no native app wrapper (Capacitor etc.) in the codebase yet, though it's been discussed as a possible direction.
 
+## Histórico de problemas (carpeta `problemas/`)
+
+Antes de tocar de nuevo algo que ya dio guerra (p. ej. alturas/`viewport-fit`/zonas seguras en iOS, el hueco abajo, la franja difuminada de arriba), **lee `problemas/`**: cada nota recoge síntomas, medidas, causa, lo que NO funcionó y lo que sí. Al cerrar un problema difícil, añade una nota nueva ahí y enlázala en `problemas/README.md`. Regla de diseño del usuario: la app es responsive; nada específico por modelo de móvil ni por navegador, solo `env(safe-area-inset-*)`.
+
 ## Deployment notes
 
 - Branch `qa` drives the isolated QA environment (see `QA-SETUP.md`); production config is in `render.yaml` (backend) and `vercel.json` (frontend).
