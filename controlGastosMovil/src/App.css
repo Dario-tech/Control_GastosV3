@@ -4417,3 +4417,11 @@ body::before { top: 0; bottom: auto; right: 0; left: 0; height: 100vh; height: 1
 .main > .sync-warning:first-child { margin-top: 10px; }
 .main:has(> .sync-warning) .tab-panel { padding-top: 12px; }
 .eb-inline { padding-top: 12px; }
+
+/* ===== APP INSTALADA EN iOS: altura completa con viewport-fit=cover =====
+   iOS 26 da a la app instalada una altura menor que la pantalla (WebKit 301108): solo 100lvh
+   informa de la altura real. Se aplica únicamente con la app instalada (display-mode: standalone)
+   y a toda la cadena html > body > #root > .app; en pestaña de navegador no cambia nada. */
+@media (display-mode: standalone) {
+  html, body, #root, .app { height: 100lvh; min-height: 100lvh; }
+}

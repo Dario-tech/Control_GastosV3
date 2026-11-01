@@ -96,7 +96,7 @@ describe('ErrorBoundary', () => {
 describe('viewport y tamaño de fuente en campos', () => {
   it('index.html fija el viewport sin zoom', () => {
     const html = readFileSync(join(root, 'index.html'), 'utf8')
-    expect(html).toMatch(/name="viewport" content="width=device-width, initial-scale=1\.0, maximum-scale=1\.0, user-scalable=no"/)
+    expect(html).toMatch(/name="viewport" content="width=device-width, initial-scale=1\.0, maximum-scale=1\.0, user-scalable=no, viewport-fit=cover"/)
   })
 
   it('ninguna regla de input/textarea/select baja de 16px', () => {

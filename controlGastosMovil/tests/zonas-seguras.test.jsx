@@ -11,9 +11,9 @@ const css = read('src/App.css')
 const cssSinComentarios = css.replace(/\/\*[\s\S]*?\*\//g, '')
 
 describe('viewport e index.html', () => {
-  it('no usa viewport-fit=cover (el hueco de abajo apareció con él) y mantiene el zoom desactivado', () => {
+  it('usa viewport-fit=cover y mantiene el zoom desactivado documentado', () => {
     const html = read('index.html')
-    expect(html).not.toContain('viewport-fit=cover')
+    expect(html).toMatch(/<meta name="viewport" content="[^"]*viewport-fit=cover[^"]*"/)
     expect(html).toContain('user-scalable=no')
     expect(html).toContain('apple-mobile-web-app-status-bar-style')
     expect(html).toContain('name="theme-color"')
@@ -135,7 +135,8 @@ describe('ronda 3: integración arriba/abajo', () => {
     // ninguna capa fixed de html/body con desplazamientos negativos
     expect(css).not.toMatch(/(html|body)::before \{[^}]*(top|bottom|left|right): -\d/)
     expect(css).not.toMatch(/(html|body)::before \{[^}]*inset: -/)
-    expect(css).not.toMatch(/@media \(display-mode: standalone\) \{[^}]*height: 100lvh/)
+    // app instalada: altura completa (100lvh) en toda la cadena (WebKit 301108)
+    expect(css).toMatch(/@media \(display-mode: standalone\) \{\s*html, body, #root, \.app \{ height: 100lvh/)
     const velo = css.match(/\.app::after \{[^}]*\}/)[0]
     expect(velo).toMatch(/transparent\)\)/)
     expect(velo).not.toMatch(/,\s*var\(--bg\)\)/)
