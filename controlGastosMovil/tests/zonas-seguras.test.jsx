@@ -135,8 +135,8 @@ describe('ronda 3: integración arriba/abajo', () => {
     // ninguna capa fixed de html/body con desplazamientos negativos
     expect(css).not.toMatch(/(html|body)::before \{[^}]*(top|bottom|left|right): -\d/)
     expect(css).not.toMatch(/(html|body)::before \{[^}]*inset: -/)
-    // app instalada: altura completa (100lvh) en toda la cadena (WebKit 301108)
-    expect(css).toMatch(/@media \(display-mode: standalone\) \{\s*html, body, #root, \.app \{ height: 100lvh/)
+    // altura completa (100vh) en toda la cadena (WebKit 301108)
+    expect(css).toMatch(/html, body, #root, \.app \{ height: 100vh; min-height: 100vh; \}/)
     const velo = css.match(/\.app::after \{[^}]*\}/)[0]
     expect(velo).toMatch(/transparent\)\)/)
     expect(velo).not.toMatch(/,\s*var\(--bg\)\)/)
