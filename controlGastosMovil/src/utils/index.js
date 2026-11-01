@@ -1,3 +1,5 @@
+import { formatMoney } from './currency'
+
 /** "YYYY-MM-DD" con la fecha LOCAL del dispositivo (no UTC: tras medianoche toISOString da otro día). */
 export function localISODate(d = new Date()) {
   const p = n => String(n).padStart(2, '0')
@@ -14,13 +16,9 @@ export function addDaysLocal(days, from = new Date()) {
   return localISODate(new Date(from.getFullYear(), from.getMonth(), from.getDate() + days))
 }
 
+// Importe con la moneda elegida en Ajustes (ver utils/currency.js).
 export function fmt(n, decimals = 0) {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(n)
+  return formatMoney(n, decimals)
 }
 
 export function sumMonth(arr, m) {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth, REGISTRO_CERRADO } from '../../context/AuthContext'
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
@@ -7,6 +7,9 @@ export default function LoginScreen() {
   const { loginWithGoogle, registerWithEmail, loginWithEmail, sessionExpiredMsg, clearSessionExpiredMsg } = useAuth()
   const [error, setError]     = useState(sessionExpiredMsg || '')
   const [loading, setLoading] = useState(false)
+  // El servidor ha dicho que el alta está cerrada: se atenúa «Regístrate»
+  const [registroCerrado, setRegistroCerrado] = useState(false)
+  const noteClosed = msg => { if (msg === REGISTRO_CERRADO) setRegistroCerrado(true) }
 
   // Si nos han traído aquí por una sesión caducada, mostramos ese aviso una
   // vez y limpiamos el flag para que no reaparezca en el siguiente login.
@@ -36,7 +39,8 @@ export default function LoginScreen() {
           try {
             await loginWithGoogle(credential)
           } catch (e) {
-            setError(e.message || 'Error al iniciar sesión')
+            if (e.message === REGISTRO_CERRADO) noteClosed(e.message)
+            else setError(e.message || 'Error al iniciar sesión')
           } finally {
             setLoading(false)
           }
@@ -71,7 +75,13 @@ export default function LoginScreen() {
         await loginWithEmail(email.trim(), password)
       }
     } catch (err) {
-      setError(err.message || 'Error de autenticación')
+      // Registro cerrado: lo dice solo la nota gris (sin alerta roja duplicada)
+      if (err.message === REGISTRO_CERRADO) {
+        noteClosed(err.message)
+        setMode('login')
+      } else {
+        setError(err.message || 'Error de autenticación')
+      }
     } finally {
       setLoading(false)
     }
@@ -126,14 +136,20 @@ export default function LoginScreen() {
               </button>
             </form>
 
-            <button
-              className="login-switch"
-              onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}
-            >
-              {mode === 'login'
-                ? '¿No tienes cuenta? Regístrate'
-                : '¿Ya tienes cuenta? Inicia sesión'}
-            </button>
+            {registroCerrado ? (
+              <p className="login-switch" role="note" style={{ opacity: 0.7 }}>
+                El registro está cerrado. Pídele acceso al administrador.
+              </p>
+            ) : (
+              <button
+                className="login-switch"
+                onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}
+              >
+                {mode === 'login'
+                  ? '¿No tienes cuenta? Regístrate'
+                  : '¿Ya tienes cuenta? Inicia sesión'}
+              </button>
+            )}
 
             {CLIENT_ID && (
               <>

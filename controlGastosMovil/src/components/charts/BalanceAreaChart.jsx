@@ -2,18 +2,20 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
-import { getCumulativeBalance, fmt } from '../../utils'
+import { getCumulativeBalance } from '../../utils'
+import { fmtAmount, axisTick } from '../../utils/amounts'
+import { useHideAmounts } from '../../hooks/useHideAmounts'
 import { MONTH_SHORT } from '../../data/mockData'
 import { useChartColors } from '../../hooks/useChartColors'
 
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload, label, hide }) => {
   if (!active || !payload?.length) return null
   const v = payload[0].value
   return (
     <div className="chart-tooltip">
       <p className="tt-title">{MONTH_SHORT[label]}</p>
       <p className={`tt-row ${v >= 0 ? 'tt-blue' : 'tt-red'}`}>
-        Acumulado <strong>{fmt(v)}</strong>
+        Acumulado <strong>{fmtAmount(v, hide)}</strong>
       </p>
     </div>
   )
@@ -21,6 +23,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function BalanceAreaChart({ data: financeData }) {
   const { tick, grid, refLine } = useChartColors()
+  const hide = useHideAmounts()
   const data = getCumulativeBalance(financeData).map(d => ({ ...d, monthLabel: MONTH_SHORT[d.month] }))
 
   return (
@@ -43,9 +46,9 @@ export default function BalanceAreaChart({ data: financeData }) {
           tick={{ fill: tick, fontSize: 11 }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}
+          tickFormatter={axisTick(hide)}
         />
-        <Tooltip content={<CustomTooltip />} />
+        <Tooltip content={<CustomTooltip hide={hide} />} />
         <ReferenceLine y={0} stroke={refLine} strokeDasharray="4 4" />
         <Area
           type="monotone"

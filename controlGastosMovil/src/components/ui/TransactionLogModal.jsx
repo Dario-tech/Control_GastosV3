@@ -9,6 +9,7 @@ import {
 } from '../../utils/txlog'
 import { useFocusTrap, Icon } from './FormKit'
 import TransactionEditModal from './TransactionEditModal'
+import Amt from './Amt'
 
 function money(n) {
   const v = Math.abs(n)
@@ -147,7 +148,7 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, year, 
               <div className="txlog-sticky-bar">
                 <span>Total {monthName.toLowerCase()} · {sum.count} mov.</span>
                 <span className={`txlog-sticky-total ${isIncome ? 'is-income' : ''}`}>
-                  {sum.count ? sign : ''}{money(sum.total)}
+                  <Amt>{sum.count ? sign : ''}{money(sum.total)}</Amt>
                 </span>
               </div>
             </div>
@@ -155,7 +156,7 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, year, 
               <div className="txlog-summary-main">
                 <span className="txlog-summary-label">Total {monthName.toLowerCase()}</span>
                 <span className={`txlog-summary-total ${isIncome ? 'is-income' : ''}`}>
-                  {sum.count ? sign : ''}{money(sum.total)}
+                  <Amt>{sum.count ? sign : ''}{money(sum.total)}</Amt>
                 </span>
               </div>
               <div className="txlog-summary-stats">
@@ -164,7 +165,7 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, year, 
                   <span className="txlog-stat-label">movimiento{sum.count !== 1 ? 's' : ''}</span>
                 </div>
                 <div className="txlog-stat">
-                  <span className="txlog-stat-value">{sum.count ? money(sum.avg) : '—'}</span>
+                  <span className="txlog-stat-value">{sum.count ? <Amt>{money(sum.avg)}</Amt> : '—'}</span>
                   <span className="txlog-stat-label">media</span>
                 </div>
                 <div className="txlog-stat">
@@ -180,7 +181,7 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, year, 
                         {sum.diff === 0 ? '' : `${Math.abs(sum.pct)}%`}
                       </span>
                       <span className="txlog-stat-label">
-                        vs {prevName.toLowerCase()} ({money(sum.prevTotal)})
+                        vs {prevName.toLowerCase()} (<Amt>{money(sum.prevTotal)}</Amt>)
                       </span>
                     </>
                   )}
@@ -222,7 +223,7 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, year, 
                           {g.items.length > 1 && (
                             <li className="txlog-day-total" aria-label={`Total del día ${money(g.total)}`}>
                               <span>{g.items.length} movimientos</span>
-                              <span>{sign}{money(g.total)}</span>
+                              <span><Amt>{sign}{money(g.total)}</Amt></span>
                             </li>
                           )}
                         </ul>

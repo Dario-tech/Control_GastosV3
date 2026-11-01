@@ -46,57 +46,107 @@ def ensure_goals_tables():
         """)
         # Foto opcional por aportación (data-URL JPEG comprimida en el cliente).
         cur.execute("ALTER TABLE savings_goal_contributions ADD COLUMN IF NOT EXISTS foto TEXT")
+        # Índices aditivos: la PK de members es (goal_id, user_email), así que buscar
+        # "metas de un usuario" y "aportaciones de una meta" no tenía índice útil.
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_goal_contrib_goal ON savings_goal_contributions(goal_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_goal_members_user ON savings_goal_members(user_email)")
+
+
+def _fetch_goals(cur, email: str, goal_id: int | None = None) -> list[dict]:
+    """Metas del usuario (o solo `goal_id`) con miembros y aportaciones.
+
+    Siempre 3 consultas como máximo, sin importar cuántas metas haya (antes eran
+    3 por meta): metas, miembros (ANY) y aportaciones (ANY), agrupadas en Python.
+    Las aportaciones NO llevan la foto (hasta ~800 KB cada una): solo `tiene_foto`;
+    la imagen se pide aparte con GET /api/goals/{id}/contributions/{cid}/foto."""
+    sql = """SELECT g.id, g.nombre, g.objetivo, g.emoji, g.imagen_url, g.fecha::text, g.created_by
+             FROM savings_goals g
+             JOIN savings_goal_members m ON m.goal_id = g.id
+             WHERE m.user_email = %s"""
+    params: list = [email]
+    if goal_id is not None:
+        sql += " AND g.id = %s"
+        params.append(goal_id)
+    cur.execute(sql + " ORDER BY g.created_at DESC", params)
+    goals = [dict(r) for r in cur.fetchall()]
+    if not goals:
+        return goals
+    ids = [g["id"] for g in goals]
+
+    cur.execute(
+        """SELECT m.goal_id, m.user_email, COALESCE(u.name, m.user_email) AS name
+           FROM savings_goal_members m
+           JOIN users u ON u.email = m.user_email
+           WHERE m.goal_id = ANY(%s) ORDER BY m.joined_at""",
+        (ids,),
+    )
+    members_by_goal: dict[int, list[dict]] = {i: [] for i in ids}
+    for r in cur.fetchall():
+        members_by_goal[r["goal_id"]].append({"user_email": r["user_email"], "name": r["name"]})
+
+    # `tiene_foto` se calcula en SQL: la columna foto no viaja a Python.
+    cur.execute(
+        """SELECT c.goal_id, c.id, c.user_email, COALESCE(u.name, c.user_email) AS name,
+                  c.importe, c.created_at::text AS fecha,
+                  (c.foto IS NOT NULL AND c.foto <> '') AS tiene_foto
+           FROM savings_goal_contributions c
+           JOIN users u ON u.email = c.user_email
+           WHERE c.goal_id = ANY(%s) ORDER BY c.created_at DESC""",
+        (ids,),
+    )
+    contribs_by_goal: dict[int, list[dict]] = {i: [] for i in ids}
+    totals: dict[int, object] = {i: 0 for i in ids}
+    for r in cur.fetchall():
+        totals[r["goal_id"]] = totals[r["goal_id"]] + r["importe"]  # Decimal exacto, como SUM() en SQL
+        contribs_by_goal[r["goal_id"]].append({
+            "id": r["id"], "user_email": r["user_email"], "name": r["name"],
+            "importe": float(r["importe"]), "fecha": r["fecha"], "tiene_foto": bool(r["tiene_foto"]),
+        })
+
+    for g in goals:
+        gid = g["id"]
+        g["ahorrado"] = float(totals[gid])
+        members = members_by_goal[gid]
+        g["members"] = [m["user_email"] for m in members]  # compat: lista de emails
+        g["memberNames"] = members  # [{user_email, name}]
+        g["contributions"] = contribs_by_goal[gid]
+    return goals
 
 
 async def get_goals_for_user(email: str) -> list[dict]:
     def _q():
         with db_cursor() as cur:
-            cur.execute(
-                """SELECT g.id, g.nombre, g.objetivo, g.emoji, g.imagen_url, g.fecha::text, g.created_by
-                   FROM savings_goals g
-                   JOIN savings_goal_members m ON m.goal_id = g.id
-                   WHERE m.user_email = %s
-                   ORDER BY g.created_at DESC""",
-                (email,),
-            )
-            goals = [dict(r) for r in cur.fetchall()]
-            for g in goals:
-                cur.execute(
-                    "SELECT COALESCE(SUM(importe), 0) AS total FROM savings_goal_contributions WHERE goal_id = %s",
-                    (g["id"],),
-                )
-                g["ahorrado"] = float(cur.fetchone()["total"])
-                cur.execute(
-                    """SELECT m.user_email, COALESCE(u.name, m.user_email) AS name
-                       FROM savings_goal_members m
-                       JOIN users u ON u.email = m.user_email
-                       WHERE m.goal_id = %s ORDER BY m.joined_at""",
-                    (g["id"],),
-                )
-                members = [dict(r) for r in cur.fetchall()]
-                g["members"] = [m["user_email"] for m in members]  # compat: lista de emails
-                g["memberNames"] = members  # [{user_email, name}]
-                cur.execute(
-                    """SELECT c.id, c.user_email, COALESCE(u.name, c.user_email) AS name,
-                              c.importe, c.created_at::text AS fecha, c.foto
-                       FROM savings_goal_contributions c
-                       JOIN users u ON u.email = c.user_email
-                       WHERE c.goal_id = %s ORDER BY c.created_at DESC""",
-                    (g["id"],),
-                )
-                contributions = [dict(r) for r in cur.fetchall()]
-                for c in contributions:
-                    c["importe"] = float(c["importe"])
-                g["contributions"] = contributions
-            return goals
+            return _fetch_goals(cur, email)
     return await run_in_thread(_q)
 
 
 async def get_goal(goal_id: int, email: str) -> dict:
-    for g in await get_goals_for_user(email):
-        if g["id"] == goal_id:
-            return g
-    raise HTTPException(status_code=404, detail="Meta no encontrada")
+    """Una sola meta (3 consultas), sin recargar todas las del usuario."""
+    def _q():
+        with db_cursor() as cur:
+            return _fetch_goals(cur, email, goal_id)
+    goals = await run_in_thread(_q)
+    if not goals:
+        raise HTTPException(status_code=404, detail="Meta no encontrada")
+    return goals[0]
+
+
+async def get_contribution_foto(goal_id: int, contribution_id: int, email: str) -> str:
+    """Foto (data URL) de una aportación. Solo para miembros de la meta; 404
+    uniforme si la meta/aportación no existe, no se es miembro o no hay foto."""
+    def _q():
+        with db_cursor() as cur:
+            cur.execute(
+                """SELECT c.foto FROM savings_goal_contributions c
+                   JOIN savings_goal_members m ON m.goal_id = c.goal_id AND m.user_email = %s
+                   WHERE c.id = %s AND c.goal_id = %s""",
+                (email, contribution_id, goal_id),
+            )
+            return cur.fetchone()
+    row = await run_in_thread(_q)
+    if not row or not row["foto"]:
+        raise HTTPException(status_code=404, detail="Foto no encontrada")
+    return row["foto"]
 
 
 async def _require_member(goal_id: int, email: str):
@@ -221,21 +271,26 @@ async def delete_contribution(goal_id: int, contribution_id: int, email: str) ->
     return await get_goal(goal_id, email)
 
 
+SHARE_MSG = "Si la cuenta existe, se ha compartido la meta"
+
+
 async def share_goal(goal_id: int, email: str, invite_email: str) -> dict:
+    """Comparte la meta. Respuesta NEUTRA: es idéntica exista o no la cuenta invitada
+    (sin 404 que permita enumerar emails); devuelve la meta + "mensaje"."""
     await _require_member(goal_id, email)
     invite_email = invite_email.strip().lower()
 
     if invite_email == email:
         raise HTTPException(status_code=422, detail="Ya eres miembro de esta meta")
-    if not await get_user(invite_email):
-        raise HTTPException(status_code=404, detail="No existe ninguna cuenta con ese email")
 
-    def _q():
-        with db_cursor() as cur:
-            cur.execute(
-                """INSERT INTO savings_goal_members (goal_id, user_email)
-                   VALUES (%s, %s) ON CONFLICT DO NOTHING""",
-                (goal_id, invite_email),
-            )
-    await run_in_thread(_q)
-    return await get_goal(goal_id, email)
+    if await get_user(invite_email):
+        def _q():
+            with db_cursor() as cur:
+                cur.execute(
+                    """INSERT INTO savings_goal_members (goal_id, user_email)
+                       VALUES (%s, %s) ON CONFLICT DO NOTHING""",
+                    (goal_id, invite_email),
+                )
+        await run_in_thread(_q)
+    goal = await get_goal(goal_id, email)
+    return {**goal, "mensaje": SHARE_MSG}

@@ -1,4 +1,4 @@
-import { Component, lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { wakeBackend } from './services/api'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { AppProvider, useApp } from './context/AppContext'
@@ -7,11 +7,14 @@ import { FinanceDataProvider, useFinanceData, unreadableTxMsg } from './context/
 import Header from './components/layout/Header'
 import BottomNav from './components/layout/BottomNav'
 import ProfilePanel from './components/layout/ProfilePanel'
+import ErrorBoundary, { installPreloadErrorHandler } from './components/ui/ErrorBoundary'
 import Toast from './components/ui/Toast'
 import { TabSkeleton, FormSkeleton } from './components/ui/Skeleton'
 import { usePendingTransaction } from './hooks/usePendingTransaction'
 import { useShortcutIntake } from './hooks/useShortcutIntake'
 import { useTxQueue } from './hooks/useTxQueue'
+import { useThemeColorMeta } from './hooks/useThemeColorMeta'
+import { useViewportInsets } from './hooks/useViewportInsets'
 import LoginScreen from './components/auth/LoginScreen'
 import IntakeLoginBanner from './components/auth/IntakeLoginBanner'
 import YearTab from './components/tabs/YearTab'
@@ -26,6 +29,7 @@ const MonthTab  = lazy(importMonthTab)
 const StatsTab  = lazy(importStatsTab)
 const BudgetTab = lazy(importBudgetTab)
 const CategorizeModal      = lazy(() => import('./components/ui/CategorizeModal'))
+const TransactionSearchModal = lazy(() => import('./components/ui/TransactionSearchModal'))
 const AddTransactionModal  = lazy(() => import('./components/ui/AddTransactionModal'))
 const SpotlightTour        = lazy(() => import('./components/ui/SpotlightTour'))
 
@@ -41,29 +45,6 @@ function prefetchTabs() {
   return () => clearTimeout(id)
 }
 
-class ErrorBoundary extends Component {
-  constructor(props) {
-    super(props)
-    this.state = { error: null }
-  }
-  static getDerivedStateFromError(error) {
-    return { error }
-  }
-  render() {
-    if (this.state.error) {
-      return (
-        <div style={{ padding: 20, background: '#1e2435', color: '#ff5f7e', fontFamily: 'monospace', fontSize: 13, minHeight: '100vh' }}>
-          <h2 style={{ color: '#ff5f7e', marginBottom: 12 }}>Error de renderizado</h2>
-          <pre style={{ whiteSpace: 'pre-wrap', background: '#0f1117', padding: 16, borderRadius: 8 }}>
-            {this.state.error.message}{'\n\n'}{this.state.error.stack}
-          </pre>
-        </div>
-      )
-    }
-    return this.props.children
-  }
-}
-
 function AppContent() {
   const { activeTab, showToast } = useApp()
   const { settings, tourSeen, prefsLoaded, syncNotice, syncWarnings } = useSettings()
@@ -72,6 +53,7 @@ function AppContent() {
   const [profileOpen,    setProfileOpen]    = useState(false)
   const [categorizeOpen, setCategorizeOpen] = useState(false)
   const [addOpen,        setAddOpen]        = useState(false)
+  const [searchOpen,     setSearchOpen]     = useState(false)
   const [guideOpen,      setGuideOpen]      = useState(false)
   const { queue, fetchQueue, categorizePending, discardPending } = usePendingTransaction()
   // Pagos de Apple Pay que llegan por URL desde el Atajo de iOS (?atajo=1…)
@@ -82,6 +64,7 @@ function AppContent() {
   const current = queue[0] ?? null
 
   useEffect(prefetchTabs, [])
+  useEffect(installPreloadErrorHandler, [])
 
   // La guía se enseña una sola vez por usuario: el servidor dice si ya la vio.
   const tourAsked = useRef(false)
@@ -95,6 +78,13 @@ function AppContent() {
   // Avisos de error al guardar cambios en el servidor (con reversión)
   useEffect(() => { if (syncNotice) showToast(syncNotice.msg) }, [syncNotice, showToast])
 
+  // La clase también va en <html>: los modales y hojas que se montan en
+  // document.body (portales) quedan fuera de .app y también deben difuminarse.
+  useEffect(() => {
+    document.documentElement.classList.toggle('hide-amounts', !!settings.hideAmounts)
+    return () => document.documentElement.classList.remove('hide-amounts')
+  }, [settings.hideAmounts])
+
   return (
     <div className={`app${settings.hideAmounts ? ' hide-amounts' : ''}`}>
       <Header
@@ -102,13 +92,15 @@ function AppContent() {
         pendingCount={queue.length}
         onPendingClick={async () => { await fetchQueue(); setCategorizeOpen(true) }}
         onAddClick={() => setAddOpen(true)}
+        onSearchClick={() => setSearchOpen(true)}
       />
       <main className="main">
         {syncWarnings?.map(msg => (
-          <div key={msg} className="sync-warning" role="alert">⚠️ {msg}</div>
+          <div key={msg} className="sync-warning" role="alert"><span aria-hidden="true">⚠️</span><span>{msg}</span></div>
         ))}
-        {txWarning && <div className="sync-warning" role="alert">⚠️ {txWarning}</div>}
-        <ErrorBoundary>
+        {txWarning && <div className="sync-warning" role="alert"><span aria-hidden="true">⚠️</span><span>{txWarning}</span></div>}
+        {/* key con la moneda: al cambiarla se repintan las pantallas con el nuevo símbolo */}
+        <ErrorBoundary key={`${activeTab}-${settings.currency}`} variant="inline">
           <Suspense fallback={<TabSkeleton />}>
             {activeTab === 'year'        && <YearTab />}
             {activeTab === 'month'       && <MonthTab />}
@@ -119,41 +111,60 @@ function AppContent() {
       </main>
       <BottomNav onTabChange={() => setProfileOpen(false)} />
       <Toast />
-      <ProfilePanel
-        open={profileOpen}
-        onClose={() => setProfileOpen(false)}
-        onShowGuide={() => { setProfileOpen(false); setGuideOpen(true) }}
-      />
-      <Suspense fallback={null}>
-        {guideOpen && (
-          <SpotlightTour
-            onFinish={() => setGuideOpen(false)}
-            modalOpen={addOpen || categorizeOpen}
-          />
-        )}
-      </Suspense>
-      <Suspense fallback={<FormSkeleton />}>
-        {intake.received && (
-          <CategorizeModal
-            variant="received"
-            pending={intake.received}
-            total={1}
-            onCategorize={async (...args) => { await categorizePending(...args); intake.dismiss() }}
-            onDiscard={async id => { await discardPending(id); intake.dismiss() }}
-            onSkip={intake.dismiss}
-          />
-        )}
-        {!intake.received && categorizeOpen && current && (
-          <CategorizeModal
-            pending={current}
-            total={queue.length}
-            onCategorize={categorizePending}
-            onDiscard={discardPending}
-            onSkip={() => setCategorizeOpen(false)}
-          />
-        )}
-        {addOpen && <AddTransactionModal onClose={() => setAddOpen(false)} />}
-      </Suspense>
+      <ErrorBoundary onClose={() => setProfileOpen(false)}>
+        <ProfilePanel
+          open={profileOpen}
+          onClose={() => setProfileOpen(false)}
+          onShowGuide={() => { setProfileOpen(false); setGuideOpen(true) }}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary onClose={() => setGuideOpen(false)}>
+        <Suspense fallback={null}>
+          {guideOpen && (
+            <SpotlightTour
+              onFinish={() => setGuideOpen(false)}
+              modalOpen={addOpen || categorizeOpen}
+            />
+          )}
+        </Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary onClose={intake.dismiss}>
+        <Suspense fallback={<FormSkeleton />}>
+          {intake.received && (
+            <CategorizeModal
+              variant="received"
+              pending={intake.received}
+              total={1}
+              onCategorize={async (...args) => { await categorizePending(...args); intake.dismiss() }}
+              onDiscard={async id => { await discardPending(id); intake.dismiss() }}
+              onSkip={intake.dismiss}
+            />
+          )}
+        </Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary onClose={() => setCategorizeOpen(false)}>
+        <Suspense fallback={<FormSkeleton />}>
+          {!intake.received && categorizeOpen && current && (
+            <CategorizeModal
+              pending={current}
+              total={queue.length}
+              onCategorize={categorizePending}
+              onDiscard={discardPending}
+              onSkip={() => setCategorizeOpen(false)}
+            />
+          )}
+        </Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary onClose={() => setSearchOpen(false)}>
+        <Suspense fallback={<FormSkeleton />}>
+          {searchOpen && <TransactionSearchModal onClose={() => setSearchOpen(false)} />}
+        </Suspense>
+      </ErrorBoundary>
+      <ErrorBoundary onClose={() => setAddOpen(false)}>
+        <Suspense fallback={<FormSkeleton />}>
+          {addOpen && <AddTransactionModal onClose={() => setAddOpen(false)} />}
+        </Suspense>
+      </ErrorBoundary>
     </div>
   )
 }
@@ -178,6 +189,9 @@ export default function App() {
   // Despierta el backend en segundo plano en cuanto se abre la app, antes de
   // que el usuario intente guardar algo (Render free tier duerme el servicio).
   useEffect(() => { wakeBackend() }, [])
+  // Zonas seguras: theme-color según el tema y altura del teclado virtual
+  useThemeColorMeta()
+  useViewportInsets()
 
   return (
     <AuthProvider>

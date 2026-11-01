@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { SESSION_EXPIRED_EVENT } from '../services/api'
+import { SESSION_EXPIRED_EVENT, errorDetail, logoutRemote, clearPhotoCache } from '../services/api'
 import { AUTH_KEY as LS_KEY, clearUserData, clearExpiredSession } from '../utils/storageKeys'
 import { hasLegacyData, finalImportBestEffort } from '../utils/legacyImport'
 import { fetchPrefs, putPref } from '../services/prefsApi'
@@ -19,9 +19,27 @@ function friendlyAuthError(e, fallback) {
   return e instanceof Error ? e : new Error(fallback)
 }
 
-function loadStored() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY)) } catch { return null }
+// La clave personal del Atajo (shortcut_token) nunca se guarda en el navegador:
+// se pide al servidor solo al copiarla.
+export function withoutShortcutToken(user) {
+  if (!user || typeof user !== 'object') return user
+  const { shortcut_token, ...rest } = user // eslint-disable-line no-unused-vars
+  return rest
 }
+
+function loadStored() {
+  let raw
+  try { raw = JSON.parse(localStorage.getItem(LS_KEY)) } catch { return null }
+  if (raw && typeof raw === 'object' && 'shortcut_token' in raw) {
+    // Sesión antigua que sí la traía: se limpia y se reescribe sin la clave.
+    raw = withoutShortcutToken(raw)
+    try { localStorage.setItem(LS_KEY, JSON.stringify(raw)) } catch { /* no-op */ }
+  }
+  return raw
+}
+
+// Respuesta 403 de /register o del alta por Google con ALLOW_REGISTER cerrado
+export const REGISTRO_CERRADO = 'El registro está cerrado. Pídele acceso al administrador.'
 
 const AuthCtx = createContext(null)
 
@@ -38,6 +56,7 @@ export function AuthProvider({ children }) {
       // Solo se pierde el token y la caché de finanzas: nunca categorías ni
       // presupuestos antiguos que aún no se hayan importado al servidor.
       clearExpiredSession()
+      clearPhotoCache()
       setUser(null)
       setSessionExpiredMsg('Tu sesión ha caducado. Vuelve a iniciar sesión.')
     }
@@ -46,7 +65,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   function authErrorMessage(res, body, fallback) {
-    if (typeof body?.detail === 'string' && body.detail) return body.detail
+    const detail = errorDetail(body, '')
+    if (detail) return detail
     if (res.status === 429) return 'Demasiados intentos, espera unos minutos'
     return fallback
   }
@@ -68,7 +88,7 @@ export function AuthProvider({ children }) {
       throw new Error(authErrorMessage(res, err, 'Login fallido'))
     }
     const data   = await res.json()
-    const stored = { ...data.user, sessionToken: data.session_token }
+    const stored = { ...withoutShortcutToken(data.user), sessionToken: data.session_token }
     localStorage.setItem(LS_KEY, JSON.stringify(stored))
     setUser(stored)
     return stored
@@ -90,7 +110,7 @@ export function AuthProvider({ children }) {
     if (!res.ok) {
       throw new Error(authErrorMessage(res, data, 'Error de autenticación'))
     }
-    const stored = { ...data.user, sessionToken: data.session_token }
+    const stored = { ...withoutShortcutToken(data.user), sessionToken: data.session_token }
     localStorage.setItem(LS_KEY, JSON.stringify(stored))
     setUser(stored)
     return stored
@@ -109,7 +129,10 @@ export function AuthProvider({ children }) {
   // hay, antes se intenta un último import de mejor esfuerzo (timeout corto, aún
   // con token). Si no se completa, siguen ligadas a su dueño y no se borran.
   function logout() {
-    const finish = () => { clearUserData(); setUser(null) }
+    // Revoca el token en el servidor en segundo plano (mejor esfuerzo, sin esperar):
+    // el token se captura ahora porque clearUserData() lo borra justo después.
+    logoutRemote(user?.sessionToken)
+    const finish = () => { clearUserData(); clearPhotoCache(); setUser(null) }
     if (!user || !hasLegacyData()) { finish(); return }
     return finalImportBestEffort({
       user,

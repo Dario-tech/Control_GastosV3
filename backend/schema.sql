@@ -44,9 +44,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_transactions_user_id_cliente
 CREATE TABLE IF NOT EXISTS pending_transactions (
     id              SERIAL PRIMARY KEY,
     user_email      TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
-    importe         NUMERIC(12,2) NOT NULL,
+    importe         NUMERIC(12,2),          -- LEGADO en claro: NULL en filas nuevas (ver importe_enc)
     fecha           DATE NOT NULL DEFAULT CURRENT_DATE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    importe_enc     BYTEA,                  -- importe cifrado (AES-GCM, encrypt_float)
+    importe_hmac    BYTEA,                  -- HMAC del importe en céntimos (dedup por igualdad)
     comercio_enc    BYTEA,
     comercio_hmac   BYTEA,
     fuente          TEXT,
@@ -57,6 +59,9 @@ ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS comercio_enc    BYTEA;
 ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS comercio_hmac   BYTEA;
 ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS fuente          TEXT;
 ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS id_externo_hmac BYTEA;
+ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS importe_enc     BYTEA;
+ALTER TABLE pending_transactions ADD COLUMN IF NOT EXISTS importe_hmac    BYTEA;
+ALTER TABLE pending_transactions ALTER COLUMN importe DROP NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_pending_user ON pending_transactions(user_email);
 CREATE INDEX IF NOT EXISTS idx_pending_user_created ON pending_transactions(user_email, created_at DESC);
 
@@ -102,6 +107,10 @@ CREATE TABLE IF NOT EXISTS savings_goal_contributions (
     foto       TEXT  -- opcional: data-URL JPEG comprimida en cliente ("álbum de recuerdos")
 );
 
+-- Índices para listar metas/aportaciones sin recorrer la tabla (idempotentes).
+CREATE INDEX IF NOT EXISTS idx_goal_contrib_goal ON savings_goal_contributions(goal_id);
+CREATE INDEX IF NOT EXISTS idx_goal_members_user ON savings_goal_members(user_email);
+
 -- Gastos fijos anuales (IBI, seguro del coche…). meses_reparto: meses concretos
 -- (1-12) en los que se reparte el importe; importe / len(meses_reparto) es lo
 -- que se sugiere apartar cada uno de esos meses, y aparece como gasto fijo
@@ -143,6 +152,14 @@ CREATE TABLE IF NOT EXISTS user_prefs (
     PRIMARY KEY (user_email, kind)
 );
 
+-- Sesiones revocadas (POST /api/auth/logout): jti del JWT y su caducidad. Aditiva e
+-- idempotente; el backend también la crea al arrancar (ensure_revoked_sessions_table)
+-- y la carga en memoria. Las filas caducadas se borran al arrancar.
+CREATE TABLE IF NOT EXISTS revoked_sessions (
+    jti TEXT PRIMARY KEY,
+    exp TIMESTAMPTZ NOT NULL
+);
+
 -- Row Level Security en todas las tablas de public, SIN políticas: bloquea el
 -- acceso por la API REST de Supabase (roles anon/authenticated) a estas tablas.
 -- El backend se conecta como owner de las tablas, que no está sujeto a RLS
@@ -158,3 +175,4 @@ ALTER TABLE public.annual_fixed_expenses      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.merchant_rules             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_categories           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_prefs                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.revoked_sessions           ENABLE ROW LEVEL SECURITY;

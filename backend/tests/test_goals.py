@@ -80,13 +80,22 @@ def test_share_a_uno_mismo_422(fake_db):
     assert _status(goals.share_goal(1, "a@b.com", "  A@B.com ")) == 422
 
 
-def test_share_usuario_inexistente_404(fake_db, monkeypatch):
-    fake_db["cur"] = FakeCursor(fetchone={"x": 1})
+def test_share_usuario_inexistente_respuesta_neutra(fake_db, monkeypatch):
+    """Sin enumeración de emails: una cuenta inexistente responde como si se hubiera compartido
+    (misma forma, con "mensaje") y NO se inserta ningún miembro."""
+    cur = FakeCursor(fetchone={"x": 1})
+    fake_db["cur"] = cur
 
     async def no_user(_):
         return None
+
+    async def fake_get_goal(goal_id, email):
+        return {"id": goal_id, "nombre": "Viaje"}
     monkeypatch.setattr(goals, "get_user", no_user)
-    assert _status(goals.share_goal(1, "a@b.com", "x@y.com")) == 404
+    monkeypatch.setattr(goals, "get_goal", fake_get_goal)
+    r = asyncio.run(goals.share_goal(1, "a@b.com", "x@y.com"))
+    assert r["id"] == 1 and r["mensaje"] == goals.SHARE_MSG
+    assert not any("INSERT INTO savings_goal_members" in q[0] for q in cur.executed)
 
 
 def test_delete_contribution_inexistente_404(fake_db, monkeypatch):
@@ -109,8 +118,6 @@ def test_delete_contribution_creador_borra_cualquiera(fake_db, monkeypatch):
     assert "user_email" not in cur.executed[-1][0]
 
 
-def test_get_goal_no_encontrada(monkeypatch):
-    async def empty(_):
-        return []
-    monkeypatch.setattr(goals, "get_goals_for_user", empty)
+def test_get_goal_no_encontrada(fake_db):
+    fake_db["cur"].fetchall = lambda: []  # la meta no existe o no es miembro: 0 filas
     assert _status(goals.get_goal(9, "a@b.com")) == 404

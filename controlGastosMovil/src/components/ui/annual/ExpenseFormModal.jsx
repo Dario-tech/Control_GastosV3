@@ -4,6 +4,7 @@ import { fmt } from '../../../utils'
 import { MONTH_NAMES } from '../../../data/mockData'
 import { FormScreen, Field, Section, AmountInput, Chips, Segmented, SwitchRow, PrimaryButton, Icon } from '../FormKit'
 import { dueState } from './annualUtils'
+import Amt from '../Amt'
 
 const DUE_TOTAL_DAYS = (m, d) => {
   // Días hasta el próximo vencimiento (solo para la vista previa del formulario).
@@ -28,10 +29,11 @@ const REPARTO_PRESETS = [
   { key: 'm1',  label: 'Solo al vencer', count: 1 },
 ]
 const AVISO_PRESETS = [7, 15, 30].map(v => ({ key: v, label: `${v} días`, value: v }))
-const IMPORTE_QUICK = [100, 250, 500, 1000].map(v => ({ key: v, label: fmt(v), value: v }))
+const IMPORTE_QUICK_VALUES = [100, 250, 500, 1000]
 const sameSet = (a, b) => a.size === b.size && [...a].every(x => b.has(x))
 
 export default function ExpenseFormModal({ expense, onSave, onClose }) {
+  const IMPORTE_QUICK = IMPORTE_QUICK_VALUES.map(v => ({ key: v, label: fmt(v), value: v }))
   useLockBodyScroll()
   const [nombre, setNombre]     = useState(expense?.nombre ?? '')
   const [importe, setImporte]   = useState(expense?.importe != null ? String(expense.importe) : '')
@@ -121,11 +123,11 @@ export default function ExpenseFormModal({ expense, onSave, onClose }) {
             <span className={`fm-preview-name${nombreOk ? '' : ' muted'}`}>{nombreOk ? nombre.trim() : 'Nombre del gasto'}</span>
             <span className="fm-preview-sub">{diaOk ? `${diaNum} de ${MONTH_NAMES[Number(mes) - 1]}` : 'Fecha de vencimiento'}</span>
           </div>
-          <span className="fm-preview-amount tabular">{fmt(importeOk ? importeNum : 0)}</span>
+          <span className="fm-preview-amount tabular"><Amt>{fmt(importeOk ? importeNum : 0)}</Amt></span>
         </div>
         <div className="fm-preview-chips">
           {due && <span className="annual-due-chip"><span aria-hidden="true">{due.icon}</span>{due.label}</span>}
-          {porMes != null && <span className="fm-pill tabular">Equivale a {fmt(porMes)}/mes{cuotas > 0 ? ` · ${cuotas} cuota${cuotas !== 1 ? 's' : ''}` : ''}</span>}
+          {porMes != null && <span className="fm-pill tabular">Equivale a <Amt>{fmt(porMes)}</Amt>/mes{cuotas > 0 ? ` · ${cuotas} cuota${cuotas !== 1 ? 's' : ''}` : ''}</span>}
         </div>
       </div>
 
@@ -216,7 +218,7 @@ export default function ExpenseFormModal({ expense, onSave, onClose }) {
               <p className="fm-error" role="alert"><Icon name="alert" size={15} />Elige al menos un mes.</p>
             ) : importeOk ? (
               <p className="fm-reparto-sum tabular">
-                Apartarás <b>{fmt(importeNum / mesesSel.size)}</b>/mes en {mesesSel.size} mes{mesesSel.size !== 1 ? 'es' : ''}
+                Apartarás <b><Amt>{fmt(importeNum / mesesSel.size)}</Amt></b>/mes en {mesesSel.size} mes{mesesSel.size !== 1 ? 'es' : ''}
               </p>
             ) : null}
           </div>

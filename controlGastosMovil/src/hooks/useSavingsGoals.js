@@ -39,8 +39,9 @@ export function useSavingsGoals() {
   }
 
   async function share(id, email) {
-    await shareGoal(id, email)
+    const res = await shareGoal(id, email)
     await refresh()
+    return res?.mensaje
   }
 
   async function removeContribution(goalId, contributionId) {

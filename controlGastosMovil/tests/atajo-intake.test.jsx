@@ -213,7 +213,7 @@ describe('ShortcutSetupScreen', () => {
     expect(await screen.findByText('✓ Copiado')).toBeTruthy()
 
     fireEvent.click(screen.getAllByRole('tab')[1])
-    // el de segundo plano pide la clave (ver atajo-prompt-clave.test.jsx)
+    // los de segundo plano (con y sin clave): ver atajo-prompt-clave.test.jsx
   })
 })
 

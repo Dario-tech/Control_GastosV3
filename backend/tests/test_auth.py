@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi import HTTPException
-from jose import jwt
+import jwt
 
 from services import auth
 
@@ -37,7 +37,7 @@ def test_jwt_roundtrip():
 
 def test_jwt_expira_en_30_dias():
     p = jwt.decode(auth.create_jwt("a@b.com"), auth.JWT_SECRET, algorithms=["HS256"])
-    delta = datetime.utcfromtimestamp(p["exp"]) - datetime.utcnow()
+    delta = datetime.fromtimestamp(p["exp"], timezone.utc) - datetime.now(timezone.utc)
     assert timedelta(days=29, hours=23) < delta <= timedelta(days=30)
 
 
@@ -78,12 +78,48 @@ def test_jwt_alg_none_rechazado():
     _expect_401(f"Bearer {t}")
 
 
-def test_jwt_sin_sub_da_keyerror():
-    """BUG menor: un token con firma válida pero sin 'sub' provoca KeyError (-> 500), no 401.
-    Solo lo puede forjar quien tenga JWT_SECRET, así que el impacto es bajo."""
-    t = jwt.encode({"exp": datetime.utcnow() + timedelta(days=1)}, auth.JWT_SECRET, algorithm="HS256")
-    with pytest.raises(KeyError):
-        auth.get_current_user(f"Bearer {t}")
+def test_jwt_sin_sub_da_401():
+    t = jwt.encode({"exp": datetime.now(timezone.utc) + timedelta(days=1)}, auth.JWT_SECRET, algorithm="HS256")
+    _expect_401(f"Bearer {t}")
+
+
+def test_jwt_sin_exp_da_401():
+    t = jwt.encode({"sub": "a@b.com"}, auth.JWT_SECRET, algorithm="HS256")
+    _expect_401(f"Bearer {t}")
+
+
+def test_jwt_sub_no_texto_da_401():
+    t = jwt.encode({"sub": 123, "exp": datetime.now(timezone.utc) + timedelta(days=1)},
+                   auth.JWT_SECRET, algorithm="HS256")
+    _expect_401(f"Bearer {t}")
+
+
+def test_jwt_lleva_jti_unico():
+    a = jwt.decode(auth.create_jwt("a@b.com"), auth.JWT_SECRET, algorithms=["HS256"])
+    b = jwt.decode(auth.create_jwt("a@b.com"), auth.JWT_SECRET, algorithms=["HS256"])
+    assert a["jti"] and a["jti"] != b["jti"]
+
+
+def test_jwt_antiguo_sin_jti_sigue_valido():
+    t = jwt.encode({"sub": "a@b.com", "exp": datetime.now(timezone.utc) + timedelta(days=1)},
+                   auth.JWT_SECRET, algorithm="HS256")
+    assert auth.get_current_user(f"Bearer {t}") == "a@b.com"
+
+
+def test_jwt_jti_revocado_da_401():
+    t = auth.create_jwt("a@b.com")
+    p = jwt.decode(t, auth.JWT_SECRET, algorithms=["HS256"])
+    auth._revoked[p["jti"]] = p["exp"]
+    try:
+        _expect_401(f"Bearer {t}")
+    finally:
+        auth._revoked.clear()
+
+
+def test_revocacion_caducada_se_limpia():
+    auth._revoked["viejo"] = 1.0
+    auth._purge_revoked()
+    assert "viejo" not in auth._revoked
 
 
 # ── Verificación de Google (httpx simulado, sin red) ─────────────────────────

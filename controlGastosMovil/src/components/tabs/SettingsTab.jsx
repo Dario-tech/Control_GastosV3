@@ -1,261 +1,78 @@
 import { useState } from 'react'
-import { useSettings, ACCENTS } from '../../context/SettingsContext'
+import { useSettings } from '../../context/SettingsContext'
+import { Section, Row, NavRow, Toggle } from '../profile/ui'
+import AppearanceScreen, { THEMES } from '../profile/AppearanceScreen'
+import CategoriesScreen from '../profile/CategoriesScreen'
+import BudgetAlertsScreen from '../profile/BudgetAlertsScreen'
+import DataScreen from '../profile/DataScreen'
+import HelpScreen from '../profile/HelpScreen'
 
-const THEMES = [
-  { id: 'dark',     name: 'Oscuro' },
-  { id: 'light',    name: 'Claro' },
-  { id: 'pastel',   name: 'Pastel' },
-  { id: 'ocean',    name: 'Océano' },
-  { id: 'sunset',   name: 'Atardecer' },
-  { id: 'forest',   name: 'Bosque' },
-  { id: 'midnight', name: 'Medianoche' },
-  { id: 'auto',     name: 'Auto' },
-]
-
-function ThemeCard({ theme, selected, onSelect }) {
-  return (
-    <button
-      className={`theme-card${selected ? ' active' : ''}`}
-      onClick={() => onSelect(theme.id)}
-      aria-pressed={selected}
-      aria-label={`Tema ${theme.name}`}
-    >
-      <span className={`theme-dot theme-dot-${theme.id}`} />
-      <span className="theme-card-label">
-        <span className="theme-card-name">{theme.name}</span>
-      </span>
-    </button>
-  )
-}
-import { useBudget } from '../../hooks/useBudget'
-import { useApp } from '../../context/AppContext'
-import { sendMonthlyReport } from '../../services/api'
-
-const SUPPORT_EMAIL_DISPLAY = 'soporte@mieconomia.app'
-const SUPPORT_EMAIL_REAL    = 'marioomc00@gmail.com'
-
-function Section({ title, children }) {
-  return (
-    <div className="settings-section">
-      {title && <div className="settings-section-title">{title}</div>}
-      <div className="settings-card">{children}</div>
-    </div>
-  )
+/* «Perfil y ajustes» al estilo de los Ajustes de iOS: una pantalla principal
+   corta (`home`) y una subpantalla por área. ProfilePanel pone la barra
+   superior (atrás/título) y puede controlar `screen`; sin él, el estado es
+   interno. */
+export const SCREENS = {
+  home:       { title: 'Perfil y ajustes' },
+  appearance: { title: 'Apariencia' },
+  categories: { title: 'Categorías' },
+  budget:     { title: 'Presupuestos y alertas' },
+  data:       { title: 'Datos y exportar' },
+  help:       { title: 'Ayuda' },
 }
 
-function Row({ icon, label, last, danger, children }) {
-  return (
-    <div className={`setting-row${last ? ' last' : ''}${danger ? ' danger-row' : ''}`}>
-      <div className="setting-row-left">
-        <span className="setting-icon">{icon}</span>
-        <span className={`setting-label${danger ? ' danger-label' : ''}`}>{label}</span>
-      </div>
-      <div className="setting-row-right">{children}</div>
-    </div>
-  )
+export default function SettingsTab({
+  screen: screenProp, onNavigate, initialScreen = 'home',
+  onOpenShortcut, onShowGuide, onLogout,
+}) {
+  const [inner, setInner] = useState(initialScreen)
+  const screen = screenProp ?? inner
+  const go = onNavigate ?? setInner
+
+  if (screen === 'appearance') return <div className="tab-panel pf-screen"><AppearanceScreen /></div>
+  if (screen === 'categories') return <div className="tab-panel pf-screen"><CategoriesScreen /></div>
+  if (screen === 'budget')     return <div className="tab-panel pf-screen"><BudgetAlertsScreen /></div>
+  if (screen === 'data')       return <div className="tab-panel pf-screen"><DataScreen /></div>
+  if (screen === 'help')       return <div className="tab-panel pf-screen"><HelpScreen onShowGuide={onShowGuide} /></div>
+  return <Home go={go} onOpenShortcut={onOpenShortcut} onLogout={onLogout} />
 }
 
-function Toggle({ value, onChange }) {
-  return (
-    <button
-      className={`s-toggle${value ? ' on' : ''}`}
-      onClick={() => onChange(!value)}
-      role="switch"
-      aria-checked={value}
-    >
-      <span className="s-toggle-thumb" />
-    </button>
-  )
-}
-
-function Segmented({ options, value, onChange }) {
-  return (
-    <div className="s-segmented">
-      {options.map(o => (
-        <button
-          key={o.value}
-          className={`s-seg-btn${value === o.value ? ' active' : ''}`}
-          onClick={() => onChange(o.value)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-
-const TIPO_LABEL = { 'Gasto Variable': 'Variable', 'Gasto Fijo': 'Fijo', 'Ingreso': 'Ingreso' }
-
-export default function SettingsTab() {
-  const { settings, update, customCategories, removeCategory } = useSettings()
-  const { allItems: budgetItems, removeItem } = useBudget()
-  const { showToast } = useApp()
-  const [sendingReport, setSendingReport] = useState(false)
-
-  const customList = ['Gasto Variable', 'Gasto Fijo', 'Ingreso']
-    .flatMap(tipo => (customCategories[tipo] || []).map(c => ({ ...c, tipo })))
-
-  function handleRemoveCategory(tipo, concepto) {
-    if (window.confirm(`¿Eliminar la categoría "${concepto}"? Las transacciones ya guardadas con ella no cambian, pero dejará de aparecer para elegirla en nuevos movimientos.`)) {
-      removeCategory(tipo, concepto)
-    }
-  }
-
-  async function handleSendReport() {
-    setSendingReport(true)
-    try {
-      await sendMonthlyReport()
-      showToast('📧 Informe enviado a tu email')
-    } catch (e) {
-      showToast(e.message.includes('RESEND_API_KEY')
-        ? '⚠️ Envío de email no configurado'
-        : '⚠️ No se pudo enviar el informe')
-    } finally {
-      setSendingReport(false)
-    }
-  }
-
-  function exportData() {
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      budget:     budgetItems,
-      settings,
-    }
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-    const url  = URL.createObjectURL(blob)
-    const a    = Object.assign(document.createElement('a'), {
-      href: url,
-      download: `mi-economia-${new Date().toISOString().slice(0, 10)}.json`,
-    })
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  function clearBudget() {
-    if (window.confirm('¿Eliminar todas las categorías del presupuesto? Esta acción no se puede deshacer.')) {
-      budgetItems.forEach(i => removeItem(i.id))
-    }
-  }
+function Home({ go, onOpenShortcut, onLogout }) {
+  const { settings, update, customCategories } = useSettings()
+  const themeName = THEMES.find(t => t.id === settings.theme)?.name ?? ''
+  const customCount = ['Gasto Variable', 'Gasto Fijo', 'Ingreso']
+    .reduce((n, t) => n + (customCategories?.[t]?.length || 0), 0)
 
   return (
-    <div className="tab-panel">
-
-      <Section title="Temas">
-        <div className="theme-grid">
-          {THEMES.map(t => (
-            <ThemeCard
-              key={t.id}
-              theme={t}
-              selected={settings.theme === t.id}
-              onSelect={v => update('theme', v)}
-            />
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Apariencia">
-        <Row icon="🎨" label="Color de acento" last>
-          <div className="accent-swatches">
-            {ACCENTS.map(a => (
-              <button
-                key={a.id}
-                className={`accent-swatch${settings.accent === a.color ? ' active' : ''}`}
-                style={{ background: a.color }}
-                onClick={() => update('accent', a.color)}
-                title={a.label}
-              />
-            ))}
-          </div>
-        </Row>
-      </Section>
-
-      <Section title="General">
-        <Row icon="👁️" label="Ocultar importes">
-          <Toggle value={settings.hideAmounts} onChange={v => update('hideAmounts', v)} />
-        </Row>
-        <Row icon="💱" label="Moneda" last>
-          <Segmented
-            value={settings.currency}
-            onChange={v => update('currency', v)}
-            options={[
-              { value: 'EUR', label: '€' },
-              { value: 'USD', label: '$' },
-              { value: 'GBP', label: '£' },
-            ]}
-          />
-        </Row>
-      </Section>
-
-      <Section title="Presupuesto">
-        <Row icon="🔔" label="Alertas de gasto">
-          <Toggle value={settings.budgetAlerts} onChange={v => update('budgetAlerts', v)} />
-        </Row>
-        <Row icon="⚠️" label={`Umbral de alerta: ${settings.alertThreshold}%`} last>
-          <input
-            type="range"
-            min="50" max="100" step="5"
-            value={settings.alertThreshold}
-            onChange={e => update('alertThreshold', Number(e.target.value))}
-            className="s-slider"
-            disabled={!settings.budgetAlerts}
-          />
-        </Row>
-      </Section>
-
-      <Section title="Categorías personalizadas">
-        {customList.length === 0 ? (
-          <Row icon="🏷️" label="Aún no has creado ninguna" last>
-            <span className="s-value-text" style={{ fontSize: "var(--fs-xs)" }}>Se crean desde "+ Nueva" al añadir un gasto</span>
-          </Row>
-        ) : (
-          customList.map((c, i) => (
-            <Row
-              key={`${c.tipo}|${c.concepto}|${i}`}
-              icon={c.emoji}
-              label={c.concepto}
-              last={i === customList.length - 1}
-            >
-              <span className="s-value-text" style={{ fontSize: "var(--fs-xs)", marginRight: 6 }}>{TIPO_LABEL[c.tipo]}</span>
-              <button
-                className="s-action-btn danger"
-                onClick={() => handleRemoveCategory(c.tipo, c.concepto)}
-              >
-                Eliminar
-              </button>
-            </Row>
-          ))
+    <div className="tab-panel pf-screen pf-home">
+      <Section>
+        <NavRow id="appearance" icon="🎨" label="Apariencia" value={themeName} onClick={() => go('appearance')} />
+        <NavRow id="categories" icon="🏷️" label="Categorías" value={customCount ? `${customCount} propias` : ''} onClick={() => go('categories')} />
+        <NavRow
+          id="budget" icon="🔔" label="Presupuestos y alertas"
+          value={settings.budgetAlerts ? `Al ${settings.alertThreshold}%` : 'Sin alertas'}
+          onClick={() => go('budget')}
+        />
+        {onOpenShortcut && (
+          <NavRow id="shortcut" icon="📲" label="Pagos automáticos" value="Apple Pay" onClick={onOpenShortcut} />
         )}
+        <NavRow id="data" icon="📤" label="Datos y exportar" onClick={() => go('data')} />
+        <NavRow id="help" icon="❓" label="Ayuda" onClick={() => go('help')} last />
       </Section>
 
-      <Section title="Datos">
-        <Row icon="📤" label="Exportar datos">
-          <button className="s-action-btn" onClick={exportData}>Exportar</button>
-        </Row>
-        <Row icon="📧" label="Informe mensual por email">
-          <button className="s-action-btn" onClick={handleSendReport} disabled={sendingReport}>
-            {sendingReport ? 'Enviando…' : 'Enviar ahora'}
-          </button>
-        </Row>
-        <Row icon="🗑️" label="Borrar presupuesto" danger last>
-          <button className="s-action-btn danger" onClick={clearBudget}>Borrar</button>
+      <div className="pf-bottom">
+      <Section>
+        <Row icon="👁️" label="Ocultar importes" last>
+          <Toggle label="Ocultar importes" value={!!settings.hideAmounts} onChange={v => update('hideAmounts', v)} />
         </Row>
       </Section>
 
-      <Section title="Ayuda">
-        <Row icon="❓" label="¿Tienes dudas o algo no funciona?">
-          <span className="s-value-text" style={{ fontSize: "var(--fs-xs)" }}>Escríbenos</span>
-        </Row>
-        <Row icon="✉️" label="Contacto" last>
-          <a
-            className="s-value-text s-link"
-            href={`mailto:${SUPPORT_EMAIL_REAL}?subject=${encodeURIComponent('Ayuda con Mi Economía')}`}
-          >
-            {SUPPORT_EMAIL_DISPLAY}
-          </a>
-        </Row>
-      </Section>
-
+      {onLogout && (
+        <div className="pf-logout-wrap">
+          <button type="button" className="pf-logout" onClick={onLogout}>Cerrar sesión</button>
+        </div>
+      )}
+      </div>
+      <p className="build-marker-inline" onClick={() => { window.location.href = "/?diag=1" }}>build {__BUILD_SHA__} · {__BUILD_TIME__.slice(0, 16).replace('T', ' ')}</p>
     </div>
   )
 }

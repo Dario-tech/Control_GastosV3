@@ -1,5 +1,20 @@
+import os
 import secrets
+from fastapi import HTTPException
 from .db import db_cursor, run_in_thread
+
+REGISTRO_CERRADO_MSG = "El registro está cerrado. Pídele acceso al administrador."
+
+
+def registration_open() -> bool:
+    """ALLOW_REGISTER=true|1|yes abre el alta de usuarios nuevos (registro con
+    contraseña y primer login con Google). Por defecto, o con cualquier otro valor,
+    está CERRADO. Se lee en cada llamada (no al importar)."""
+    return os.getenv("ALLOW_REGISTER", "").strip().lower() in ("true", "1", "yes")
+
+
+def registro_cerrado_error() -> HTTPException:
+    return HTTPException(status_code=403, detail=REGISTRO_CERRADO_MSG)
 
 
 def ensure_password_column():
@@ -47,18 +62,36 @@ async def create_user_with_password(email: str, name: str, password_hash: str) -
 
 
 async def ensure_user(email: str, name: str) -> dict:
-    """Crea el usuario si no existe; actualiza el nombre si ya existe."""
+    """Alta/entrada por Google. Si el usuario ya existe actualiza el nombre; si es NUEVO
+    solo lo crea con el registro abierto (ALLOW_REGISTER), si no lanza 403.
+
+    Un usuario creado aquí NUNCA tiene password_hash (la columna queda a NULL). Si ya
+    existía una fila con hash (alta previa con contraseña) y entra por Google, el hash
+    no se toca (no es de Google). Riesgo de pre-secuestro: quien registre antes un email
+    ajeno con contraseña conservaría acceso a esa cuenta cuando su dueño entre por
+    Google; con el registro cerrado (por defecto) no hay forma de crear esa fila."""
+    abierto = registration_open()
+
     def _q():
         token = secrets.token_urlsafe(32)
         with db_cursor() as cur:
-            cur.execute(
-                """INSERT INTO users (email, name, shortcut_token) VALUES (%s, %s, %s)
-                   ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
-                   RETURNING email, name, shortcut_token""",
-                (email, name, token),
-            )
+            if abierto:
+                cur.execute(
+                    """INSERT INTO users (email, name, shortcut_token) VALUES (%s, %s, %s)
+                       ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
+                       RETURNING email, name, shortcut_token""",
+                    (email, name, token),
+                )
+            else:
+                cur.execute(
+                    """UPDATE users SET name = %s WHERE email = %s
+                       RETURNING email, name, shortcut_token""",
+                    (name, email),
+                )
             return cur.fetchone()
     row = await run_in_thread(_q)
+    if not row:
+        raise registro_cerrado_error()
     return dict(row)
 
 

@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
-import { postTransaction, suggestEmoji } from '../../services/api'
-import { TYPES, EMOJI_SUGGESTIONS, combineCategories, categoryExists, categoryKey } from '../../data/categories'
+import { postTransaction } from '../../services/api'
+import { TYPES, combineCategories, categoryKey } from '../../data/categories'
 import { isUnusualAmount, fmt, todayLocal, addDaysLocal } from '../../utils'
 import { FormScreen, Field, Section, AmountInput, Chips, PrimaryButton, Icon } from './FormKit'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
@@ -11,7 +11,11 @@ import { useApp } from '../../context/AppContext'
 import { newId } from '../../utils/id'
 import { classifyTxError, txErrorMessage, enqueueTx, MSG_OFFLINE } from '../../utils/txQueue'
 
-export const DUPLICATE_CAT_MSG = 'Ya existe una categoría con ese nombre'
+import { DUPLICATE_CAT_MSG } from './CategoryFields'
+import NewCategorySheet, { NewCategoryButton } from './NewCategorySheet'
+import Amt from './Amt'
+
+export { DUPLICATE_CAT_MSG }
 
 export default function AddTransactionModal({ onClose }) {
   useLockBodyScroll()
@@ -25,19 +29,15 @@ export default function AddTransactionModal({ onClose }) {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState(null)
 
-  // Inline new-category form
+  // Hoja «Nueva categoría»
   const [showNewCat, setShowNewCat] = useState(false)
-  const [newEmoji, setNewEmoji]     = useState('💶')
-  const [newName, setNewName]       = useState('')
-  const [newCatErr, setNewCatErr]   = useState('')
-  const [suggesting, setSuggesting] = useState(false)
 
   const { refresh, data }    = useFinanceData()
   const { showToast }        = useApp()
   // Id de cliente: uno por formulario abierto; se reutiliza en cualquier reintento.
   const clientId             = useRef(null)
   if (!clientId.current) clientId.current = newId()
-  const { customCategories, addCategory } = useSettings()
+  const { customCategories } = useSettings()
   const DEFAULT_CATEGORIES = useCategories()
 
   function handleType(t) { setTipo(t); setStep(2); setShowNewCat(false) }
@@ -63,33 +63,6 @@ export default function AddTransactionModal({ onClose }) {
       setError(txErrorMessage(err))
       setLoading(false)
     }
-  }
-
-  async function handleSuggestEmoji() {
-    const name = newName.trim()
-    if (!name || suggesting) return
-    setSuggesting(true)
-    try {
-      const { emoji } = await suggestEmoji(name)
-      setNewEmoji(emoji)
-    } catch {
-      // silencioso: el usuario sigue pudiendo elegir emoji a mano
-    } finally {
-      setSuggesting(false)
-    }
-  }
-
-  function handleAddNewCat() {
-    const name = newName.trim()
-    if (!name) { setNewCatErr('Escribe un nombre'); return }
-    if (categoryExists(allCats, name) || addCategory(tipo, { concepto: name, emoji: newEmoji }) === false) {
-      setNewCatErr(DUPLICATE_CAT_MSG)
-      return
-    }
-    setShowNewCat(false)
-    setNewName('')
-    setNewCatErr('')
-    handleSubmit(name)
   }
 
   const allCats = tipo ? combineCategories(DEFAULT_CATEGORIES[tipo], customCategories[tipo]) : []
@@ -119,7 +92,7 @@ export default function AddTransactionModal({ onClose }) {
         <>
           {error && <p className="fm-error fm-footer-error" role="alert"><Icon name="alert" size={15} />{error}</p>}
           <PrimaryButton loading={loading} disabled={!canSave} hint={missing} onClick={() => handleSubmit(selected)}>
-            {amtOk ? `Guardar ${fmt(amtNum, Number.isInteger(amtNum) ? 0 : 2)}` : 'Guardar movimiento'}
+            {amtOk ? <>Guardar <Amt>{fmt(amtNum, Number.isInteger(amtNum) ? 0 : 2)}</Amt></> : 'Guardar movimiento'}
           </PrimaryButton>
         </>
       ) : null}
@@ -175,6 +148,7 @@ export default function AddTransactionModal({ onClose }) {
           </Field>
 
           <Section title="Categoría">
+            <NewCategoryButton onClick={() => setShowNewCat(true)} disabled={loading} />
             <div className="fm-grid fm-grid--3" role="radiogroup" aria-label="Categoría">
               {allCats.map(c => {
                 const unusual = amtOk ? isUnusualAmount(data, c.concepto, amtNum) : null
@@ -183,7 +157,7 @@ export default function AddTransactionModal({ onClose }) {
                   <button key={categoryKey(tipo, c.concepto)} type="button" role="radio" aria-checked={sel}
                     className={`fm-tile${sel ? ' selected' : ''}`}
                     disabled={loading}
-                    onClick={() => { setSelected(c.concepto); setShowNewCat(false); setError(null) }}>
+                    onClick={() => { setSelected(c.concepto); setError(null) }}>
                     {unusual && <span className="fm-tile-warn" aria-label="Importe inusual">⚠️</span>}
                     <span className="fm-tile-icon">{c.emoji}</span>
                     <span className="fm-tile-label">{c.concepto}</span>
@@ -191,12 +165,6 @@ export default function AddTransactionModal({ onClose }) {
                   </button>
                 )
               })}
-              {!showNewCat && (
-                <button type="button" className="fm-tile fm-tile--new" onClick={() => setShowNewCat(true)}>
-                  <span className="fm-tile-icon">＋</span>
-                  <span className="fm-tile-label">Nueva</span>
-                </button>
-              )}
             </div>
             {unusualSel && (
               <p className="fm-warn"><span aria-hidden="true">⚠️</span>{unusualSel.ratio}× tu gasto medio en {selected}</p>
@@ -204,33 +172,9 @@ export default function AddTransactionModal({ onClose }) {
           </Section>
 
           {showNewCat && (
-            <div className="fm-card fm-newcat">
-              <span className="fm-label">Nueva categoría</span>
-              <div className="fm-emoji-scroll" role="radiogroup" aria-label="Emoji">
-                {EMOJI_SUGGESTIONS.map(e => (
-                  <button key={e} type="button" role="radio" aria-checked={newEmoji === e}
-                    className={`fm-emoji${newEmoji === e ? ' selected' : ''}`} onClick={() => setNewEmoji(e)}>{e}</button>
-                ))}
-              </div>
-              <div className="fm-newcat-row">
-                <span className="fm-newcat-emoji" aria-hidden="true">{newEmoji}</span>
-                <input className="fm-input" placeholder="Nombre de la categoría" value={newName} maxLength={32}
-                  aria-invalid={!!newCatErr || undefined} aria-label="Nombre de la categoría"
-                  onChange={e => { setNewName(e.target.value); setNewCatErr('') }}
-                  onKeyDown={e => e.key === 'Enter' && handleAddNewCat()} autoFocus />
-                <button type="button" className="fm-icon-btn" onClick={handleSuggestEmoji}
-                  disabled={!newName.trim() || suggesting} aria-label="Sugerir emoji con IA" title="Sugerir emoji con IA">
-                  {suggesting ? <span className="fm-spinner" aria-hidden="true" /> : '✨'}
-                </button>
-              </div>
-              {newCatErr && <p className="fm-error" role="alert"><Icon name="alert" size={15} />{newCatErr}</p>}
-              <div className="fm-sheet-actions">
-                <button type="button" className="fm-secondary" onClick={() => { setShowNewCat(false); setNewName(''); setNewCatErr('') }}>Cancelar</button>
-                <button type="button" className="fm-confirm" onClick={handleAddNewCat} disabled={loading}>
-                  <span>Añadir y guardar</span>
-                </button>
-              </div>
-            </div>
+            <NewCategorySheet tipo={tipo} existing={allCats}
+              onCreated={name => { setSelected(name); setError(null) }}
+              onClose={() => setShowNewCat(false)} />
           )}
         </>
       )}

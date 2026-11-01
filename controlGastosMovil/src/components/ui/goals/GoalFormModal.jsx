@@ -4,6 +4,7 @@ import { fmt } from '../../../utils'
 import { FormScreen, Field, Section, AmountInput, Chips, TileGrid, PrimaryButton } from '../FormKit'
 import { GoalRing } from './GoalRing'
 import { goalRemaining, formatGoalDate, toIso, addMonthsIso } from './goalUtils'
+import Amt from '../Amt'
 
 const GOAL_EMOJIS = ['🎯', '🏖️', '🚗', '🏠', '💍', '🎓', '✈️', '💻', '🛟', '🎁']
 const DATE_SHORTCUTS = [
@@ -13,9 +14,10 @@ const DATE_SHORTCUTS = [
   { key: '2y',  label: '2 años',       iso: () => addMonthsIso(24) },
   { key: 'none', label: 'Sin fecha',   iso: () => '' },
 ]
-const GOAL_QUICK = [1000, 3000, 5000, 10000].map(v => ({ key: v, label: fmt(v), value: v }))
+const GOAL_QUICK_VALUES = [1000, 3000, 5000, 10000]
 
 export default function GoalFormModal({ goal, onSave, onClose }) {
+  const GOAL_QUICK = GOAL_QUICK_VALUES.map(v => ({ key: v, label: fmt(v), value: v }))
   useLockBodyScroll()
   const [nombre, setNombre]     = useState(goal?.nombre ?? '')
   const [objetivo, setObjetivo] = useState(goal?.objetivo != null ? String(goal.objetivo) : '')
@@ -73,11 +75,11 @@ export default function GoalFormModal({ goal, onSave, onClose }) {
           <span className={nombreOk ? '' : 'muted'}>{nombreOk ? nombre.trim() : 'Nombre de tu meta'}</span>
         </div>
         <div className="fm-preview-goal-amounts tabular">
-          <b>{fmt(prevGoal.ahorrado)}</b> / {fmt(prevGoal.objetivo)}
+          <Amt><b>{fmt(prevGoal.ahorrado)}</b> / {fmt(prevGoal.objetivo)}</Amt>
         </div>
         <span className="fm-preview-foot tabular">
           {prevRem.mes != null
-            ? `≈ ${fmt(prevRem.mes)}/mes hasta ${formatGoalDate(fecha)}`
+            ? <>≈ <Amt>{fmt(prevRem.mes)}</Amt>/mes hasta {formatGoalDate(fecha)}</>
             : (fecha ? `Para ${formatGoalDate(fecha)}` : 'Sin fecha límite')}
         </span>
       </div>

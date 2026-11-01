@@ -6,6 +6,7 @@ import { useCategories } from '../../hooks/useCategories'
 import { useSettings } from '../../context/SettingsContext'
 import { fmt } from '../../utils'
 import { FormScreen, Field, Section, AmountInput, Chips, Segmented, TileGrid, PrimaryButton, DangerButton, ConfirmSheet, Icon } from './FormKit'
+import Amt from './Amt'
 
 const TIPOS = [
   { id: 'Gasto Variable', label: 'Variable' },
@@ -20,13 +21,16 @@ function inferTipo(name) {
   return 'Gasto Variable'
 }
 
-const QUICK_LIMITS = [50, 100, 200, 500].map(v => ({ key: v, label: fmt(v), value: v }))
+const QUICK_LIMIT_VALUES = [50, 100, 200, 500]
 
 export default function BudgetModal({ item, onSave, onClose, onDelete }) {
   useLockBodyScroll()
   const isEdit = !!item
   const { customCategories } = useSettings()
-  const filteredCategories = useCategories()
+  // Etiquetas calculadas al renderizar: siguen el cambio de moneda sin recargar.
+  const QUICK_LIMITS = QUICK_LIMIT_VALUES.map(v => ({ key: v, label: fmt(v), value: v }))
+  // Con todas las categorías: un presupuesto de una categoría oculta sigue visible y editable.
+  const filteredCategories = useCategories({ includeHidden: true })
 
   const [tipo, setTipo]           = useState(item?.tipo || inferTipo(item?.name))
   const [selectedCat, setSelectedCat] = useState(
@@ -93,11 +97,11 @@ export default function BudgetModal({ item, onSave, onClose, onDelete }) {
             <span className={`fm-preview-name${selectedCat ? '' : ' muted'}`}>{selectedCat?.concepto || 'Elige una categoría'}</span>
             <span className="fm-preview-sub">{tipo === 'Gasto Fijo' ? 'Gasto fijo' : 'Gasto variable'} · al mes</span>
           </div>
-          <span className="fm-preview-amount tabular">{fmt(limitOk ? limitNum : 0)}</span>
+          <span className="fm-preview-amount tabular"><Amt>{fmt(limitOk ? limitNum : 0)}</Amt></span>
         </div>
         <div className="fm-preview-bar"><div className="fm-preview-bar-fill" style={{ width: '60%', background: color, boxShadow: `0 0 10px ${color}66` }} /></div>
         <span className="fm-preview-foot tabular">
-          {limitOk ? `≈ ${fmt(limitNum / daysInMonth)} al día` : 'Verás cuánto puedes gastar al día'}
+          {limitOk ? <>≈ <Amt>{fmt(limitNum / daysInMonth)}</Amt> al día</> : 'Verás cuánto puedes gastar al día'}
         </span>
       </div>
 

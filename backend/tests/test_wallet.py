@@ -165,37 +165,38 @@ class FakeCursor:
         self._res = []
         if q.startswith("SELECT pg_advisory_xact_lock"):
             return
-        if q.startswith("SELECT id, importe, fecha::text, comercio_enc FROM pending_transactions"):
-            email, ide, _, reciente, importe, chmac = params
+        if q.startswith("SELECT id, importe, importe_enc, fecha::text, comercio_enc FROM pending_transactions"):
+            email, ide, _, reciente, itag, chmac = params
             cands = [
                 p for p in db.pending if p["user_email"] == email and (
                     (ide is not None and p["id_externo_hmac"] == ide
                      and p["created_at"] > db.now - timedelta(hours=24))
-                    or (reciente and round(p["importe"], 2) == round(importe, 2)
+                    or (reciente and p["importe_hmac"] == itag
                         and p["comercio_hmac"] == chmac
                         and p["created_at"] > db.now - timedelta(minutes=2)))
             ]
             cands.sort(key=lambda p: -p["id"])
-            self._res = [{k: cands[0][k] for k in ("id", "importe", "fecha", "comercio_enc")}] if cands else []
+            self._res = [{k: cands[0].get(k) for k in ("id", "importe", "importe_enc", "fecha", "comercio_enc")}] if cands else []
             return
         if q.startswith("INSERT INTO pending_transactions") and "comercio_enc" in q:
-            email, importe, fecha, cenc, chmac, fuente, ide = params
-            row = {"id": db.next_id(), "user_email": email, "importe": round(importe, 2), "fecha": fecha,
-                   "comercio_enc": cenc, "comercio_hmac": chmac, "fuente": fuente,
+            email, ienc, itag, fecha, cenc, chmac, fuente, ide = params
+            row = {"id": db.next_id(), "user_email": email, "importe": None, "importe_enc": ienc,
+                   "importe_hmac": itag, "fecha": fecha, "comercio_enc": cenc, "comercio_hmac": chmac, "fuente": fuente,
                    "id_externo_hmac": ide, "created_at": db.now}
             db.pending.append(row)
-            self._res = [{"id": row["id"], "importe": row["importe"], "fecha": fecha}]
+            self._res = [{"id": row["id"], "fecha": fecha}]
             return
-        if q.startswith("INSERT INTO pending_transactions (user_email, importe"):
-            if len(params) == 4:
-                email, importe, fecha, fuente = params
+        if q.startswith("INSERT INTO pending_transactions (user_email, importe_enc"):
+            if len(params) == 5:
+                email, ienc, itag, fecha, fuente = params
             else:
-                (email, importe, fuente), fecha = params, "2000-01-01"
-            row = {"id": db.next_id(), "user_email": email, "importe": importe, "fecha": fecha,
+                (email, ienc, itag, fuente), fecha = params, "2000-01-01"
+            row = {"id": db.next_id(), "user_email": email, "importe": None, "importe_enc": ienc,
+                   "importe_hmac": itag, "fecha": fecha,
                    "comercio_enc": None, "comercio_hmac": None, "fuente": fuente,
                    "id_externo_hmac": None, "created_at": db.now}
             db.pending.append(row)
-            self._res = [{"id": row["id"], "fecha": fecha, "importe": importe}]
+            self._res = [{"id": row["id"], "fecha": fecha}]
             return
         if q.startswith("SELECT tipo, concepto_enc FROM user_categories"):
             self._res = [c for c in db.user_cats if c["user_email"] == params[0]]
@@ -211,7 +212,7 @@ class FakeCursor:
         if q.startswith("SELECT id, tipo, concepto_enc, importe_enc FROM transactions"):
             self._res = [t for t in db.transactions if t["user_email"] == params[0]]
             return
-        if q.startswith("SELECT id, importe, fecha::text, comercio_enc, comercio_hmac, fuente"):
+        if q.startswith("SELECT id, importe, importe_enc, fecha::text, comercio_enc, comercio_hmac, fuente"):
             self._res = sorted((p for p in db.pending if p["user_email"] == params[0]),
                                key=lambda p: (p["created_at"], p["id"]))
             return
@@ -220,7 +221,7 @@ class FakeCursor:
             self._res = [dict(r, comercio_hmac=k[1]) for k, r in db.rules.items()
                          if k[0] == email and k[1] in tags]
             return
-        if q.startswith("SELECT importe, fecha, comercio_hmac, comercio_enc FROM pending_transactions"):
+        if q.startswith("SELECT id, importe, importe_enc, fecha, comercio_hmac, comercio_enc FROM pending_transactions"):
             pid, email = params
             self._res = [p for p in db.pending if p["id"] == pid and p["user_email"] == email]
             return
@@ -637,7 +638,7 @@ def test_atajo_comercio_cifrado_y_importe_de_cartera(client, db, broadcasts):
     r = _atajo(client, importe="12,40 €", comercio="  Mercadona  ", fecha="2026-10-01")
     assert r.status_code == 200, r.text
     j = r.json()
-    assert j["importe"] == 12.4 and j["comercio"] == "Mercadona" and j["duplicada"] is False
+    assert j == {"id": db.pending[0]["id"], "duplicada": False}
     row = db.pending[0]
     assert row["user_email"] == EMAIL and row["fuente"] == "atajo"
     assert b"Mercadona" not in row["comercio_enc"] and crypto.decrypt_str(row["comercio_enc"]) == "Mercadona"
@@ -686,6 +687,25 @@ def test_atajo_reintento_mismo_id_externo_duplicada(client, db, broadcasts):
     b = _atajo(client, importe="3,20 €", id_externo="disp-1").json()
     assert a["duplicada"] is False and b["duplicada"] is True and a["id"] == b["id"]
     assert len(db.pending) == 1 and broadcasts == [1]
+
+
+def test_atajo_dedup_respuesta_recortada(client, db, broadcasts):
+    j = _atajo(client, importe="12,40 €", comercio="Mercadona", id_externo="x1").json()
+    assert set(j) == {"id", "duplicada"}
+    for k in ("sugerencia", "comercio", "importe"):
+        assert k not in j
+
+
+def test_atajo_dedup_reintento_mismo_id_sin_fugas(client, db, broadcasts):
+    a = _atajo(client, importe=9, comercio="Zara", id_externo="x2").json()
+    b = _atajo(client, importe=9, comercio="Zara", id_externo="x2").json()
+    assert b == {"id": a["id"], "duplicada": True}
+    assert broadcasts == [1]
+
+
+def test_atajo_antiguo_conserva_respuesta(client, db, broadcasts):
+    j = _atajo(client, importe=4, fecha="2026-10-01").json()
+    assert j == {"id": db.pending[0]["id"], "importe": 4.0, "fecha": "2026-10-01"}
 
 
 # ── GET /api/shortcut/token ───────────────────────────────────────────────────
@@ -833,3 +853,43 @@ def test_get_pending_regla_gana_al_diccionario(client, post, db, broadcasts, aut
 def test_sin_comercio_no_consulta_categorias(post, db, broadcasts):
     post({"importe": 5})
     assert not any("user_categories" in q or "user_prefs" in q for q in db.sql)
+
+
+# ── Las respuestas de sesión no llevan shortcut_token ────────────────────────
+
+def test_sesion_no_devuelve_shortcut_token(client, monkeypatch):
+    import main
+    secreto = "SECRETO-SHORTCUT-TOKEN-123"
+
+    async def get_hash(_):
+        return "hash"
+
+    async def get_user(_):
+        return {"name": "Ana", "shortcut_token": secreto}
+
+    async def create(email, name, pw_hash):
+        return {"name": name, "shortcut_token": secreto}
+
+    async def google(_):
+        return {"email": "g@example.com", "name": "G", "picture": "p"}
+
+    async def ensure(email, name):
+        return {"name": name, "shortcut_token": secreto}
+    monkeypatch.setattr(main, "get_password_hash", get_hash)
+    monkeypatch.setattr(main, "get_user", get_user)
+    monkeypatch.setattr(main, "verify_password", lambda pw, h: True)
+    monkeypatch.setattr(main, "hash_password", lambda pw: "h")
+    monkeypatch.setattr(main, "create_user_with_password", create)
+    monkeypatch.setattr(main, "verify_google_token", google)
+    monkeypatch.setattr(main, "ensure_user", ensure)
+
+    respuestas = [
+        client.post("/api/auth/login-email", json={"email": "a@b.com", "password": "x"}),
+        client.post("/api/auth/register", json={"email": "n@b.com", "name": "N", "password": "1234567890"}),
+        client.post("/api/auth/login", json={"token": "g"}),
+    ]
+    for r in respuestas:
+        assert r.status_code == 200, r.text
+        assert "shortcut_token" not in r.text and secreto not in r.text
+        u = r.json()["user"]
+        assert u["email"] and "name" in u and "picture" in u and r.json()["session_token"]

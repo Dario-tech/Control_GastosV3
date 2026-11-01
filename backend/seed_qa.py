@@ -121,8 +121,9 @@ def main():
 
         # Pago pendiente de categorizar (≈34,50€) → la app sugerirá "Comida".
         cur.execute(
-            "INSERT INTO pending_transactions (user_email, importe, fecha) VALUES (%s, %s, %s::date)",
-            (EMAIL, 34.50, "2026-07-10"),
+            "INSERT INTO pending_transactions (user_email, importe_enc, importe_hmac, fecha) "
+            "VALUES (%s, %s, %s, %s::date)",
+            (EMAIL, encrypt_float(34.50), hmac_tag("importe:3450"), "2026-07-10"),
         )
 
         conn.commit()
