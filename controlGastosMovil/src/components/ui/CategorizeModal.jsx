@@ -28,7 +28,7 @@ export function suggestionBadge(suggested, comercio) {
 /* variant="received": hoja "Gasto recibido" que se abre al llegar un pago del
    Atajo de iOS. Con sugerencia, la muestra ya elegida con "Guardar" y
    "Cambiar categoría" (que lleva a la misma rejilla que la campana). */
-export default function CategorizeModal({ pending, total, onCategorize, onSkip, onDiscard, variant = 'queue' }) {
+export default function CategorizeModal({ pending, total, position, onPrev, onNext, onCategorize, onSkip, onDiscard, variant = 'queue' }) {
   const received = variant === 'received'
   const [changing, setChanging] = useState(false)
   const [step, setStep]       = useState(1)
@@ -107,7 +107,13 @@ export default function CategorizeModal({ pending, total, onCategorize, onSkip, 
       <div className="catmodal" role="dialog" aria-modal="true" ref={ref} tabIndex={-1}
         aria-label={title}>
         <div className="catmodal-counter">
-          {received ? 'Gasto recibido' : total > 1 ? `Quedan ${total} pagos por categorizar` : 'Pago pendiente'}
+          {received ? 'Gasto recibido' : total > 1 ? (
+            <>
+              <button type="button" className="catmodal-nav" onClick={onPrev} disabled={loading} aria-label="Pago anterior">‹</button>
+              <span>Pago {position} de {total}</span>
+              <button type="button" className="catmodal-nav" onClick={onNext} disabled={loading} aria-label="Pago siguiente">›</button>
+            </>
+          ) : 'Pago pendiente'}
         </div>
         {comercio && <h2 className="catmodal-merchant">{comercio}</h2>}
         <div className="catmodal-amount">{importeLabel}</div>

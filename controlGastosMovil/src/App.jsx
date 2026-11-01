@@ -61,7 +61,11 @@ function AppContent() {
   // Movimientos guardados sin conexión: se reenvían al volver la red
   useTxQueue({ onChange: finance?.refresh })
 
-  const current = queue[0] ?? null
+  // El usuario puede saltar entre pagos pendientes sin seguir el orden de la cola.
+  const [pendingIdx, setPendingIdx] = useState(0)
+  const safeIdx = Math.min(pendingIdx, Math.max(queue.length - 1, 0))
+  const current = queue[safeIdx] ?? null
+  const movePending = step => setPendingIdx((safeIdx + step + queue.length) % queue.length)
 
   useEffect(prefetchTabs, [])
   useEffect(installPreloadErrorHandler, [])
@@ -90,7 +94,7 @@ function AppContent() {
       <Header
         onAvatarClick={() => setProfileOpen(true)}
         pendingCount={queue.length}
-        onPendingClick={async () => { await fetchQueue(); setCategorizeOpen(true) }}
+        onPendingClick={async () => { await fetchQueue(); setPendingIdx(0); setCategorizeOpen(true) }}
         onAddClick={() => setAddOpen(true)}
         onSearchClick={() => setSearchOpen(true)}
       />
@@ -146,8 +150,12 @@ function AppContent() {
         <Suspense fallback={<FormSkeleton />}>
           {!intake.received && categorizeOpen && current && (
             <CategorizeModal
+              key={current.id}
               pending={current}
               total={queue.length}
+              position={safeIdx + 1}
+              onPrev={() => movePending(-1)}
+              onNext={() => movePending(1)}
               onCategorize={categorizePending}
               onDiscard={discardPending}
               onSkip={() => setCategorizeOpen(false)}
