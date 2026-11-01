@@ -45,7 +45,7 @@ class FakeDB:
     def __init__(self, estructura: str):
         assert estructura in ("nueva", "prod")
         self.estructura = estructura
-        self.cols = {"id", "user_email", "fecha", "tipo", "comentario", "concepto_enc", "importe_enc"}
+        self.cols = {"id", "user_email", "fecha", "tipo", "comentario", "comentario_enc", "concepto_enc", "importe_enc"}
         if estructura == "prod":
             self.cols |= {"concepto", "importe"}
         self.transactions: dict[int, dict] = {}
@@ -105,7 +105,7 @@ class FakeCursor:
             for c, v in zip(cols, vals):
                 row[c] = _numeric_10_2(v) if c == "importe" else v
             self._res = {k: row.get(k) for k in
-                         ("id", "fecha", "tipo", "concepto_enc", "importe_enc", "comentario")}
+                         ("id", "fecha", "tipo", "concepto_enc", "importe_enc", "comentario", "comentario_enc")}
             return
 
         if q.startswith("SELECT id, importe, importe_enc, fecha, comercio_hmac, comercio_enc FROM pending_transactions"):
@@ -259,7 +259,8 @@ def test_categorizar_pendiente(db, client, auth_headers):
                     json={"tipo": "Gasto Variable", "concepto": "Supermercado", "comentario": "semana"})
     assert r.status_code == 200, r.text
     row = db.transactions[r.json()["id"]]
-    assert row["fecha"] == "2026-07-10" and row["comentario"] == "semana"
+    assert row["fecha"] == "2026-07-10"
+    assert crypto.decrypt_str(row["comentario_enc"]) == "semana" and row.get("comentario") is None
     assert _assert_coherente(db, row) == ("Supermercado", 34.5)
     assert 50 not in db.pending
 

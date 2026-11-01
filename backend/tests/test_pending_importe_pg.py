@@ -40,7 +40,7 @@ def pg(monkeypatch):
             comercio_hmac BYTEA, fuente TEXT, id_externo_hmac BYTEA)""")
         c.execute(f"""CREATE TABLE {schema}.transactions (
             id SERIAL PRIMARY KEY, user_email TEXT NOT NULL, fecha DATE NOT NULL DEFAULT CURRENT_DATE,
-            tipo TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now(), comentario TEXT,
+            tipo TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now(), comentario TEXT, comentario_enc BYTEA,
             concepto_enc BYTEA, importe_enc BYTEA)""")
         c.execute(f"""CREATE TABLE {schema}.merchant_rules (
             user_email TEXT, comercio_hmac BYTEA, tipo TEXT, concepto_enc BYTEA,

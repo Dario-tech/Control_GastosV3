@@ -441,22 +441,23 @@ async def categorize_pending(pending_id: int, email: str, tipo: str, concepto: s
                                     detail="El importe debe ser mayor que 0 y no superar 1.000.000")
             importe_enc = encrypt_float(importe)
             nota = _nota_con_comercio(_decrypt_or_none(row.get("comercio_enc")), comentario)
+            nota_enc = encrypt_str(nota) if nota else None  # la nota va cifrada como el resto
             if legacy_plain.enabled():
                 # TEMPORAL (B2, hasta la fase 3 de MIGRACION_QA_A_PROD.md): en PROD
                 # concepto/importe en claro son NOT NULL sin default. Mismo valor
                 # que lo cifrado; nunca se leen.
                 cur.execute(
-                    "INSERT INTO transactions (user_email, fecha, tipo, concepto_enc, importe_enc, comentario, "
+                    "INSERT INTO transactions (user_email, fecha, tipo, concepto_enc, importe_enc, comentario_enc, "
                     "concepto, importe) "
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, fecha::text",
-                    (email, row["fecha"], tipo, concepto_enc, importe_enc, nota,
+                    (email, row["fecha"], tipo, concepto_enc, importe_enc, nota_enc,
                      concepto, importe),
                 )
             else:
                 cur.execute(
-                    "INSERT INTO transactions (user_email, fecha, tipo, concepto_enc, importe_enc, comentario) "
+                    "INSERT INTO transactions (user_email, fecha, tipo, concepto_enc, importe_enc, comentario_enc) "
                     "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, fecha::text",
-                    (email, row["fecha"], tipo, concepto_enc, importe_enc, nota),
+                    (email, row["fecha"], tipo, concepto_enc, importe_enc, nota_enc),
                 )
             tx = cur.fetchone()
             c_hmac = row.get("comercio_hmac")

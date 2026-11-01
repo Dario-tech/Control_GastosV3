@@ -1,10 +1,13 @@
+import logging
 import unicodedata
 from datetime import date as date_type
 from fastapi import HTTPException
 from .db import db_cursor, run_in_thread
-from .crypto import encrypt_str, encrypt_float, decrypt_transaction
+from .crypto import encrypt_str, encrypt_float, decrypt_str, decrypt_transaction, EncryptionNotConfigured
 from . import legacy_plain
 from .importes import redondear_importe
+
+_log = logging.getLogger("uvicorn.error")
 
 
 def ensure_comentario_column():
@@ -15,10 +18,62 @@ def ensure_comentario_column():
 
 def ensure_encrypted_columns():
     """Migración aditiva e idempotente: concepto e importe cifrados en reposo
-    (ver services/crypto.py). tipo, fecha y comentario quedan en claro."""
+    (ver services/crypto.py) y comentario (la nota) también cifrado. tipo y fecha
+    quedan en claro."""
     with db_cursor() as cur:
         cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS concepto_enc BYTEA")
         cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS importe_enc BYTEA")
+        cur.execute("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS comentario_enc BYTEA")
+
+
+def read_comentario(row) -> str:
+    """Nota de una transacción: comentario_enc descifrado; si es NULL (fila antigua
+    sin migrar) la columna en claro. "" si no hay nota o no se puede leer (se
+    registra solo el id, nunca el contenido)."""
+    enc = row.get("comentario_enc")
+    if enc is not None:
+        try:
+            return decrypt_str(bytes(enc))
+        except EncryptionNotConfigured:
+            raise
+        except Exception as e:
+            _log.warning("No se pudo descifrar la nota de la transacción id=%s (%s)",
+                         row.get("id"), type(e).__name__)
+            return ""
+    return row.get("comentario") or ""
+
+
+def _comentario_enc(comentario) -> bytes | None:
+    return encrypt_str(comentario) if comentario else None
+
+
+def backfill_comentarios() -> int:
+    """Cifra las notas antiguas (comentario en claro, comentario_enc NULL) y vacía la
+    columna en claro en la MISMA sentencia: nunca queda sin copia. Idempotente y a
+    prueba de fallos: no rompe el arranque ni registra contenidos (solo contadores).
+    Devuelve cuántas notas ha cifrado."""
+    done = 0
+    try:
+        with db_cursor() as cur:
+            cur.execute(
+                "SELECT id, comentario FROM transactions "
+                "WHERE comentario_enc IS NULL AND comentario IS NOT NULL"
+            )
+            for r in cur.fetchall():
+                try:
+                    cur.execute(
+                        "UPDATE transactions SET comentario_enc = %s, comentario = NULL "
+                        "WHERE id = %s AND comentario_enc IS NULL",
+                        (_comentario_enc(r["comentario"]), r["id"]),
+                    )
+                    done += 1
+                except EncryptionNotConfigured:
+                    raise
+                except Exception as e:
+                    _log.warning("Backfill de notas: fila id=%s omitida (%s)", r["id"], type(e).__name__)
+    except Exception as e:
+        _log.warning("Backfill de notas no completado (%s)", type(e).__name__)
+    return done
 
 
 def ensure_id_cliente():
@@ -214,13 +269,13 @@ async def get_finance_data(email: str, year: int | None = None) -> dict:
                 )
                 years = [r["y"] for r in cur.fetchall()]
                 cur.execute(
-                    "SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario FROM transactions "
+                    "SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario, comentario_enc FROM transactions "
                     "WHERE user_email = %s AND fecha >= make_date(%s, 1, 1) AND fecha < make_date(%s, 1, 1) ORDER BY fecha, id",
                     (email, year, year + 1),
                 )
             else:
                 cur.execute(
-                    "SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario FROM transactions WHERE user_email = %s ORDER BY fecha, id",
+                    "SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario, comentario_enc FROM transactions WHERE user_email = %s ORDER BY fecha, id",
                     (email,),
                 )
             rows = cur.fetchall()
@@ -264,7 +319,7 @@ def _decrypt_and_build(rows, year: int | None = None) -> dict:
             unreadable += 1
             continue  # fila indescifrable: se omite (ya registrada en el log, solo id)
         data_rows.append({"_rowIndex": r["id"], "fecha": r["fecha"], "tipo": r["tipo"],
-                          "concepto": dec[0], "importe": dec[1], "comentario": r["comentario"]})
+                          "concepto": dec[0], "importe": dec[1], "comentario": read_comentario(r)})
     result = _build_finance(data_rows, year)
     result["unreadable"] = unreadable
     return result
@@ -331,7 +386,7 @@ async def search_transactions(
                 params.extend([after_fecha, after_id])
             params.append(SEARCH_BATCH_SIZE)
             cur.execute(
-                f"""SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario
+                f"""SELECT id, fecha::text, tipo, concepto_enc, importe_enc, comentario, comentario_enc
                     FROM transactions WHERE {' AND '.join(clauses)}
                     ORDER BY fecha DESC, id DESC LIMIT %s""",
                 params,
@@ -363,7 +418,8 @@ async def search_transactions(
                 unreadable += 1
                 continue  # fila indescifrable: se omite (ya registrada en el log, solo id)
             concepto, importe = dec[0], abs(dec[1])
-            if q_norm and q_norm not in _plano(concepto) and q_norm not in _plano(row["comentario"]):
+            nota = read_comentario(row)
+            if q_norm and q_norm not in _plano(concepto) and q_norm not in _plano(nota):
                 continue
             results.append({
                 "rowIndex":   row["id"],
@@ -371,7 +427,7 @@ async def search_transactions(
                 "concepto":   concepto,
                 "importe":    importe,
                 "bucket":     _normalize_tipo(row["tipo"], concepto),
-                "comentario": row["comentario"] or "",
+                "comentario": nota,
             })
             if len(results) >= limit:
                 batch_fully_consumed = False
@@ -415,9 +471,9 @@ async def post_transaction(
     concepto_enc = encrypt_str(concepto)
     importe_enc  = encrypt_float(importe)
 
-    cols = ["user_email", "tipo", "concepto_enc", "importe_enc", "comentario"]
+    cols = ["user_email", "tipo", "concepto_enc", "importe_enc", "comentario_enc"]
     vals = ["%s"] * 5
-    params: list = [email, tipo, concepto_enc, importe_enc, comentario]
+    params: list = [email, tipo, concepto_enc, importe_enc, _comentario_enc(comentario)]
     if fecha:
         cols.append("fecha")
         vals.append("%s::date")
@@ -460,7 +516,7 @@ async def post_transaction(
 
 # Columnas editables vía PATCH /api/transactions/{id}. Lista blanca: los nombres
 # de columna nunca salen del cliente, solo los valores (que van parametrizados).
-_EDITABLE_COLUMNS = ("fecha", "tipo", "concepto_enc", "importe_enc", "comentario",
+_EDITABLE_COLUMNS = ("fecha", "tipo", "concepto_enc", "importe_enc", "comentario_enc", "comentario",
                      # TEMPORAL (B2): columnas en claro de PROD; solo se escriben
                      # si legacy_plain.enabled(). Nunca se leen.
                      "concepto", "importe")
@@ -489,7 +545,8 @@ async def update_transaction(tx_id: int, email: str, changes: dict) -> dict:
     if "importe" in changes:
         values["importe_enc"] = encrypt_float(changes["importe"])
     if "comentario" in changes:
-        values["comentario"] = changes["comentario"] or None
+        values["comentario_enc"] = _comentario_enc(changes["comentario"])
+        values["comentario"] = None  # si era una nota antigua en claro, deja de estarlo
     if legacy_plain.enabled():
         # TEMPORAL (B2, hasta la fase 3 de MIGRACION_QA_A_PROD.md): mantener al
         # día las columnas en claro de PROD con el mismo valor que lo cifrado.
@@ -512,7 +569,7 @@ async def update_transaction(tx_id: int, email: str, changes: dict) -> dict:
             cur.execute(
                 f"""UPDATE transactions SET {', '.join(sets)}
                     WHERE id = %s AND user_email = %s
-                    RETURNING id, fecha::text, tipo, concepto_enc, importe_enc, comentario""",
+                    RETURNING id, fecha::text, tipo, concepto_enc, importe_enc, comentario, comentario_enc""",
                 params,
             )
             return cur.fetchone()
@@ -539,7 +596,7 @@ async def update_transaction(tx_id: int, email: str, changes: dict) -> dict:
         # Mismo convenio que /api/finance y la búsqueda: el importe se expone en
         # positivo; el sentido (gasto/ingreso) lo da `tipo`.
         "importe":    abs(float(importe)),
-        "comentario": row["comentario"] or "",
+        "comentario": read_comentario(row),
     }
 
 
@@ -548,8 +605,8 @@ async def update_transaction_comment(row_index: int, email: str, comentario: str
     def _q():
         with db_cursor() as cur:
             cur.execute(
-                "UPDATE transactions SET comentario = %s WHERE id = %s AND user_email = %s",
-                (comentario, row_index, email),
+                "UPDATE transactions SET comentario_enc = %s, comentario = NULL WHERE id = %s AND user_email = %s",
+                (_comentario_enc(comentario), row_index, email),
             )
             return cur.rowcount
 

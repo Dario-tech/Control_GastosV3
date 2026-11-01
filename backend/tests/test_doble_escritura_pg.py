@@ -31,7 +31,7 @@ def _ddl(schema: str, estructura: str) -> list[str]:
                 id SERIAL PRIMARY KEY, user_email TEXT NOT NULL,
                 fecha DATE NOT NULL DEFAULT CURRENT_DATE, tipo TEXT NOT NULL,
                 {_PLAIN if estructura == 'prod' else ''}
-                created_at TIMESTAMPTZ DEFAULT now(), comentario TEXT,
+                created_at TIMESTAMPTZ DEFAULT now(), comentario TEXT, comentario_enc BYTEA,
                 concepto_enc BYTEA, importe_enc BYTEA)""",
         f"""CREATE TABLE {schema}.pending_transactions (
                 id SERIAL PRIMARY KEY, user_email TEXT NOT NULL,

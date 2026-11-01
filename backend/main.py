@@ -21,7 +21,7 @@ load_dotenv()
 
 from services.sheets import (
     get_finance_data, delete_transaction, post_transaction,
-    ensure_comentario_column, update_transaction_comment, ensure_encrypted_columns,
+    ensure_comentario_column, update_transaction_comment, ensure_encrypted_columns, backfill_comentarios,
     update_transaction,
     ensure_search_index, search_transactions, ensure_id_cliente,
 )
@@ -68,7 +68,8 @@ async def lifespan(app: FastAPI):
     ensure_revoked_sessions_table()  # migración aditiva idempotente (sesiones revocadas) + carga en memoria
     ensure_goals_tables()     # migración aditiva idempotente (metas de ahorro compartidas)
     ensure_comentario_column()  # migración aditiva idempotente (comentario libre en transacciones)
-    ensure_encrypted_columns()  # migración aditiva idempotente (concepto/importe cifrados)
+    ensure_encrypted_columns()  # migración aditiva idempotente (concepto/importe/nota cifrados)
+    backfill_comentarios()  # cifra las notas antiguas en claro; nunca rompe el arranque
     ensure_annual_expenses_table()  # migración aditiva idempotente (gastos fijos anuales)
     ensure_id_cliente()  # migración aditiva idempotente (id_cliente: idempotencia del alta)
     ensure_search_index()  # migración aditiva idempotente (índice para paginar la búsqueda)

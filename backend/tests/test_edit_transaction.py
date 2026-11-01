@@ -30,8 +30,8 @@ class FakeTxCursor:
             return
         for col, val in zip(cols, vals):
             row[col] = val
-        self._last = {k: row[k] for k in
-                      ("id", "fecha", "tipo", "concepto_enc", "importe_enc", "comentario")}
+        self._last = {k: row.get(k) for k in
+                      ("id", "fecha", "tipo", "concepto_enc", "importe_enc", "comentario", "comentario_enc")}
 
     def fetchone(self):
         return self._last
@@ -253,3 +253,61 @@ def test_post_importe_enorme_422(client, auth_headers, monkeypatch, raw):
     r = client.post("/api/transaction", headers={**auth_headers, "Content-Type": "application/json"},
                     content='{"importe": %s, "tipo": "Gasto Variable", "concepto": "X"}' % raw)
     assert r.status_code == 422
+
+
+# ── La nota va cifrada ───────────────────────────────────────────────────────
+
+def test_la_nota_se_cifra_y_deja_de_estar_en_claro(client, auth_headers, db, broadcasts):
+    r = _patch(client, auth_headers, {"comentario": "dentista con Ana"})
+    assert r.status_code == 200 and r.json()["comentario"] == "dentista con Ana"
+    sql, params = db.executed[0]
+    assert "dentista con Ana" not in params                 # no viaja en claro a la BD
+    row = db.rows[7]
+    assert row["comentario"] is None                        # la nota antigua en claro se vacía
+    assert crypto.decrypt_str(row["comentario_enc"]) == "dentista con Ana"
+
+
+def test_nota_antigua_en_claro_se_sigue_leyendo():
+    from services.sheets import read_comentario
+    assert read_comentario({"id": 1, "comentario": "cena", "comentario_enc": None}) == "cena"
+    assert read_comentario({"id": 1, "comentario": None, "comentario_enc": None}) == ""
+    assert read_comentario({"id": 1, "comentario": "x", "comentario_enc": crypto.encrypt_str("y")}) == "y"
+
+
+def test_nota_ilegible_no_rompe_y_no_filtra_contenido(caplog):
+    from services.sheets import read_comentario
+    mala = b"\x00" * 40
+    with caplog.at_level("WARNING"):
+        assert read_comentario({"id": 9, "comentario": "secreto-en-claro", "comentario_enc": mala}) == ""
+    assert "id=9" in caplog.text and "secreto" not in caplog.text
+
+
+def test_backfill_cifra_y_vacia_el_claro(monkeypatch):
+    class Cur:
+        def __init__(self):
+            self.updates = []
+            self.rows = [{"id": 1, "comentario": "cena"}, {"id": 2, "comentario": ""}]
+
+        def execute(self, sql, params=None):
+            if sql.lstrip().startswith("SELECT"):
+                return
+            self.updates.append((sql, params))
+
+        def fetchall(self):
+            return self.rows
+
+    cur = Cur()
+
+    class _Ctx:
+        def __enter__(self):
+            return cur
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(sheets_mod, "db_cursor", lambda: _Ctx())
+    assert sheets_mod.backfill_comentarios() == 2
+    sql, (enc, rid) = cur.updates[0]
+    assert "comentario = NULL" in sql and "comentario_enc IS NULL" in sql
+    assert crypto.decrypt_str(enc) == "cena" and rid == 1
+    assert cur.updates[1][1][0] is None  # nota vacía: sin cifrar, queda NULL

@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     tipo         TEXT NOT NULL DEFAULT '',
     concepto_enc BYTEA NOT NULL,
     importe_enc  BYTEA NOT NULL,
-    comentario   TEXT  -- nota libre opcional, se puede añadir al crear o después (sin cifrar)
+    comentario   TEXT,  -- OBSOLETA (notas antiguas en claro); se vacía al migrar a comentario_enc
+    comentario_enc BYTEA  -- nota libre opcional, cifrada como concepto/importe
 );
 CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_email);
 -- Paginación de la búsqueda por (usuario, fecha, id) sin escanear toda la tabla.

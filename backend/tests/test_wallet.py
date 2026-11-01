@@ -226,7 +226,8 @@ class FakeCursor:
             self._res = [p for p in db.pending if p["id"] == pid and p["user_email"] == email]
             return
         if q.startswith("INSERT INTO transactions"):
-            email, fecha, tipo, cenc, ienc, comentario = params
+            email, fecha, tipo, cenc, ienc, comentario_enc = params
+            comentario = crypto.decrypt_str(comentario_enc) if comentario_enc is not None else None
             t = {"id": db.next_id(), "user_email": email, "fecha": fecha, "tipo": tipo,
                  "concepto_enc": cenc, "importe_enc": ienc, "comentario": comentario}
             db.transactions.append(t)
