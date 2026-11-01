@@ -7,6 +7,36 @@ def test_health(client):
     assert r.status_code == 200 and r.json() == {"status": "ok"}
 
 
+def test_health_db_toca_la_bd(client, monkeypatch):
+    import contextlib
+    import main
+    consultas = []
+
+    class _Cur:
+        def execute(self, sql, *a): consultas.append(sql)
+
+    @contextlib.contextmanager
+    def _fake():
+        yield _Cur()
+
+    monkeypatch.setattr(main, "db_cursor", _fake)
+    r = client.get("/api/health/db")
+    assert r.status_code == 200 and r.json() == {"status": "ok", "db": "ok"}
+    assert consultas == ["SELECT 1"]
+
+
+def test_health_db_503_generico_si_la_bd_falla(client, monkeypatch):
+    import main
+
+    def _roto():
+        raise RuntimeError("password=secreto host=db.interno")
+
+    monkeypatch.setattr(main, "db_cursor", _roto)
+    r = client.get("/api/health/db")
+    assert r.status_code == 503 and r.json() == {"status": "error"}
+    assert "secreto" not in r.text
+
+
 PROTEGIDAS = [
     ("get", "/api/auth/me"),
     ("get", "/api/finance"),

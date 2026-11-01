@@ -34,7 +34,7 @@ from services.users import (
     ensure_password_column, get_password_hash, create_user_with_password,
     registration_open, registro_cerrado_error,
 )
-from services.db import init_pool, run_in_thread
+from services.db import init_pool, run_in_thread, db_cursor
 from services import user_data
 from services import legacy_plain
 from services.ratelimit import enforce, reset as ratelimit_reset, client_ip
@@ -241,7 +241,7 @@ class SecurityHeadersMiddleware:
     _FIJAS = ((b"x-content-type-options", b"nosniff"),
               (b"referrer-policy", b"no-referrer"),
               (b"x-frame-options", b"DENY"))
-    _SIN_NOSTORE = ("/api/health", "/api/events")
+    _SIN_NOSTORE = ("/api/health", "/api/health/db", "/api/events")
 
     def __init__(self, app):
         self.app = app
@@ -488,6 +488,20 @@ async def auth_login_email(body: EmailLoginIn, request: Request):
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/health/db")
+async def health_db():
+    """Para el monitor de disponibilidad: despierta Render Y toca la BD, así Supabase
+    (plan gratuito) no la pausa por inactividad. 503 genérico si la BD no responde."""
+    def _q():
+        with db_cursor() as cur:
+            cur.execute("SELECT 1")
+    try:
+        await run_in_thread(_q)
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "error"})
+    return {"status": "ok", "db": "ok"}
 
 
 @app.get("/api/events")
