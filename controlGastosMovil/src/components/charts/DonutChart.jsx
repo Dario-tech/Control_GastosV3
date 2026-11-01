@@ -6,12 +6,10 @@ import { useHideAmounts } from '../../hooks/useHideAmounts'
 import { groupConceptsForMonth } from '../../utils/conceptBreakdown'
 
 const COLORS = ['#5b7cff', '#ff9f43']
-// Por concepto: tonos de la misma familia que el color del tipo en el donut
-// "Todo" (azul = fijos, naranja = variables); el gris es para "Otros".
-const CONCEPT_COLORS = {
-  fijo:     ['#5b7cff', '#7d6bff', '#4aa3ff', '#a08cff', '#3f58d4', '#8a93a6'],
-  variable: ['#ff9f43', '#ffc069', '#ff7f50', '#ffd98c', '#e0762a', '#8a93a6'],
-}
+// Por concepto: un color distinto por categoría (tonos espaciados en el círculo
+// cromático, con la misma viveza que el azul/naranja del donut "Todo") para que
+// se distingan a simple vista. El gris es para "Otros".
+const CONCEPT_COLORS = ['#5b7cff', '#ff9f43', '#2ec4b6', '#ff6b8b', '#a78bfa', '#8a93a6']
 const LABELS = ['Gastos Fijos', 'Gastos Variables']
 
 const CustomTooltip = ({ active, payload, hide }) => {
@@ -42,7 +40,7 @@ export default function DonutChart({ fixed, variable, tipo = 'todo', items, mont
   const byConcept = tipo !== 'todo'
   const rows = byConcept ? groupConceptsForMonth(items, monthIndex) : null
   const total = byConcept ? rows.reduce((s, r) => s + r.value, 0) : fixed + variable
-  const colors = byConcept ? CONCEPT_COLORS[tipo] : COLORS
+  const colors = byConcept ? CONCEPT_COLORS : COLORS
   const data = byConcept
     ? rows.map(r => ({ name: r.name, value: r.value }))
     : [
