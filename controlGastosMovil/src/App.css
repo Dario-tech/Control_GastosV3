@@ -4449,3 +4449,5 @@ html, body, #root, .app { height: 100vh; min-height: 100vh; }
    (hora e isla) y con solo --safe-top los primeros píxeles del título quedaban borrosos. Se suman
    18 px únicamente si el móvil declara zona segura arriba (en móviles sin ella no cambia nada). */
 :root { --safe-top-use: calc(var(--safe-top) + min(var(--safe-top), 1px) * 18); }
+
+.sc-open-shortcuts { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }

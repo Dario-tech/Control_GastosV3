@@ -12,7 +12,7 @@ import { loadIntakeQueue } from '../src/utils/shortcutIntake'
 import { useShortcutIntake } from '../src/hooks/useShortcutIntake'
 import { usePendingTransaction } from '../src/hooks/usePendingTransaction'
 import IntakeLoginBanner from '../src/components/auth/IntakeLoginBanner'
-import ShortcutSetupScreen, { shortcutLinkBase, shortcutTestLink, buildPromptApp, buildPromptBackground, KEY_PLACEHOLDER } from '../src/components/ui/ShortcutSetupScreen'
+import ShortcutSetupScreen, { shortcutLinkBase, SHORTCUTS_URL, buildPromptApp, buildPromptBackground, KEY_PLACEHOLDER } from '../src/components/ui/ShortcutSetupScreen'
 
 const jsonRes = (body, status = 200) =>
   Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }))
@@ -140,68 +140,18 @@ describe('flujo sin sesión', () => {
 })
 
 describe('ShortcutSetupScreen', () => {
-  it('copia el enlace con el origen real de la app y "Probar ahora" abre el enlace de prueba', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
-    const navigate = vi.fn()
-    render(<ShortcutSetupScreen onClose={() => {}} navigate={navigate} />)
-
-    const link = `${window.location.origin}/?atajo=1`
-    expect(shortcutLinkBase()).toBe(link)
-    expect(screen.getByTestId('sc-link').textContent).toBe(link)
-    expect(link).not.toContain(BASE)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Copiar enlace del atajo' }))
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith(link))
-    expect(await screen.findByText('✓ Copiado')).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Probar ahora' }))
-    expect(navigate).toHaveBeenCalledWith(shortcutTestLink())
-    const params = new URL(navigate.mock.calls[0][0]).searchParams
-    expect(params.get('atajo')).toBe('1')
-    expect(params.get('importe')).toBe('1,00 €')
-    expect(params.get('comercio')).toBe('Prueba')
-  })
-
-  it('explica Safari, Codificar URL, Abrir URLs y la automatización Transacción', () => {
+  it('Abrir app / Segundo plano: un único paso con botón «Abrir Atajos» y el prompt (sin enlace, automatización ni prueba aparte)', () => {
     render(<ShortcutSetupScreen onClose={() => {}} />)
-    const text = document.body.textContent
-    for (const s of ['Safari', 'Codificar URL', 'Abrir URLs', 'Transacción', 'Ejecutar inmediatamente', 'Mi Economía', 'Apple Pay del iPhone']) {
-      expect(text).toContain(s)
+    expect(shortcutLinkBase()).toBe(`${window.location.origin}/?atajo=1`)
+    expect(shortcutLinkBase()).not.toContain(BASE)
+    for (const tab of [0, 1]) {
+      fireEvent.click(screen.getAllByRole('tab')[tab])
+      expect(screen.getByTestId('sc-open-shortcuts').getAttribute('href')).toBe(SHORTCUTS_URL)
+      expect(screen.getByTestId('sc-prompt')).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Probar ahora' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Copiar enlace del atajo' })).toBeNull()
+      expect(screen.queryByText('Crea la automatización')).toBeNull()
     }
-    expect(text).not.toMatch(/clave|token|Authorization/i)
-  })
-
-  it('selector de modos accesible: Abrir la app por defecto y cambio a En segundo plano', () => {
-    render(<ShortcutSetupScreen onClose={() => {}} />)
-    expect(screen.getByRole('tablist')).toBeTruthy()
-    const [tabApp, tabFondo] = screen.getAllByRole('tab')
-    expect(tabApp.getAttribute('aria-selected')).toBe('true')
-    expect(tabFondo.getAttribute('aria-selected')).toBe('false')
-    expect(screen.getByText('Importante:')).toBeTruthy() // aviso de Safari solo en modo A
-    fireEvent.click(tabFondo)
-    expect(tabFondo.getAttribute('aria-selected')).toBe('true')
-    expect(screen.queryByText('Importante:')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Probar ahora' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Copiar mi clave' })).toBeNull() // la clave solo en Manual
-    expect(screen.getAllByRole('tab')).toHaveLength(3)
-  })
-
-  it('prompt del modo A lleva el enlace de la app y la fórmula; el de B la API y el marcador, sin token', () => {
-    const a = buildPromptApp()
-    expect(a).toContain(shortcutLinkBase())
-    expect(a).toContain('&importe=')
-    expect(a).toContain('&comercio=')
-    expect(a).toContain('Ejecutar inmediatamente')
-    const b = buildPromptBackground()
-    expect(b).toContain(`${BASE}/api/shortcut/pending`)
-    expect(b).toContain(KEY_PLACEHOLDER)
-    expect(b).not.toMatch(/NO tienes mi clave|No me pidas la clave/)
-    expect(KEY_PLACEHOLDER).toBe('<PEGA_AQUI_TU_CLAVE>')
-    for (const s of ['Recibir', 'Repetir', 'Obtener contenido de URL', 'POST', 'application/json', 'id_externo', 'Esperar', 'ISO 8601', 'Mostrar notificación', 'Ejecutar inmediatamente']) {
-      expect(b).toContain(s)
-    }
-    expect(b).not.toMatch(/eyJ|Bearer/)
   })
 
   it('copia el prompt de cada modo y avisa si no se puede copiar', async () => {
