@@ -3847,6 +3847,20 @@ html, body, #root { min-height: 100vh; min-height: 100dvh; }
 .kb-open .fm-footer { padding-bottom: 14px; }
 .kb-open .modal-sheet, .kb-open .fm-sheet { padding-bottom: 20px; }
 .kb-open .catmodal { padding-bottom: 24px; }
+/* Teclado abierto: formulario compacto. Con medio móvil tapado, el título grande, la ayuda
+   del botón y los márgenes holgados dejaban un campo y medio a la vista. Aquí el título ya
+   va en la cabecera, el fondo es sólido (no se ve la app detrás) y los campos caben. */
+.kb-open .fm-screen { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.kb-open .fm-header { padding-top: calc(4px + var(--safe-top)); padding-bottom: 4px; }
+.kb-open .fm-header-title { opacity: 1; transform: none; }
+.kb-open .fm-heading { display: none; }
+.kb-open .fm-body { gap: 14px; padding-top: 8px; padding-bottom: 16px; }
+.kb-open .fm-body > * { animation: none; }
+.kb-open .fm-amount--lg { padding: 10px 16px; }
+.kb-open .fm-amount--lg .fm-amount-input { font-size: var(--fs-hero); }
+.kb-open .fm-footer { padding-top: 8px; gap: 6px; }
+.kb-open .fm-footer-hint { display: none; }
+.kb-open .fm-primary { min-height: 48px; }
 
 /* Login: cabe en pantallas bajas y respeta isla y barra de inicio */
 .login-screen {

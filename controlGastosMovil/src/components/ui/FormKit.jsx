@@ -65,7 +65,15 @@ export function FormScreen({ title, subtitle, onClose, headerRight, footer, erro
     if (!ref.current?.contains(document.activeElement)) ref.current?.focus({ preventScroll: true })
     const onKey = e => { if (e.key === 'Escape') closeRef.current() }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    // Al enfocar un campo se deja a la vista (el teclado tarda en abrirse y reduce la altura).
+    const onFocusIn = e => {
+      const el = e.target
+      if (!(el instanceof HTMLElement) || !el.matches('input, textarea, select')) return
+      setTimeout(() => { if (document.activeElement === el) el.scrollIntoView?.({ block: 'center', behavior: 'smooth' }) }, 320)
+    }
+    const root = ref.current
+    root?.addEventListener('focusin', onFocusIn)
+    return () => { window.removeEventListener('keydown', onKey); root?.removeEventListener('focusin', onFocusIn) }
   }, [])
 
   return (
