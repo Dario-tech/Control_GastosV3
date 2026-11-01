@@ -10,6 +10,6 @@ jobs:
     steps:
       - name: Ping backend
         run: |
-          status=$(curl -s -o /dev/null -w "%{http_code}" https://control-gastos-api-jflv.onrender.com/api/health)
+          status=$(curl -s -o /dev/null -w "%{http_code}" https://control-gastos-api-jflv.onrender.com/api/health/db)
           echo "Health status: $status"
           [ "$status" = "200" ] || exit 1
