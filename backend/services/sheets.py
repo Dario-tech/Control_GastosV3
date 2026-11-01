@@ -1,3 +1,4 @@
+import unicodedata
 from datetime import date as date_type
 from fastapi import HTTPException
 from .db import db_cursor, run_in_thread
@@ -292,6 +293,12 @@ def _parse_cursor(cursor: str | None) -> tuple[str, int] | None:
         return None
 
 
+def _plano(texto) -> str:
+    """Texto para comparar en la búsqueda: minúsculas y sin tildes ("Jamón" == "jamon")."""
+    s = unicodedata.normalize("NFD", str(texto or "").lower())
+    return "".join(c for c in s if not unicodedata.combining(c))
+
+
 async def search_transactions(
     email: str, q: str = "", tipo: str = "all", cursor: str | None = None, limit: int = 30,
 ) -> dict:
@@ -308,7 +315,7 @@ async def search_transactions(
     el `next_cursor` devuelto ("cargar más").
     """
     limit = max(1, min(limit, 100))
-    q_norm = q.strip().lower()
+    q_norm = _plano(q.strip())
     tipo_pattern = BUCKET_SQL_PATTERN.get(tipo)
     after = _parse_cursor(cursor)
 
@@ -356,7 +363,7 @@ async def search_transactions(
                 unreadable += 1
                 continue  # fila indescifrable: se omite (ya registrada en el log, solo id)
             concepto, importe = dec[0], abs(dec[1])
-            if q_norm and q_norm not in concepto.lower():
+            if q_norm and q_norm not in _plano(concepto) and q_norm not in _plano(row["comentario"]):
                 continue
             results.append({
                 "rowIndex":   row["id"],

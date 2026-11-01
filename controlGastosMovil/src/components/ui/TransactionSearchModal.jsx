@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import { searchTransactions } from '../../services/api'
 import { fmt } from '../../utils'
-import { MONTH_SHORT_LC } from '../../data/mockData'
+import { MONTH_SHORT_LC, MONTH_NAMES } from '../../data/mockData'
 import { useFocusTrap, Icon } from './FormKit'
 import Amt from './Amt'
 
@@ -21,6 +21,26 @@ export function searchErrorMessage(e, fallback = 'No se pudo buscar') {
   }
   if (e instanceof TypeError) return 'Sin conexión con el servidor. Revisa tu conexión e inténtalo de nuevo.'
   return e?.message || fallback
+}
+
+// Agrupa los resultados (ya ordenados del más reciente al más antiguo) por mes:
+// [{ key: '2026-10', label: 'Octubre 2026', count, net, items }]. `net` = ingresos - gastos.
+export function groupByMonth(results) {
+  const groups = []
+  for (const t of results) {
+    const [y, m] = (t.fecha || '').split('-')
+    const key = y && m ? `${y}-${m}` : 'sin-fecha'
+    let g = groups[groups.length - 1]
+    if (!g || g.key !== key) {
+      const name = MONTH_NAMES[parseInt(m, 10) - 1]
+      g = { key, label: name ? `${name} ${y}` : 'Sin fecha', count: 0, net: 0, items: [] }
+      groups.push(g)
+    }
+    g.count += 1
+    g.net += t.bucket === 'income' ? t.importe : -t.importe
+    g.items.push(t)
+  }
+  return groups
 }
 
 export default function TransactionSearchModal({ onClose }) {
@@ -108,6 +128,7 @@ export default function TransactionSearchModal({ onClose }) {
   // Neto de lo mostrado: ingresos suman, gastos restan.
   const shownNet = results.reduce((s, t) => s + (t.bucket === 'income' ? t.importe : -t.importe), 0)
   const hasResults = results.length > 0
+  const groups = groupByMonth(results)
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -128,7 +149,7 @@ export default function TransactionSearchModal({ onClose }) {
             autoComplete="off"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Buscar por concepto…"
+            placeholder="Buscar por concepto o comercio…"
             aria-label="Buscar por concepto"
           />
           <button type="button" className="search-close" onClick={onClose} aria-label="Cerrar búsqueda">
@@ -173,27 +194,38 @@ export default function TransactionSearchModal({ onClose }) {
 
         {!error && !loading && (hasResults || nextCursor) && (
           <div className="search-list">
-            {results.map(t => {
-              const parts = (t.fecha || '').split('-')
-              const day   = parts[2] ?? ''
-              const mIdx  = parts[1] ? parseInt(parts[1], 10) - 1 : 0
-              const isIncome = t.bucket === 'income'
-              return (
-                <div key={t.rowIndex} className="search-row">
-                  <div className="search-date-block">
-                    <span className="search-day">{day}</span>
-                    <span className="search-month-short">{MONTH_SHORT_LC[mIdx] ?? ''}</span>
-                  </div>
-                  <div className="search-info">
-                    <span className="search-concepto">{t.concepto}</span>
-                    {t.comentario && <span className="search-comentario">💬 {t.comentario}</span>}
-                  </div>
-                  <span className={`search-importe ${isIncome ? 'pos' : 'neg'}`}>
-                    {isIncome ? '+' : '-'}{fmt(t.importe)}
+            {groups.map(g => (
+              <section key={g.key} className="search-group" aria-label={g.label}>
+                <header className="search-group-head">
+                  <span className="search-group-title">{g.label}</span>
+                  <span className="search-group-meta">
+                    {g.count} movimiento{g.count !== 1 ? 's' : ''} ·{' '}
+                    <Amt>{g.net < 0 ? '-' : (g.net > 0 ? '+' : '')}{fmt(Math.abs(g.net))}</Amt>
                   </span>
-                </div>
-              )
-            })}
+                </header>
+                {g.items.map(t => {
+                  const parts = (t.fecha || '').split('-')
+                  const day   = parts[2] ?? ''
+                  const mIdx  = parts[1] ? parseInt(parts[1], 10) - 1 : 0
+                  const isIncome = t.bucket === 'income'
+                  return (
+                    <div key={t.rowIndex} className="search-row">
+                      <div className="search-date-block">
+                        <span className="search-day">{day}</span>
+                        <span className="search-month-short">{MONTH_SHORT_LC[mIdx] ?? ''}</span>
+                      </div>
+                      <div className="search-info">
+                        <span className="search-concepto">{t.concepto}</span>
+                        {t.comentario && <span className="search-comentario">💬 {t.comentario}</span>}
+                      </div>
+                      <span className={`search-importe ${isIncome ? 'pos' : 'neg'}`}>
+                        {isIncome ? '+' : '-'}{fmt(t.importe)}
+                      </span>
+                    </div>
+                  )
+                })}
+              </section>
+            ))}
             {moreError && <div className="search-empty search-error" role="alert">{moreError}</div>}
             {nextCursor && (
               <button type="button" className="search-load-more" onClick={loadMore} disabled={loadingMore}>

@@ -556,7 +556,8 @@ def test_categorize_recordar_crea_y_actualiza_regla(client, post, db, broadcasts
     assert r.status_code == 200
     key = (EMAIL, pending_mod.merchant_tag("Mercadona"))
     assert db.rules[key]["hits"] == 1 and crypto.decrypt_str(db.rules[key]["concepto_enc"]) == "Comida"
-    assert db.pending == [] and len(db.transactions) == 1 and db.transactions[0]["comentario"] is None
+    assert db.pending == [] and len(db.transactions) == 1
+    assert db.transactions[0]["comentario"] == "Mercadona"  # el comercio queda como nota
 
     # Siguiente compra en el mismo comercio → sugerencia por regla
     db.now += timedelta(minutes=5)
@@ -568,7 +569,7 @@ def test_categorize_recordar_crea_y_actualiza_regla(client, post, db, broadcasts
                 json={"tipo": "Gasto Fijo", "concepto": "Supermercado", "comentario": "  semanal  "})
     assert db.rules[key]["hits"] == 2 and db.rules[key]["tipo"] == "Gasto Fijo"
     assert crypto.decrypt_str(db.rules[key]["concepto_enc"]) == "Supermercado"
-    assert db.transactions[-1]["comentario"] == "semanal"
+    assert db.transactions[-1]["comentario"] == "Mercadona SA · semanal"
 
 
 def test_categorize_sin_recordar_no_crea_regla(client, post, db, broadcasts, auth_headers):
@@ -893,3 +894,40 @@ def test_sesion_no_devuelve_shortcut_token(client, monkeypatch):
         assert "shortcut_token" not in r.text and secreto not in r.text
         u = r.json()["user"]
         assert u["email"] and "name" in u and "picture" in u and r.json()["session_token"]
+
+
+# ── El comercio queda como nota de la transacción ─────────────────────────────
+
+def test_el_comercio_queda_como_nota(client, post, db, broadcasts, auth_headers):
+    pid = post({"importe": 7.5, "comercio": "El Jamón", "fuente": "wallet"}).json()["id"]
+    client.post(f"/api/pending/{pid}/categorize", headers=auth_headers,
+                json={"tipo": "Gasto Variable", "concepto": "Comida"})
+    assert db.transactions[-1]["comentario"] == "El Jamón"
+
+
+def test_nota_propia_se_conserva_y_comercio_va_delante(client, post, db, broadcasts, auth_headers):
+    pid = post({"importe": 7.5, "comercio": "El Jamón"}).json()["id"]
+    client.post(f"/api/pending/{pid}/categorize", headers=auth_headers,
+                json={"tipo": "Gasto Variable", "concepto": "Comida", "comentario": "cena con Ana"})
+    assert db.transactions[-1]["comentario"] == "El Jamón · cena con Ana"
+
+
+def test_sin_comercio_no_hay_nota(client, post, db, broadcasts, auth_headers):
+    pid = post({"importe": 7.5}).json()["id"]
+    client.post(f"/api/pending/{pid}/categorize", headers=auth_headers,
+                json={"tipo": "Gasto Variable", "concepto": "Comida"})
+    assert db.transactions[-1]["comentario"] is None
+
+
+@pytest.mark.parametrize("comercio,comentario,esperado", [
+    ("El Jamón", None, "El Jamón"),
+    ("  El Jamón  ", "", "El Jamón"),
+    ("El Jamón", "el jamón de Ana", "el jamón de Ana"),   # ya lo incluye
+    ("El Jamón", "regalo", "El Jamón · regalo"),
+    (None, "regalo", "regalo"),
+    (None, None, None),
+    ("", "  ", None),
+    ("X" * 120, "y" * 490, ("X" * 120 + " · " + "y" * 490)[:500]),
+])
+def test_nota_con_comercio(comercio, comentario, esperado):
+    assert pending_mod._nota_con_comercio(comercio, comentario) == esperado

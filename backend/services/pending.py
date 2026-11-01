@@ -199,6 +199,25 @@ def _regla_de(pend: dict, comercio: str | None, reglas) -> bytes | None:
     return marca if marca and marca in reglas else None
 
 
+COMENTARIO_MAX = 500  # mismo tope que el comentario de cualquier transacción
+
+
+def _nota_con_comercio(comercio: str | None, comentario: str | None) -> str | None:
+    """Nota de la transacción creada desde un pendiente: el comercio tal como llegó
+    de Cartera («El Jamón»), para poder encontrarla en la lupa. Si el usuario escribió
+    su propia nota se conserva y el comercio va delante («El Jamón · para el regalo»),
+    salvo que ya lo incluya. Sin comercio, queda solo la nota del usuario (o ninguna)."""
+    comercio = (comercio or "").strip()
+    comentario = (comentario or "").strip()
+    if not comercio:
+        return comentario or None
+    if not comentario:
+        return comercio[:COMENTARIO_MAX]
+    if comercio.casefold() in comentario.casefold():
+        return comentario[:COMENTARIO_MAX]
+    return f"{comercio} · {comentario}"[:COMENTARIO_MAX]
+
+
 # ── Crear ─────────────────────────────────────────────────────────────────────
 
 async def create_pending(email: str, importe: float, fecha: str | None = None,
@@ -421,6 +440,7 @@ async def categorize_pending(pending_id: int, email: str, tipo: str, concepto: s
                 raise HTTPException(status_code=422,
                                     detail="El importe debe ser mayor que 0 y no superar 1.000.000")
             importe_enc = encrypt_float(importe)
+            nota = _nota_con_comercio(_decrypt_or_none(row.get("comercio_enc")), comentario)
             if legacy_plain.enabled():
                 # TEMPORAL (B2, hasta la fase 3 de MIGRACION_QA_A_PROD.md): en PROD
                 # concepto/importe en claro son NOT NULL sin default. Mismo valor
@@ -429,14 +449,14 @@ async def categorize_pending(pending_id: int, email: str, tipo: str, concepto: s
                     "INSERT INTO transactions (user_email, fecha, tipo, concepto_enc, importe_enc, comentario, "
                     "concepto, importe) "
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, fecha::text",
-                    (email, row["fecha"], tipo, concepto_enc, importe_enc, comentario,
+                    (email, row["fecha"], tipo, concepto_enc, importe_enc, nota,
                      concepto, importe),
                 )
             else:
                 cur.execute(
                     "INSERT INTO transactions (user_email, fecha, tipo, concepto_enc, importe_enc, comentario) "
                     "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, fecha::text",
-                    (email, row["fecha"], tipo, concepto_enc, importe_enc, comentario),
+                    (email, row["fecha"], tipo, concepto_enc, importe_enc, nota),
                 )
             tx = cur.fetchone()
             c_hmac = row.get("comercio_hmac")

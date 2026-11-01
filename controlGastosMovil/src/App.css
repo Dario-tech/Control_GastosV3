@@ -1330,6 +1330,12 @@ html.light .s-action-btn  { background: var(--surface2); color: var(--text2); bo
   padding: 6px 14px; font-size: var(--fs-sm); font-weight: 600; color: var(--text2); cursor: pointer; transition: all 0.15s;
 }
 .search-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.search-group-head {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  padding: 8px 2px; background: var(--card, var(--bg)); border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
+}
+.search-group-title { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+.search-group-meta { font-size: var(--fs-xs); color: var(--text2); font-variant-numeric: tabular-nums; }
 .search-row { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 0.5px solid var(--border, rgba(255,255,255,0.06)); }
 .search-date-block { display: flex; flex-direction: column; align-items: center; width: 32px; flex-shrink: 0; }
 .search-day { font-size: var(--fs-md); font-weight: 700; color: var(--text); line-height: 1; }

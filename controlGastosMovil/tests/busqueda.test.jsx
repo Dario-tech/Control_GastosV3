@@ -7,7 +7,7 @@ vi.mock('../src/context/FinanceDataContext', () => ({ useFinanceData: () => ({ d
 vi.mock('../src/context/AuthContext', () => ({ useAuth: () => ({ user: { name: 'Ana Pérez' } }) }))
 
 import { searchTransactions } from '../src/services/api'
-import TransactionSearchModal, { searchErrorMessage } from '../src/components/ui/TransactionSearchModal'
+import TransactionSearchModal, { searchErrorMessage, groupByMonth } from '../src/components/ui/TransactionSearchModal'
 import Header from '../src/components/layout/Header'
 
 const row = (id, concepto, importe, bucket = 'variableExpenses') =>
@@ -103,5 +103,29 @@ describe('searchErrorMessage', () => {
     expect(searchErrorMessage(Object.assign(new Error('x'), { name: 'TimeoutError' }))).toMatch(/despertando/)
     expect(searchErrorMessage(new TypeError('x'))).toMatch(/Sin conexión/)
     expect(searchErrorMessage(new Error('API 500'))).toBe('API 500')
+  })
+})
+
+
+describe('agrupar por mes', () => {
+  const r = (id, fecha, importe, bucket = 'variableExpenses') =>
+    ({ rowIndex: id, fecha, concepto: 'El Jamón', importe, bucket, comentario: 'El Jamón' })
+
+  it('groupByMonth junta por mes con recuento y neto', () => {
+    const g = groupByMonth([r(1, '2026-10-20', 10), r(2, '2026-10-02', 5.5), r(3, '2026-09-30', 8),
+      r(4, '2026-09-01', 20, 'income')])
+    expect(g.map(x => [x.label, x.count, x.net])).toEqual([['Octubre 2026', 2, -15.5], ['Septiembre 2026', 2, 12]])
+    expect(groupByMonth([])).toEqual([])
+    expect(groupByMonth([{ ...r(5, '', 1) }])[0].label).toBe('Sin fecha')
+  })
+
+  it('la lupa pinta un encabezado por mes con su total', async () => {
+    searchTransactions.mockResolvedValue({
+      results: [r(1, '2026-10-20', 10), r(2, '2026-10-02', 5), r(3, '2026-09-30', 8)], next_cursor: null })
+    render(<TransactionSearchModal onClose={() => {}} />)
+    expect(await screen.findByText('Octubre 2026')).toBeTruthy()
+    expect(screen.getByText('Septiembre 2026')).toBeTruthy()
+    expect(screen.getByText(/2 movimientos/)).toBeTruthy()
+    expect(screen.getByText(/1 movimiento ·/)).toBeTruthy()
   })
 })

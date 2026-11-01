@@ -222,3 +222,15 @@ def test_search_sin_ilegibles_unreadable_cero(monkeypatch, client, auth_headers)
     r = client.get("/api/transactions/search", headers=auth_headers)
     assert r.status_code == 200
     assert r.json()["unreadable"] == 0 and r.json()["next_cursor"] is None
+
+
+def test_search_encuentra_por_nota_sin_tildes_ni_mayusculas(monkeypatch, client, auth_headers):
+    a = _ok_row(2, "2026-07-03", "Gasto Variable", "Comida", 7.5)
+    a["comentario"] = "El Jamón"
+    b = _ok_row(1, "2026-06-03", "Gasto Variable", "Ocio", 9.0)
+    b["comentario"] = None
+    fake_db(monkeypatch, sheets_mod, [[a, b], []])
+    r = client.get("/api/transactions/search?q=JAMON", headers=auth_headers)
+    assert r.status_code == 200
+    assert [x["rowIndex"] for x in r.json()["results"]] == [2]
+    assert r.json()["results"][0]["comentario"] == "El Jamón"
