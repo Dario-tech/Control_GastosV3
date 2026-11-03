@@ -70,45 +70,21 @@ Notas: el enlace se abre en Safari, así que tengo que haber iniciado sesión un
 // real, que solo acaba en el portapapeles, nunca en pantalla.
 export function buildPromptBackground(api = BASE, key = KEY_PLACEHOLDER) {
   const url = `${api}/api/shortcut/pending`
-  return `Quiero crear en la app Atajos de iPhone (iOS 17 o posterior) un atajo llamado «Mi Economía (segundo plano)» y una automatización que lo ejecute cada vez que pague con Apple Pay. El atajo NO abre ninguna app: manda el pago directamente a mi servidor y queda como PENDIENTE de revisar. Explícame o guíame paso a paso, usando los nombres de las acciones en español de iOS.
+  return `Crea en la app Atajos un atajo llamado «Mi Economía (segundo plano)» con solo 3 acciones, sin bucles ni condiciones:
 
-PARTE 1. CREAR EL ATAJO
-En Atajos, pestaña «Atajos», toca «+» y ponle de nombre «Mi Economía (segundo plano)». Añade estas acciones, en este orden:
+1. «Recibir» → Transacciones de Cartera.
+2. «Obtener contenido de URL»:
+   - URL: ${url}
+   - Método: POST
+   - Cuerpo de la solicitud: JSON, con 3 campos de tipo Texto:
+     «shortcut_token» = ${key}
+     «importe» = «Importe» de la entrada del atajo
+     «comercio» = «Comercio» de la entrada del atajo
+3. «Mostrar notificación»: «Pago guardado».
 
-1. Acción «Recibir»: configúrala como «Recibir Transacciones de Cartera».
-2. Acción «Texto»: escribe, en este orden y separados por nada (sin espacios): la variable «Fecha actual» con formato de fecha «ISO 8601», la variable «Comercio» (de «Entrada del atajo») y la variable «Importe» (de «Entrada del atajo»). Ese texto es el ID del pago. Se calcula UNA sola vez, aquí, antes de reintentar, para que los reintentos no dupliquen el pago. Pon a esta acción el nombre «ID».
-3. Acción «Repetir»: repetir 3 veces. Dentro del bucle, en este orden:
-   a. Acción «Obtener contenido de URL»:
-      - URL: ${url}
-      - Método: POST
-      - Cabeceras: añade una con nombre «Content-Type» y valor «application/json».
-      - Cuerpo de la solicitud: JSON, con estos campos de tipo texto:
-          «shortcut_token» = ${key}
-          «importe» = la variable «Importe» (de «Entrada del atajo»), como texto, tal cual
-          «comercio» = la variable «Comercio» (de «Entrada del atajo»)
-          «id_externo» = la variable «ID» (el texto del paso 2)
-      - Si la acción tiene «Mostrar más», sube el tiempo de espera (timeout) al máximo posible: el servidor gratuito puede tardar unos 30 segundos en despertar.
-      - Nombre del resultado: «Respuesta».
-   b. Acción «Si»: si la «Respuesta» tiene un valor (es decir, el servidor respondió bien y no hay error):
-      - Acción «Mostrar notificación»: «Pago guardado: [Comercio] [Importe]. Revísalo en Mi Economía.» (Comercio e Importe son variables).
-      - Acción «Detener este atajo» para salir del bucle sin repetir más.
-   c. «Si no» (la respuesta está vacía, tiene un error o la petición falló):
-      - Acción «Esperar» 20 segundos y deja que el bucle haga el siguiente intento.
-   d. «Fin Si».
-4. Fin de «Repetir». Después del bucle (solo se llega aquí si los 3 intentos fallaron):
-   - Acción «Mostrar notificación»: «No se pudo guardar el pago de [Comercio]. Añádelo a mano.»
-   - Opcional, como alternativa: acción «Texto» con la dirección de mi app seguida de ?atajo=1&importe=[Importe codificado]&comercio=[Comercio codificado] y después «Abrir URLs», para abrir mi app con el pago ya rellenado.
+Si no puedes poner algún dato, déjalo vacío y dime cuál. NO la repitas ni la muestres en tus respuestas: mi clave va solo en el campo «shortcut_token».
 
-IMPORTANTE SOBRE LA CLAVE: mi clave personal ya va incluida en este texto, en el campo «shortcut_token» de la acción «Obtener contenido de URL». Úsala tal cual en ese campo. NO la repitas ni la muestres en tus respuestas (ni en resúmenes ni en ejemplos): si necesitas referirte a ella, di «tu clave».
-
-PARTE 2. CREAR LA AUTOMATIZACIÓN
-1. En Atajos, pestaña «Automatización», toca «Nueva automatización» (o «+»).
-2. Elige «Transacción» (Cartera).
-3. Marca mis tarjetas de Cartera (pueden quedar todas las categorías).
-4. Elige «Ejecutar inmediatamente» (NO «Ejecutar tras confirmación»).
-5. Toca «Siguiente» y elige el atajo «Mi Economía (segundo plano)».
-
-Cuando pague, el pago quedará como pendiente y, al entrar en la app, veré la campana con el número de pagos por revisar.`
+Después, en la pestaña «Automatización»: nueva automatización → «Transacción» → mis tarjetas → «Ejecutar inmediatamente» → «Siguiente» → el atajo «Mi Economía (segundo plano)».`
 }
 
 function StepHead({ n, title }) {
