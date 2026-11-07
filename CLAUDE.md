@@ -23,7 +23,7 @@ npm run build     # production build (also runs vite-plugin-pwa)
 npm run preview   # preview a production build
 npm test          # unit tests (vitest + jsdom), in controlGastosMovil/tests/
 ```
-Unit tests live in `controlGastosMovil/tests/` (pure logic in `src/utils` and `src/hooks`, plus render/import regression tests for the split modals). No linter is configured. `check.mjs` is a manual Playwright smoke script (375px, selectors `data-tour="tab-..."`); it needs `npm run dev` running and is not part of `npm test`. Verify changes with `npm test` plus `npm run build`.
+Unit tests live in `controlGastosMovil/tests/` (pure logic in `src/utils` and `src/hooks`, plus render/import regression tests for the split modals). No linter is configured. `check.mjs` is a manual Playwright smoke script (375px, selectors `data-tour="tab-..."`); it needs `npm run dev` running and is not part of `npm test`. Verify changes by running **only the tests related to what you changed** (`npx vitest run tests/<fichero>`; incluye los tests que importen o rendericen los ficheros tocados), no la suite completa con `npm test`, salvo que el usuario la pida. Lanza `npm run build` solo si el cambio puede afectar al build (imports, configuración, dependencias).
 
 ### Backend (`backend/`)
 ```
