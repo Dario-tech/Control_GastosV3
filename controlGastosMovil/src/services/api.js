@@ -401,3 +401,17 @@ export async function getShortcutToken() {
   })
   return apiJson(res)
 }
+
+// ── Importar extracto del banco (CSV) ───────────────────────────────────────
+// Sin `confirmar` es una vista previa (no guarda): devuelve { filas:[{i, estado:
+// 'nueva'|'duplicada'|'error', ...}] }. Con `confirmar: true` guarda las nuevas:
+// { importadas, duplicadas, errores }. Máx. 500 filas por llamada.
+export async function importTransactions(filas, confirmar = false) {
+  const res = await fetch(`${BASE}/api/transactions/import`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify({ filas, confirmar }),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return apiJson(res)
+}
