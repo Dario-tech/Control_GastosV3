@@ -4499,3 +4499,20 @@ html.pastel {
 .sub-concept { font-size: var(--fs-md); color: var(--text); overflow-wrap: anywhere; }
 .sub-freq { font-size: var(--fs-xs); color: var(--text2); }
 .sub-amount { font-size: var(--fs-md); color: var(--text); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+/* Gastos compartidos (Ajustes → Gastos compartidos) */
+.grp-form { display: flex; gap: 10px; padding: 12px 16px; align-items: center; }
+.grp-form .fm-input { flex: 1 1 auto; min-width: 0; }
+.grp-head { display: flex; align-items: center; gap: 12px; padding: 4px 0 8px; }
+.grp-title { margin: 0; font-size: var(--fs-lg); color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.grp-pad { padding: 12px 16px; }
+.grp-balances { list-style: none; margin: 0; padding: 4px 16px 12px; display: flex; flex-direction: column; gap: 6px; }
+.grp-balances li { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-sm); color: var(--text2); font-variant-numeric: tabular-nums; }
+.grp-pos { color: var(--green); font-weight: 600; }
+.grp-neg { color: var(--red); font-weight: 600; }
+.grp-expense { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; }
+.grp-label { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-xs); color: var(--text2); }
+.grp-part { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; font-size: var(--fs-md); color: var(--text); }
+.grp-part-input { width: 110px; flex: 0 0 auto; text-align: right; }
+.grp-share { font-size: var(--fs-sm); color: var(--text2); font-variant-numeric: tabular-nums; }
+.grp-actions { display: flex; gap: 10px; justify-content: flex-end; }
