@@ -1,0 +1,44 @@
+# Resumen de mejoras (rama `feat/mejoras-csv-compartidos-suscripciones-tickets`)
+
+Partiendo de `qa`. Sin merge, sin PR, sin tocar producción ni ejecutar SQL contra ninguna BD remota. Un commit por funcionalidad.
+
+## 1. Importar extractos del banco en CSV — hecho
+- **App:** Ajustes → Datos y exportar → «Importar extracto del banco (CSV)» (`CsvImportScreen.jsx`, `utils/csvImport.js`). Elegir fichero, separador (autodetectado), formato de fecha, cabeceras sí/no, mapear fecha/concepto/importe, «por el signo» (negativo = gasto, positivo = ingreso) o «todo gastos», vista previa, **revisión con duplicados** y confirmación. Límites: 1 MB y 5.000 filas (se envía en trozos de 400).
+- **Backend:** nuevo `POST /api/transactions/import` (`services/import_csv.py`). Sin `confirmar` es solo vista previa; con `confirmar: true` guarda en **una transacción** las filas nuevas, con `concepto_enc`/`importe_enc` cifrados (y doble escritura B2 si `legacy_plain` está activo, igual que `post_transaction`). Importes con `parse_importe` (el mismo de `/api/pending`), fecha con `parse_fecha`, tipo de la lista blanca, concepto ≤ 60. Duplicado = misma fecha + importe + comercio (sin mayúsculas ni espacios de más) ya guardados; cuenta ocurrencias, así dos cafés iguales el mismo día solo se marcan si ya había dos. El servidor repite la comprobación al confirmar. Rate limit 20/min y 300/día por usuario, cuerpo ≤ 160 KB, ≤ 500 filas por petición.
+- Los gastos importados entran como «Gasto Variable» (el CSV no trae categoría); se recategorizan después.
+
+## 2. Calendario de suscripciones — hecho
+- Ajustes → **Suscripciones** (`SubscriptionsScreen.jsx`, `utils/subscriptions.js`). Reutiliza `/api/recurring` y `cleanRecurring` (excluye ingresos y caducados, corrige fechas pasadas). Muestra total mensual y anual (equivalente por frecuencia) y la próxima renovación de cada una, ordenadas por fecha. **Sin cambios de backend ni de esquema.**
+
+## 3. Gastos compartidos — hecho (v1 mínima)
+- Diseño previo en `docs-diseno-gastos-compartidos.md` (commit aparte) y seguido tal cual.
+- **Backend:** `services/groups.py` + 9 endpoints `/api/groups…` en `main.py`. Grupos con miembros ya registrados (invitación por email con respuesta neutra), gastos con pagador y reparto igual o por importes (suma exacta, en céntimos), pagos entre miembros y saldo «quién debe a quién» (deudas simplificadas). Toda consulta filtra por pertenencia (no miembro = 404 idéntico a inexistente); nombre del grupo, concepto, importes y partes **cifrados**. Rate limits en escrituras, creación e invitaciones.
+- **App:** Ajustes → **Gastos compartidos** (`GroupsScreen.jsx`).
+- **Fuera de v1** (documentado en el diseño): editar un gasto, salir/expulsar miembros, otras monedas, porcentajes, convertir tu parte en movimiento propio.
+
+## 4. Captura de tickets con IA — hecho
+- **Backend:** `POST /api/ticket-scan` (`services/ticket_scan.py`) y `GET /api/ticket-scan/status`. Imagen en base64 (JPG/PNG/WebP, tipo comprobado por los primeros bytes, ≤ ~1 MB, cuerpo ≤ 1,5 MB) → Claude con salida estructurada → importe/comercio/fecha pasados por `parse_importe`/`clean_comercio`/`parse_fecha`. **No guarda nada**: ni la imagen (solo en memoria) ni el resultado; los logs solo llevan el tipo de excepción. Rate limit 3/min, 15/h y 40/día por usuario. Sin `ANTHROPIC_API_KEY` responde 503 y la app lo explica sin ofrecer subir nada.
+- **App:** Ajustes → **Escanear ticket**: pantalla de aviso («la foto se envía a un servicio externo, la API de Claude») **antes** de poder elegir foto → foto reducida a JPEG en el móvil (quita EXIF/ubicación) → propuesta editable → solo al pulsar «Crear pendiente» se llama a `POST /api/pending` (reutilizado); luego se categoriza con el flujo de pendientes de siempre.
+- El modelo usa el mismo identificador que `ai_categorize.py`; se puede cambiar con la variable opcional `TICKET_SCAN_MODEL` (un modelo más barato con visión sería recomendable; no se ha cambiado sin confirmar el identificador disponible en la cuenta).
+
+## Tests ejecutados
+- Backend (`pytest`): `test_import_csv`, `test_groups`, `test_ticket_scan`, `test_seed_y_schema`, `test_goals`, `test_hardening_api`, `test_api`, `test_seguridad_bloque_a`, `test_mejoras_revision`, `test_ratelimit` → todos pasan. `test_groups_pg` y `test_goals_pg` (9 + los de metas) contra un **Postgres 16 local desechable**: pasan; además `schema.sql` se aplicó dos veces seguidas en una BD local sin errores (idempotente) y las 5 tablas nuevas quedan con RLS.
+- Frontend (`vitest`, solo los relacionados): `csv-import`, `csv-import-pantalla`, `suscripciones`, `suscripciones-pantalla`, `gastos-compartidos`, `gastos-compartidos-pantalla`, `ticket-ia`, `ticket-imagen`, `perfil-panel`, `ajustes-*` (4), `exportar-datos` → todos pasan. `npm run build` correcto.
+- No se ha probado con la API real de Anthropic (sin clave en este entorno) ni en un móvil real: la parte de cámara/IA está probada con dobles. Conviene una prueba manual en QA.
+
+## A aplicar a mano en QA / producción
+1. **Esquema (gastos compartidos).** El backend crea las tablas al arrancar (`ensure_groups_tables`), pero si se prefiere aplicar a mano, es el bloque «Gastos compartidos en grupo» de `backend/schema.sql` (5 tablas `CREATE TABLE IF NOT EXISTS` + 3 índices) y estas líneas de RLS:
+   ```sql
+   ALTER TABLE public.expense_groups        ENABLE ROW LEVEL SECURITY;
+   ALTER TABLE public.expense_group_members ENABLE ROW LEVEL SECURITY;
+   ALTER TABLE public.group_expenses        ENABLE ROW LEVEL SECURITY;
+   ALTER TABLE public.group_expense_shares  ENABLE ROW LEVEL SECURITY;
+   ALTER TABLE public.group_settlements     ENABLE ROW LEVEL SECURITY;
+   ```
+   Importar CSV, suscripciones y tickets **no** cambian el esquema.
+2. **Variables de entorno:** ninguna obligatoria. `ANTHROPIC_API_KEY` (ya existente) activa también la lectura de tickets; `TICKET_SCAN_MODEL` (opcional) fija el modelo.
+3. Recordar que `DB_ENCRYPTION_KEY` debe ser la misma en QA/PROD de cada entorno: los gastos compartidos se cifran con ella.
+
+## Pendiente / a decidir
+- Ningún bloque ha quedado en `PENDIENTE-*.md`. Decisiones abiertas menores: modelo de IA más barato para tickets; si los gastos compartidos deben poder salir de un grupo / generar un movimiento propio; si el importador debe asignar categoría por reglas (hoy todo entra como Gasto Variable).
+- Límite de coste de la IA: hoy solo por usuario (40 llamadas/día); no hay tope global.
