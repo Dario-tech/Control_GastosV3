@@ -4480,3 +4480,6 @@ html.pastel {
   --chart-5: #f9a1b0;
   --chart-other: #d6c6d3;
 }
+
+/* Selector iPhone / Android de «Pagos automáticos»: dos botones (el de modo tiene tres). */
+.sc-modes.sc-platform { grid-template-columns: 1fr 1fr; }
