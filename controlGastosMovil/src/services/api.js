@@ -440,3 +440,21 @@ export const deleteGroupExpense = (id, expenseId) => groupsCall(`/${id}/expenses
 export const addGroupSettlement = (id, { de, a, importe, fecha }) =>
   groupsCall(`/${id}/settlements`, 'POST', { de, a, importe, fecha })
 export const deleteGroupSettlement = (id, settlementId) => groupsCall(`/${id}/settlements/${settlementId}`, 'DELETE')
+
+// ── Captura de tickets con IA ───────────────────────────────────────────────
+export async function fetchTicketScanStatus() {
+  const res = await fetch(`${BASE}/api/ticket-scan/status`, { headers: authHeaders(), signal: AbortSignal.timeout(15000) })
+  return apiJson(res)
+}
+
+// Manda la foto (data-URL JPEG ya comprimida) a leer. NO guarda nada: devuelve la
+// propuesta { importe, comercio, fecha } (campos que no se leyeron = null).
+export async function scanTicket(imagen) {
+  const res = await fetch(`${BASE}/api/ticket-scan`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify({ imagen }),
+    signal:  AbortSignal.timeout(60000),
+  })
+  return apiJson(res)
+}

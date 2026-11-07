@@ -4516,3 +4516,10 @@ html.pastel {
 .grp-part-input { width: 110px; flex: 0 0 auto; text-align: right; }
 .grp-share { font-size: var(--fs-sm); color: var(--text2); font-variant-numeric: tabular-nums; }
 .grp-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* Escanear ticket (Ajustes → Escanear ticket) */
+.tk-pad { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; }
+.tk-text { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--text2); }
+.tk-pick { position: relative; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.tk-pick.disabled { opacity: 0.45; pointer-events: none; }
+.tk-file { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
