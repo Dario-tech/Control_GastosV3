@@ -4480,3 +4480,42 @@ html.pastel {
   --chart-5: #f9a1b0;
   --chart-other: #d6c6d3;
 }
+
+/* Selector iPhone / Android de «Pagos automáticos»: dos botones (el de modo tiene tres). */
+.sc-modes.sc-platform { grid-template-columns: 1fr 1fr; }
+
+/* Calendario de suscripciones (Ajustes → Suscripciones) */
+.sub-totals { display: flex; gap: 12px; padding: 14px 16px; }
+.sub-total { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sub-total-label { font-size: var(--fs-xs); color: var(--text2); }
+.sub-total-value { font-size: var(--fs-xl, 22px); color: var(--text); font-variant-numeric: tabular-nums; }
+.sub-list { list-style: none; margin: 0; padding: 0; }
+.sub-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); min-height: 56px; }
+.sub-item:last-child { border-bottom: none; }
+.sub-date { display: flex; flex-direction: column; width: 84px; flex-shrink: 0; }
+.sub-date-day { font-size: var(--fs-sm); color: var(--text); font-weight: 600; text-transform: capitalize; }
+.sub-date-rel { font-size: var(--fs-xs); color: var(--accent-fg, var(--accent)); }
+.sub-name { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.sub-concept { font-size: var(--fs-md); color: var(--text); overflow-wrap: anywhere; }
+.sub-freq { font-size: var(--fs-xs); color: var(--text2); }
+.sub-amount { font-size: var(--fs-md); color: var(--text); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+/* Fijos que se repiten (Planificación): edición de la fecha de fin */
+.fr-edit { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; }
+.fr-label { margin: 0; font-size: var(--fs-xs); color: var(--text2); }
+.fr-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* Logos de servicios de suscripción */
+.svc-logo { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
+.svc-logo-letter { font-weight: 700; line-height: 1; }
+.svc-picker { display: flex; flex-wrap: wrap; gap: 10px; }
+.svc-chip { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 76px; padding: 8px 4px; min-height: 44px;
+  background: var(--glass-bg-inner, var(--surface2)); border: 1px solid var(--glass-border, var(--border)); border-radius: 14px;
+  color: var(--text); font: inherit; font-size: var(--fs-xs); cursor: pointer; }
+.svc-chip.selected { border-color: var(--accent); background: var(--accent-dim); }
+.svc-chip-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.svc-break { list-style: none; margin: 0; padding: 4px 16px 8px; display: flex; flex-direction: column; gap: 10px; }
+.svc-break li { display: flex; align-items: center; gap: 12px; }
+.svc-break-name { flex: 1 1 auto; min-width: 0; font-size: var(--fs-md); color: var(--text); overflow-wrap: anywhere; }
+.svc-break-count { font-size: var(--fs-xs); color: var(--text2); }
+.svc-break-total { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }

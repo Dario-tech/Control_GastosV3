@@ -48,6 +48,8 @@ from services.wallet import (
 )
 from services.recurring import get_recurring
 from services.importes import IMPORTE_MAX, redondear_importe, validar_importe
+from services import import_csv
+from services import fixed_recurring
 from services.ai_categorize import suggest_emoji
 from services.email_report import send_monthly_report, send_monthly_reports_to_all
 from services.goals import (
@@ -71,6 +73,7 @@ async def lifespan(app: FastAPI):
     ensure_encrypted_columns()  # migración aditiva idempotente (concepto/importe/nota cifrados)
     backfill_comentarios()  # cifra las notas antiguas en claro; nunca rompe el arranque
     ensure_annual_expenses_table()  # migración aditiva idempotente (gastos fijos anuales)
+    fixed_recurring.ensure_fixed_recurring_table()  # migración aditiva idempotente (fijos que se repiten cada mes)
     ensure_id_cliente()  # migración aditiva idempotente (id_cliente: idempotencia del alta)
     ensure_search_index()  # migración aditiva idempotente (índice para paginar la búsqueda)
     ensure_wallet_schema()  # migración aditiva idempotente (Atajo de Cartera: comercio, reglas)
@@ -150,6 +153,7 @@ USERDATA_MAX_BODY = 128 * 1024
 _USERDATA_PREFIXES = ("/api/categories", "/api/prefs")
 GLOBAL_MAX_BODY = 64 * 1024        # tope por defecto en /api/*
 SHORTCUT_MAX_BODY = 4 * 1024       # atajo iOS: sin JWT, se corta antes de leer/validar el token
+IMPORT_MAX_BODY = 160 * 1024       # importar extracto CSV: ≤ 500 filas por petición
 CONTRIBUTE_MAX_BODY = 1_200_000    # aportación de meta con foto (≤ 800.000 caracteres de data-URL)
 _CONTRIBUTE_RE = re.compile(r"^/api/goals/[^/]+/contribute/?$")
 
@@ -162,6 +166,8 @@ def _max_body_for(path: str) -> int | None:
         return USERDATA_MAX_BODY
     if path.rstrip("/") == "/api/shortcut/pending":
         return SHORTCUT_MAX_BODY
+    if path.rstrip("/") == "/api/transactions/import":
+        return IMPORT_MAX_BODY
     if _CONTRIBUTE_RE.match(path):
         return CONTRIBUTE_MAX_BODY
     return GLOBAL_MAX_BODY
@@ -642,6 +648,44 @@ async def add_transaction(request: Request, email: str = Depends(get_current_use
     await _broadcast()
     return result
 
+
+
+@app.post("/api/transactions/import")
+async def import_transactions(request: Request, email: str = Depends(get_current_user)):
+    """Importa un extracto del banco ya leído en el móvil.
+
+    Body: {filas: [{fecha, concepto, importe, tipo}] (≤ 500), confirmar?: bool}.
+    Sin `confirmar` (vista previa) NO se guarda nada: cada fila vuelve como
+    "nueva" | "duplicada" (mismo día + importe + comercio ya guardados) | "error".
+    Con `confirmar: true` se guardan solo las nuevas, cifradas, en una transacción;
+    la comprobación de duplicados se repite en el servidor. Los importes pasan por
+    `parse_importe` (el mismo parser que /api/pending). Nunca se registra el contenido.
+    """
+    enforce("import-min", [email], limit=20, window=60, block=300)
+    enforce("import-day", [email], limit=300, window=86400, block=3600)
+    raw = await request.body()
+    try:
+        data = json_lib.loads(raw)
+    except Exception:
+        data = None
+    if not isinstance(data, dict) or not isinstance(data.get("filas"), list):
+        _err422("Body inválido")
+    filas = data["filas"]
+    if not filas or len(filas) > import_csv.MAX_FILAS:
+        _err422(f"Envía entre 1 y {import_csv.MAX_FILAS} filas por petición")
+    confirmar = data.get("confirmar") is True
+    try:
+        if not confirmar:
+            return {"filas": await import_csv.previsualizar(email, filas)}
+        res = await import_csv.guardar(email, filas)
+    except HTTPException:
+        raise
+    except Exception:
+        _log.exception("Error en POST /api/transactions/import")
+        raise HTTPException(status_code=502, detail="Error al importar los movimientos")
+    if res["importadas"]:
+        await _broadcast()
+    return res
 
 class CommentIn(BaseModel):
     comentario: str = Field(max_length=4 * 500)  # transporte; el tope real (500, tras strip) lo valida el endpoint
@@ -1242,6 +1286,45 @@ async def update_annual_expense_endpoint(expense_id: int, body: AnnualExpenseIn,
 @app.delete("/api/annual-expenses/{expense_id}")
 async def delete_annual_expense_endpoint(expense_id: int, email: str = Depends(get_current_user)):
     await delete_annual_expense(email, expense_id)
+    return {"status": "ok"}
+
+
+# ── Gastos fijos que se repiten cada mes hasta una fecha ─────────────────────
+
+class FixedRecurringIn(BaseModel):
+    concepto: Txt = Field(max_length=200)   # tope real (60) en fixed_recurring.validate
+    importe:  Any
+    dia:      Any = 1
+    desde:    Txt = Field(max_length=10)    # AAAA-MM
+    hasta:    Txt | None = Field(default=None, max_length=10)  # AAAA-MM; sin valor = sin fecha de fin
+
+
+@app.get("/api/fixed-recurring")
+async def list_fixed_recurring_endpoint(email: str = Depends(get_current_user)):
+    return await fixed_recurring.list_for_user(email)
+
+
+@app.post("/api/fixed-recurring", status_code=201)
+async def create_fixed_recurring_endpoint(body: FixedRecurringIn, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    res = await fixed_recurring.create(email, body.concepto, body.importe, body.dia, body.desde, body.hasta)
+    await _broadcast()
+    return res
+
+
+@app.patch("/api/fixed-recurring/{rule_id}")
+async def update_fixed_recurring_endpoint(rule_id: int, body: FixedRecurringIn, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    res = await fixed_recurring.update(email, rule_id, body.concepto, body.importe, body.dia, body.desde, body.hasta)
+    await _broadcast()
+    return res
+
+
+@app.delete("/api/fixed-recurring/{rule_id}")
+async def delete_fixed_recurring_endpoint(rule_id: int, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    await fixed_recurring.delete(email, rule_id)
+    await _broadcast()
     return {"status": "ok"}
 
 

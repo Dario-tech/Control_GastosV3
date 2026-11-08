@@ -1,10 +1,13 @@
 import { useRef, useState } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
-import { postTransaction } from '../../services/api'
+import { postTransaction, createFixedRecurring } from '../../services/api'
+import { nextMonthOf } from '../../utils/fixedRecurring'
+import { SERVICES, isSubscriptionCategory, composeNote } from '../../data/services'
+import ServiceLogo from './ServiceLogo'
 import { TYPES, combineCategories, categoryKey } from '../../data/categories'
 import { isUnusualAmount, fmt, todayLocal, addDaysLocal } from '../../utils'
-import { FormScreen, Field, Section, AmountInput, Chips, PrimaryButton, Icon } from './FormKit'
+import { FormScreen, Field, Section, AmountInput, Chips, PrimaryButton, Icon, SwitchRow } from './FormKit'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import { useCategories } from '../../hooks/useCategories'
 import { useApp } from '../../context/AppContext'
@@ -26,8 +29,16 @@ export default function AddTransactionModal({ onClose }) {
   const [importe, setImporte]   = useState('')
   const [fecha, setFecha]       = useState(todayLocal())
   const [comentario, setComentario] = useState('')
+  // Solo para la categoría «Suscripciones»: qué servicio es (Netflix, HBO…). Opcional.
+  const [servicio, setServicio] = useState('')
+  const [otroServicio, setOtroServicio] = useState('')
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState(null)
+
+  // Gasto fijo que se repite cada mes: hasta qué mes (o sin fin). Solo para «Gasto Fijo».
+  const [repeat, setRepeat]       = useState(false)
+  const [sinFin, setSinFin]       = useState(false)
+  const [hasta, setHasta]         = useState(() => nextMonthOf(addDaysLocal(330)))
 
   // Hoja «Nueva categoría»
   const [showNewCat, setShowNewCat] = useState(false)
@@ -45,17 +56,31 @@ export default function AddTransactionModal({ onClose }) {
   async function handleSubmit(concepto) {
     const amt = parseFloat(String(importe).replace(',', '.'))
     if (!amt || amt <= 0) { setError('Introduce un importe válido'); return }
+    // Nota final: «Netflix» o «Netflix · nota» si es una suscripción con servicio elegido.
+    const nota = composeNote(isSubscriptionCategory(concepto) ? (servicio === '__otro' ? otroServicio : servicio) : '', comentario)
     setLoading(true)
     setError(null)
     try {
-      await postTransaction(amt, tipo, concepto, fecha, comentario.trim() || null, clientId.current)
+      await postTransaction(amt, tipo, concepto, fecha, nota || null, clientId.current)
+      if (repeat && tipo === 'Gasto Fijo') {
+        // El movimiento ya está guardado: si la repetición falla, se avisa pero no se deshace nada.
+        try {
+          await createFixedRecurring({
+            concepto, importe: amt, dia: Number(fecha.slice(8, 10)) || 1,
+            desde: nextMonthOf(fecha), hasta: sinFin ? null : hasta,
+          })
+          window.dispatchEvent(new Event('fixed-recurring-changed'))
+        } catch {
+          showToast('Guardado, pero no se pudo programar la repetición. Prueba desde Planificación.')
+        }
+      }
       refresh()
       onClose()
     } catch (err) {
       if (classifyTxError(err) === 'offline') {
         // Red / timeout / servidor dormido: se guarda en la cola con el mismo
         // id y se reenvía solo al volver la conexión (sin duplicar).
-        enqueueTx({ id: clientId.current, importe: amt, tipo, concepto, fecha, comentario: comentario.trim() || null })
+        enqueueTx({ id: clientId.current, importe: amt, tipo, concepto, fecha, comentario: nota || null })
         showToast(MSG_OFFLINE)
         onClose()
         return
@@ -73,8 +98,10 @@ export default function AddTransactionModal({ onClose }) {
   const dateMode = fecha === hoy ? 'hoy' : fecha === ayer ? 'ayer' : 'otra'
   const unusualSel = selected && amtOk ? isUnusualAmount(data, selected, amtNum) : null
   const tipoMeta = TYPES.find(t => t.id === tipo)
-  const canSave = !!selected && amtOk && !loading
-  const missing = !amtOk ? 'Escribe un importe para continuar' : 'Elige una categoría para continuar'
+  const hastaOk = !repeat || sinFin || (/^\d{4}-\d{2}$/.test(hasta) && hasta >= nextMonthOf(fecha))
+  const canSave = !!selected && amtOk && !loading && hastaOk
+  const missing = !amtOk ? 'Escribe un importe para continuar'
+    : !selected ? 'Elige una categoría para continuar' : 'Elige un mes de fin posterior a este'
 
   function goBack() { setStep(1); setShowNewCat(false); setSelected(null); setError(null) }
 
@@ -170,6 +197,52 @@ export default function AddTransactionModal({ onClose }) {
               <p className="fm-warn"><span aria-hidden="true">⚠️</span>{unusualSel.ratio}× tu gasto medio en {selected}</p>
             )}
           </Section>
+
+          {selected && isSubscriptionCategory(selected) && (
+            <Section title="¿Qué suscripción es?">
+              <div className="svc-picker" role="radiogroup" aria-label="Servicio">
+                {SERVICES.map(sv => (
+                  <button key={sv.id} type="button" role="radio" aria-checked={servicio === sv.nombre}
+                    className={`svc-chip${servicio === sv.nombre ? ' selected' : ''}`}
+                    onClick={() => setServicio(servicio === sv.nombre ? '' : sv.nombre)}>
+                    <ServiceLogo nombre={sv.nombre} size={36} />
+                    <span className="svc-chip-name">{sv.nombre}</span>
+                  </button>
+                ))}
+                <button type="button" role="radio" aria-checked={servicio === '__otro'}
+                  className={`svc-chip${servicio === '__otro' ? ' selected' : ''}`}
+                  onClick={() => setServicio(servicio === '__otro' ? '' : '__otro')}>
+                  <span className="svc-logo" style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--surface2)', color: 'var(--text)' }} aria-hidden="true">+</span>
+                  <span className="svc-chip-name">Otra</span>
+                </button>
+              </div>
+              {servicio === '__otro' && (
+                <input className="fm-input" value={otroServicio} maxLength={40} placeholder="Nombre de la suscripción"
+                  aria-label="Nombre de la suscripción" onChange={e => setOtroServicio(e.target.value)} autoComplete="off" />
+              )}
+              <p className="fm-hint">Opcional: así verás cuánto gastas en cada una.</p>
+            </Section>
+          )}
+
+          {tipo === 'Gasto Fijo' && (
+            <Section title="Repetición">
+              <SwitchRow checked={repeat} onChange={setRepeat} title="Repetir cada mes"
+                desc="Aparecerá solo en los meses siguientes con este importe. No lo actives si el importe cambia cada mes (la luz)." />
+              {repeat && (
+                <>
+                  <SwitchRow checked={sinFin} onChange={setSinFin} title="Sin fecha de fin" desc="Hasta que lo pares tú." />
+                  {!sinFin && (
+                    <Field label="Hasta el mes de" error={hastaOk ? '' : 'Elige un mes posterior al de este gasto'}>
+                      {({ id }) => (
+                        <input id={id} className="fm-input" type="month" value={hasta} min={nextMonthOf(fecha)}
+                          onChange={e => setHasta(e.target.value)} />
+                      )}
+                    </Field>
+                  )}
+                </>
+              )}
+            </Section>
+          )}
 
           {showNewCat && (
             <NewCategorySheet tipo={tipo} existing={allCats}

@@ -401,3 +401,34 @@ export async function getShortcutToken() {
   })
   return apiJson(res)
 }
+
+// ── Importar extracto del banco (CSV) ───────────────────────────────────────
+// Sin `confirmar` es una vista previa (no guarda): devuelve { filas:[{i, estado:
+// 'nueva'|'duplicada'|'error', ...}] }. Con `confirmar: true` guarda las nuevas:
+// { importadas, duplicadas, errores }. Máx. 500 filas por llamada.
+export async function importTransactions(filas, confirmar = false) {
+  const res = await fetch(`${BASE}/api/transactions/import`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body:    JSON.stringify({ filas, confirmar }),
+    signal:  AbortSignal.timeout(WRITE_TIMEOUT_MS),
+  })
+  return apiJson(res)
+}
+
+// ── Gastos fijos que se repiten cada mes hasta una fecha ────────────────────
+// Regla: { id, concepto, importe, dia, desde: 'AAAA-MM', hasta: 'AAAA-MM' | null (sin fin) }.
+// Se proyectan en la app como gasto fijo previsto; no crean movimientos reales.
+async function fixedCall(path, method = 'GET', body) {
+  const res = await fetch(`${BASE}/api/fixed-recurring${path}`, {
+    method,
+    headers: { ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...authHeaders() },
+    body:    body !== undefined ? JSON.stringify(body) : undefined,
+    signal:  AbortSignal.timeout(method === 'GET' ? 15000 : WRITE_TIMEOUT_MS),
+  })
+  return apiJson(res)
+}
+export const fetchFixedRecurring  = () => fixedCall('')
+export const createFixedRecurring = rule => fixedCall('', 'POST', rule)
+export const updateFixedRecurring = (id, rule) => fixedCall(`/${id}`, 'PATCH', rule)
+export const deleteFixedRecurring = id => fixedCall(`/${id}`, 'DELETE')

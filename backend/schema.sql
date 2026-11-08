@@ -161,6 +161,21 @@ CREATE TABLE IF NOT EXISTS revoked_sessions (
     exp TIMESTAMPTZ NOT NULL
 );
 
+-- Gastos fijos que se repiten cada mes hasta una fecha (el piso hasta dic-2027). Se
+-- proyectan en la app como gasto fijo previsto; concepto e importe CIFRADOS (AES-GCM).
+-- Aditivo e idempotente; el backend también lo crea al arrancar (ensure_fixed_recurring_table).
+CREATE TABLE IF NOT EXISTS fixed_recurring (
+    id           SERIAL PRIMARY KEY,
+    user_email   TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    concepto_enc BYTEA NOT NULL,
+    importe_enc  BYTEA NOT NULL,
+    dia          INTEGER NOT NULL DEFAULT 1 CHECK (dia BETWEEN 1 AND 31),
+    desde        DATE NOT NULL,   -- primer día del mes de inicio
+    hasta        DATE,            -- primer día del último mes; NULL = sin fecha de fin
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_fixed_recurring_user ON fixed_recurring(user_email);
+
 -- Row Level Security en todas las tablas de public, SIN políticas: bloquea el
 -- acceso por la API REST de Supabase (roles anon/authenticated) a estas tablas.
 -- El backend se conecta como owner de las tablas, que no está sujeto a RLS
@@ -177,3 +192,4 @@ ALTER TABLE public.merchant_rules             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_categories           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_prefs                 ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.revoked_sessions           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fixed_recurring            ENABLE ROW LEVEL SECURITY;

@@ -11,7 +11,6 @@ export const DEFAULT_CATEGORIES = {
     { concepto: 'Ropa',                 emoji: '👗' },
     { concepto: 'Vuelos',               emoji: '✈️' },
     { concepto: 'Gimnasio',             emoji: '💪' },
-    { concepto: 'Suscripciones',        emoji: '📺' },
     { concepto: 'Variado',              emoji: '💶' },
   ],
   'Gasto Fijo': [
@@ -21,6 +20,7 @@ export const DEFAULT_CATEGORIES = {
     { concepto: 'Agua',        emoji: '🚿' },
     { concepto: 'Wifi',        emoji: '📡' },
     { concepto: 'Transporte',  emoji: '🚇' },
+    { concepto: 'Suscripciones', emoji: '📺' },
     { concepto: 'Inversiones', emoji: '📈' },
     { concepto: 'Cripto',      emoji: '₿'  },
   ],

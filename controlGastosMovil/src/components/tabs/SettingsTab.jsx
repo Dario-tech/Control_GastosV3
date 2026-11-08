@@ -53,7 +53,7 @@ function Home({ go, onOpenShortcut, onLogout }) {
           onClick={() => go('budget')}
         />
         {onOpenShortcut && (
-          <NavRow id="shortcut" icon="📲" label="Pagos automáticos" value="Apple Pay" onClick={onOpenShortcut} />
+          <NavRow id="shortcut" icon="📲" label="Pagos automáticos" value="Apple Pay · Google Pay" onClick={onOpenShortcut} />
         )}
         <NavRow id="data" icon="📤" label="Datos y exportar" onClick={() => go('data')} />
         <NavRow id="help" icon="❓" label="Ayuda" onClick={() => go('help')} last />

@@ -8,6 +8,8 @@ import { getMonthStats, mergeAnnualSplits, filterDataByYear, getTransactionYears
 import { MONTH_NAMES } from '../../data/mockData'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
+import { useFixedRecurring } from '../../hooks/useFixedRecurring'
+import { mergeFixedRecurring } from '../../utils/fixedRecurring'
 
 // Calendario, hoja de mes y detalle de movimientos: solo se bajan al usarlos.
 const CalendarView        = lazy(() => import('../ui/CalendarView'))
@@ -41,7 +43,9 @@ export default function MonthTab() {
   // Los repartos de gastos fijos anuales cuentan como gasto fijo del mes que
   // les toca — se fusionan aquí una vez y de ahí para abajo todo (saldo,
   // donut, listado) los trata igual que cualquier otro gasto fijo.
-  const data = mergeAnnualSplits(rawData, annualExpenses)
+  // Fijos que se repiten cada mes hasta una fecha: se proyectan como previstos.
+  const { rules: fixedRules } = useFixedRecurring()
+  const data = mergeAnnualSplits(mergeFixedRecurring(rawData, fixedRules, selectedYear), annualExpenses)
   const [selectedConcept, setSelectedConcept] = useState(null)
   const [heatmapOpen, setHeatmapOpen] = useState(() => {
     try { return JSON.parse(localStorage.getItem('mi-economia-cal-open') ?? 'false') }
@@ -78,7 +82,7 @@ export default function MonthTab() {
     selectedYear === now.getFullYear() && selectedMonth === now.getMonth() && stats.income === 0
 
   function handleSelectConcept(item) {
-    if (!item.isAnnualSplit) setSelectedConcept(item)
+    if (!item.isAnnualSplit && !item.isProjected) setSelectedConcept(item)
   }
 
   return (

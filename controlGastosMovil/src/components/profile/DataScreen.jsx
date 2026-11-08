@@ -9,6 +9,7 @@ import {
 } from '../../utils/exportData'
 import { localISODate } from '../../utils'
 import { Section, Row } from './ui'
+import CsvImportScreen from '../ui/CsvImportScreen'
 
 export default function DataScreen() {
   const { settings, hiddenCategories = [] } = useSettings()
@@ -19,6 +20,7 @@ export default function DataScreen() {
   // Exportación: null | 'json' | 'csv' (preparando)
   const [exporting, setExporting] = useState(null)
   const [exportError, setExportError] = useState('')
+  const [importing, setImporting] = useState(false)
 
   async function handleSendReport() {
     setSendingReport(true)
@@ -78,6 +80,15 @@ export default function DataScreen() {
         <p className="s-note">El JSON incluye todo (movimientos, presupuesto, metas y ajustes); el CSV solo los movimientos, para abrirlos en una hoja de cálculo.</p>
       </Section>
 
+      <Section title="Importar">
+        <Row icon="📥" label="Importar extracto del banco (CSV)" last>
+          <button type="button" className="s-action-btn s-touch" aria-label="Importar extracto del banco en CSV" onClick={() => setImporting(true)}>
+            Importar
+          </button>
+        </Row>
+        <p className="s-note">Eliges el CSV de tu banco, indicas qué columna es cada dato y revisas los duplicados antes de guardar.</p>
+      </Section>
+
       <Section title="Informe por email">
         <Row icon="📧" label="Informe mensual por email" last>
           <button type="button" className="s-action-btn s-touch" aria-label="Enviar informe mensual ahora" onClick={handleSendReport} disabled={sendingReport}>
@@ -85,6 +96,7 @@ export default function DataScreen() {
           </button>
         </Row>
       </Section>
+      {importing && <CsvImportScreen onClose={() => setImporting(false)} />}
     </>
   )
 }

@@ -87,6 +87,48 @@ Si no puedes poner algún dato, déjalo vacío y dime cuál. NO la repitas ni la
 Después, en la pestaña «Automatización»: nueva automatización → «Transacción» → mis tarjetas → «Ejecutar inmediatamente» → «Siguiente» → el atajo «Mi Economía (segundo plano)».`
 }
 
+// Android: MacroDroid es la app de automatización (gratuita) que lee el aviso de Google Wallet.
+export const MACRODROID_URL = 'https://play.google.com/store/apps/details?id=com.arlosoft.macrodroid'
+
+// Prompt de Android. Misma mecánica que el modo «En segundo plano» de iPhone: la macro
+// manda el pago a POST /api/shortcut/pending y queda PENDIENTE. `key` lleva el marcador
+// por defecto (lo que se ve) o la clave real (solo en el portapapeles).
+export function buildPromptAndroid(api = BASE, key = KEY_PLACEHOLDER) {
+  const url = `${api}/api/shortcut/pending`
+  return `Quiero crear en la app MacroDroid de Android una macro llamada «Mi Economía» que se ejecute cada vez que pague con Google Wallet (Google Pay). La macro NO abre ninguna app: manda el pago directamente a mi servidor y queda como PENDIENTE de revisar. Guíame paso a paso, con los nombres de las opciones de MacroDroid en español.
+
+PARTE 1. PERMISOS
+1. MacroDroid necesita «Acceso a las notificaciones»: concédeselo cuando lo pida.
+2. Excluye MacroDroid de la optimización de batería, para que no se cierre en segundo plano.
+
+PARTE 2. CREAR LA MACRO
+Llámala «Mi Economía».
+
+DESENCADENANTE: «Notificación recibida», de la aplicación Google Wallet (o Google Pay, la que muestre el aviso al pagar). Solo debe saltar con avisos de pago: filtra por texto que contenga el símbolo de moneda «€».
+
+ACCIONES, en este orden:
+1. Extraer el importe del texto de la notificación con una expresión regular (por ejemplo (\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})) y guardarlo en una variable de texto llamada «importe». Usa la acción de MacroDroid para manipular o extraer texto. El servidor solo entiende importes como «12,40» o «12,40 €», no el texto entero de la notificación.
+2. «Petición HTTP»:
+   - URL: ${url}
+   - Método: POST
+   - Cabecera «Content-Type»: application/json
+   - Cuerpo, JSON con estos campos de tipo texto:
+       «shortcut_token» = ${key}
+       «importe» = la variable «importe»
+       «comercio» = el título de la notificación (suele traer el comercio)
+       «id_externo» = la fecha y hora actuales seguidas del importe (evita duplicados si la macro se dispara dos veces)
+   - Tiempo de espera alto (60 segundos): el servidor gratuito puede tardar unos 30 segundos en despertar.
+   - Si la petición falla, reintenta hasta 3 veces esperando 20 segundos entre intentos.
+3. Si el servidor responde bien: muestra la notificación «Pago guardado. Revísalo en Mi Economía.». Si los 3 intentos fallan: «No se pudo guardar el pago. Añádelo a mano.».
+
+IMPORTANTE SOBRE LA CLAVE: mi clave personal ya va incluida en este texto, en el campo «shortcut_token». Úsala tal cual en ese campo. NO la repitas ni la muestres en tus respuestas (ni en resúmenes ni en ejemplos): si necesitas referirte a ella, di «tu clave».
+
+PARTE 3. COMPROBAR
+Haz un pago pequeño con Google Wallet. Si no salta, mira el texto real de la notificación (puede variar según el banco) y ajusta el filtro y la expresión regular.
+
+Cuando pague, el pago quedará como pendiente y, al entrar en la app, veré la campana con el número de pagos por revisar.`
+}
+
 function StepHead({ n, title }) {
   return (
     <div className="sc-step-head">
@@ -255,7 +297,7 @@ function SecretCopyFeedback({ sc, okText }) {
 
 // Prompt para pegar en la IA de Atajos. Con `withKey`, al copiar se sustituye el
 // marcador por la clave real; en pantalla siempre se ve el marcador.
-function PromptBlock({ prompt, withKey = false, buildCopy }) {
+function PromptBlock({ prompt, withKey = false, buildCopy, intro = 'Cópialo y pégalo cuando la IA de Atajos te pregunte.' }) {
   const plain = useCopy()
   const sc = useSecretCopy(buildCopy || (() => prompt))
   const noKey = useCopy()
@@ -265,9 +307,7 @@ function PromptBlock({ prompt, withKey = false, buildCopy }) {
         <span className="sc-step-num" aria-hidden="true">🤖</span>
         <h2 className="sc-step-title">Texto para pegar en la IA</h2>
       </div>
-      <p className="sc-text">
-        Cópialo y pégalo cuando la IA de Atajos te pregunte.
-      </p>
+      <p className="sc-text">{intro}</p>
       <pre className="sc-prompt" data-testid="sc-prompt" tabIndex={0} aria-label="Texto del prompt">{prompt}</pre>
       {withKey ? (
         <>
@@ -511,16 +551,84 @@ function ManualMode({ link, api }) {
   )
 }
 
+const PLATFORMS = [
+  { id: 'ios',     label: 'iPhone',  hint: 'Apple Pay' },
+  { id: 'android', label: 'Android', hint: 'Google Pay' },
+]
+
+function detectPlatform() {
+  return typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent || '') ? 'android' : 'ios'
+}
+
+// Botones (no pestañas) para no mezclarse con el selector de modo de iPhone.
+function PlatformSelector({ platform, setPlatform }) {
+  return (
+    <div className="sc-modes sc-platform" role="group" aria-label="Tu móvil">
+      {PLATFORMS.map(p => (
+        <button key={p.id} type="button" aria-pressed={platform === p.id} data-testid={`sc-platform-${p.id}`}
+          className={`sc-mode${platform === p.id ? ' sc-mode--on' : ''}`} onClick={() => setPlatform(p.id)}>
+          <span className="sc-mode-label">{p.label}</span>
+          <span className="sc-mode-hint">{p.hint}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// Android: instalar MacroDroid + copiar el prompt con la clave. Sin pasos manuales.
+function AndroidSetup() {
+  return (
+    <>
+      <section className="fm-card sc-intro" aria-label="Cómo funciona">
+        <div className="sc-phone" aria-hidden="true">
+          <div className="sc-phone-notch" />
+          <div className="sc-phone-notif">
+            <span className="sc-phone-app">🔔</span>
+            <span className="sc-phone-text">
+              <strong>Pago guardado</strong>
+              <span>12,40 € · Mercadona</span>
+            </span>
+          </div>
+          <div className="sc-phone-cta">Pendiente (1)</div>
+        </div>
+        <ul className="sc-list">
+          <li>Pagas con <strong>Google Wallet</strong> y el gasto queda <strong>pendiente</strong>. Lo verás en la <strong>campana</strong> de la app.</li>
+          <li>Usa <strong>MacroDroid</strong> (gratis), que lee el aviso de pago. Si falta algún gasto, añádelo a mano.</li>
+        </ul>
+      </section>
+
+      <section className="fm-card sc-step" aria-labelledby="sc-step-1">
+        <StepHead n={1} title="Abre MacroDroid" />
+        <p className="sc-text">
+          Instálala si no la tienes. Después vuelve aquí y copia el texto de abajo.
+        </p>
+        <a className="shortcut-token-copy sc-copy-btn sc-open-shortcuts" href={MACRODROID_URL} target="_blank" rel="noopener noreferrer" data-testid="sc-open-macrodroid">
+          Abrir MacroDroid
+        </a>
+        <p className="sc-hint">¿No se abre? Búscala en Play Store: <strong>MacroDroid</strong>.</p>
+      </section>
+
+      <PromptBlock key="android" withKey prompt={buildPromptAndroid()} buildCopy={k => buildPromptAndroid(BASE, k)}
+        intro="Cópialo y pégalo en tu asistente de IA (Gemini, ChatGPT, Claude…). Te guiará paso a paso para crear la macro en MacroDroid." />
+    </>
+  )
+}
+
 export default function ShortcutSetupScreen({ onClose }) {
   const link = shortcutLinkBase()
+  const [platform, setPlatform] = useState(detectPlatform)
   const [mode, setMode] = useState('app')
-    const fondo = mode === 'fondo'
+  const fondo = mode === 'fondo'
   const manual = mode === 'manual'
 
   return (
-    <FormScreen title="Pagos automáticos (iPhone)" label="Configurar pagos automáticos con Apple Pay" onClose={onClose}
-      subtitle={SUBTITLES[mode]}>
+    <FormScreen title="Pagos automáticos" label="Configurar pagos automáticos con Apple Pay o Google Pay" onClose={onClose}
+      subtitle={platform === 'android' ? 'Pagas con Google Wallet y el gasto se guarda solo. Lo revisas después en la campana.' : SUBTITLES[mode]}>
 
+      <PlatformSelector platform={platform} setPlatform={setPlatform} />
+
+      {platform === 'android' ? <AndroidSetup /> : (
+      <>
       <ModeSelector mode={mode} setMode={setMode} />
 
       <div id="sc-mode-panel" role="tabpanel" aria-labelledby={`sc-mode-${mode}`} className="sc-panel">
@@ -579,6 +687,8 @@ export default function ShortcutSetupScreen({ onClose }) {
       {fondo && <PromptBlock key="fondo" withKey prompt={buildPromptBackground()} buildCopy={k => buildPromptBackground(BASE, k)} />}
 
       </div>
+      </>
+      )}
     </FormScreen>
   )
 }

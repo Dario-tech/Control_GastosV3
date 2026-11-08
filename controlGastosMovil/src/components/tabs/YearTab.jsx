@@ -7,6 +7,8 @@ import { MONTH_NAMES } from '../../data/mockData'
 import { useApp } from '../../context/AppContext'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
+import { useFixedRecurring } from '../../hooks/useFixedRecurring'
+import { mergeFixedRecurring } from '../../utils/fixedRecurring'
 
 // recharts pesa bastante: el gráfico se descarga aparte para que Año pinte antes.
 const IncomeExpenseChart = lazy(() => import('../charts/IncomeExpenseChart'))
@@ -15,7 +17,8 @@ export default function YearTab() {
   const { goToMonth } = useApp()
   const { data: rawData } = useFinanceData()
   const { expenses: annualExpenses } = useAnnualExpenses()
-  const data = mergeAnnualSplits(rawData, annualExpenses)
+  const { rules: fixedRules } = useFixedRecurring()
+  const data = mergeAnnualSplits(mergeFixedRecurring(rawData, fixedRules, rawData?.year ?? new Date().getFullYear()), annualExpenses)
   const { income, expenses, balance, savingsRate, avgIncome } = getYearStats(data)
   const activeMonths = getActiveMonths(data)
 
