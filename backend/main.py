@@ -50,7 +50,6 @@ from services.recurring import get_recurring
 from services.importes import IMPORTE_MAX, redondear_importe, validar_importe
 from services import import_csv
 from services import groups
-from services import ticket_scan
 from services import fixed_recurring
 from services.ai_categorize import suggest_emoji
 from services.email_report import send_monthly_report, send_monthly_reports_to_all
@@ -156,7 +155,6 @@ USERDATA_MAX_BODY = 128 * 1024
 _USERDATA_PREFIXES = ("/api/categories", "/api/prefs")
 GLOBAL_MAX_BODY = 64 * 1024        # tope por defecto en /api/*
 SHORTCUT_MAX_BODY = 4 * 1024       # atajo iOS: sin JWT, se corta antes de leer/validar el token
-SCAN_MAX_BODY = 1_500_000          # foto de ticket (base64 ≤ 1.400.000 caracteres)
 IMPORT_MAX_BODY = 160 * 1024       # importar extracto CSV: ≤ 500 filas por petición
 CONTRIBUTE_MAX_BODY = 1_200_000    # aportación de meta con foto (≤ 800.000 caracteres de data-URL)
 _CONTRIBUTE_RE = re.compile(r"^/api/goals/[^/]+/contribute/?$")
@@ -170,8 +168,6 @@ def _max_body_for(path: str) -> int | None:
         return USERDATA_MAX_BODY
     if path.rstrip("/") == "/api/shortcut/pending":
         return SHORTCUT_MAX_BODY
-    if path.rstrip("/") == "/api/ticket-scan":
-        return SCAN_MAX_BODY
     if path.rstrip("/") == "/api/transactions/import":
         return IMPORT_MAX_BODY
     if _CONTRIBUTE_RE.match(path):
@@ -1052,50 +1048,6 @@ async def suggest_emoji_endpoint(body: EmojiSuggestIn, email: str = Depends(get_
     enforce("emoji-user", [email], limit=20, window=3600, block=3600)
     emoji = await suggest_emoji(body.nombre.strip())
     return {"emoji": emoji}
-
-
-# ── Captura de tickets con IA ─────────────────────────────────────────────────
-
-@app.get("/api/ticket-scan/status")
-async def ticket_scan_status(email: str = Depends(get_current_user)):
-    """¿Está configurada la IA? (la app oculta la opción si no)."""
-    return {"disponible": ticket_scan.disponible()}
-
-
-@app.post("/api/ticket-scan")
-async def ticket_scan_endpoint(request: Request, email: str = Depends(get_current_user)):
-    """Propone importe, comercio y fecha a partir de la foto de un ticket (Claude).
-
-    Body: {imagen: <base64 de un JPG/PNG/WebP, con o sin prefijo data:>}. NO guarda nada:
-    ni la imagen (solo en memoria, se manda a la API de Anthropic) ni el resultado; la app
-    lo enseña editable y, solo si el usuario confirma, crea el pendiente con POST /api/pending.
-    Cada llamada cuesta dinero: 3/min, 15/hora y 40/día por usuario. Nunca se registra la
-    imagen ni los importes. 503 si no hay ANTHROPIC_API_KEY.
-    """
-    if not ticket_scan.disponible():
-        raise HTTPException(status_code=503, detail="El análisis de tickets no está disponible")
-    enforce("scan-min", [email], limit=3, window=60, block=300)
-    enforce("scan-hour", [email], limit=15, window=3600, block=3600)
-    enforce("scan-day", [email], limit=40, window=86400, block=3600)
-    raw = await request.body()
-    try:
-        data = json_lib.loads(raw)
-    except Exception:
-        data = None
-    if not isinstance(data, dict):
-        _err422("Body inválido")
-    try:
-        imagen, tipo = ticket_scan.decodificar_imagen(data.get("imagen"))
-    except ticket_scan.TicketScanError as e:
-        _err422(str(e))
-    try:
-        return await ticket_scan.escanear_ticket(imagen, tipo)
-    except ticket_scan.TicketScanError as e:
-        _err422(str(e))
-    except ticket_scan.TicketScanUnavailable:
-        raise HTTPException(status_code=503, detail="El análisis de tickets no está disponible")
-    except ticket_scan.TicketReadError:
-        raise HTTPException(status_code=502, detail="No se pudo analizar la imagen. Inténtalo de nuevo.")
 
 
 # ── Informe mensual por email ─────────────────────────────────────────────────
