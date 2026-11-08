@@ -7,8 +7,11 @@ Partiendo de `qa`. Sin merge, sin PR, sin tocar producción ni ejecutar SQL cont
 - **Backend:** nuevo `POST /api/transactions/import` (`services/import_csv.py`). Sin `confirmar` es solo vista previa; con `confirmar: true` guarda en **una transacción** las filas nuevas, con `concepto_enc`/`importe_enc` cifrados (y doble escritura B2 si `legacy_plain` está activo, igual que `post_transaction`). Importes con `parse_importe` (el mismo de `/api/pending`), fecha con `parse_fecha`, tipo de la lista blanca, concepto ≤ 60. Duplicado = misma fecha + importe + comercio (sin mayúsculas ni espacios de más) ya guardados; cuenta ocurrencias, así dos cafés iguales el mismo día solo se marcan si ya había dos. El servidor repite la comprobación al confirmar. Rate limit 20/min y 300/día por usuario, cuerpo ≤ 160 KB, ≤ 500 filas por petición.
 - Los gastos importados entran como «Gasto Variable» (el CSV no trae categoría); se recategorizan después.
 
-## 2. Calendario de suscripciones — hecho
-- Ajustes → **Suscripciones** (`SubscriptionsScreen.jsx`, `utils/subscriptions.js`). Reutiliza `/api/recurring` y `cleanRecurring` (excluye ingresos y caducados, corrige fechas pasadas). Muestra total mensual y anual (equivalente por frecuencia) y la próxima renovación de cada una, ordenadas por fecha. **Sin cambios de backend ni de esquema.**
+## 2. Suscripciones — rehecho como gasto fijo (rama `feat/suscripciones-como-gasto-fijo`)
+- Ya **no está en Ajustes**. En Mes, bajo «Gastos Fijos», hay una tarjeta «🔁 Suscripciones» con las que el usuario ha **marcado** (próxima renovación, total al mes y al año) y, plegadas, los gastos recurrentes detectados con el botón «Es suscripción». Reutiliza `/api/recurring`.
+- Las categorías marcadas **cuentan como gasto fijo** (Mes y Año) y se agrupan en una fila «Suscripciones» del listado de fijos; el total de gastos no cambia, solo se reclasifica.
+- Las marcas se guardan en los ajustes del usuario (`settings.subscriptions`), sin cambios de esquema ni de backend.
+- Limitación: el servicio es el nombre de la categoría del gasto (Netflix, HBO…); si varios van bajo una misma categoría «Suscripciones» se verán por importe.
 
 ## 3. Gastos compartidos — hecho (v1 mínima)
 - Diseño previo en `docs-diseno-gastos-compartidos.md` (commit aparte) y seguido tal cual.
