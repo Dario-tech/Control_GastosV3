@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
-import { postTransaction } from '../../services/api'
+import { postTransaction, postSharedExpense } from '../../services/api'
 import { TYPES, combineCategories, categoryKey } from '../../data/categories'
 import { isUnusualAmount, fmt, todayLocal, addDaysLocal } from '../../utils'
 import { FormScreen, Field, Section, AmountInput, Chips, PrimaryButton, Icon } from './FormKit'
@@ -14,6 +14,8 @@ import { classifyTxError, txErrorMessage, enqueueTx, MSG_OFFLINE } from '../../u
 import { DUPLICATE_CAT_MSG } from './CategoryFields'
 import NewCategorySheet, { NewCategoryButton } from './NewCategorySheet'
 import Amt from './Amt'
+import SplitSection from './SplitSection'
+import { useShared } from '../../hooks/useShared'
 
 export { DUPLICATE_CAT_MSG }
 
@@ -28,6 +30,10 @@ export default function AddTransactionModal({ onClose }) {
   const [comentario, setComentario] = useState('')
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState(null)
+
+  // «Dividir»: null = gasto normal; { payload, error } = reparto en curso
+  const [split, setSplit] = useState(null)
+  const shared = useShared()
 
   // Hoja «Nueva categoría»
   const [showNewCat, setShowNewCat] = useState(false)
@@ -48,11 +54,19 @@ export default function AddTransactionModal({ onClose }) {
     setLoading(true)
     setError(null)
     try {
-      await postTransaction(amt, tipo, concepto, fecha, comentario.trim() || null, clientId.current)
+      if (split) {
+        // Gasto compartido: movimiento propio + reparto en una sola petición (sin cola offline).
+        await postSharedExpense({
+          importe: amt, tipo, concepto, fecha, comentario: comentario.trim() || null,
+          id_cliente: clientId.current, ...split.payload,
+        })
+      } else {
+        await postTransaction(amt, tipo, concepto, fecha, comentario.trim() || null, clientId.current)
+      }
       refresh()
       onClose()
     } catch (err) {
-      if (classifyTxError(err) === 'offline') {
+      if (!split && classifyTxError(err) === 'offline') {
         // Red / timeout / servidor dormido: se guarda en la cola con el mismo
         // id y se reenvía solo al volver la conexión (sin duplicar).
         enqueueTx({ id: clientId.current, importe: amt, tipo, concepto, fecha, comentario: comentario.trim() || null })
@@ -73,8 +87,9 @@ export default function AddTransactionModal({ onClose }) {
   const dateMode = fecha === hoy ? 'hoy' : fecha === ayer ? 'ayer' : 'otra'
   const unusualSel = selected && amtOk ? isUnusualAmount(data, selected, amtNum) : null
   const tipoMeta = TYPES.find(t => t.id === tipo)
-  const canSave = !!selected && amtOk && !loading
-  const missing = !amtOk ? 'Escribe un importe para continuar' : 'Elige una categoría para continuar'
+  const splitOk = !split || !!split.payload
+  const canSave = !!selected && amtOk && !loading && splitOk
+  const missing = !amtOk ? 'Escribe un importe para continuar' : !selected ? 'Elige una categoría para continuar' : 'Completa el reparto para continuar'
 
   function goBack() { setStep(1); setShowNewCat(false); setSelected(null); setError(null) }
 
@@ -170,6 +185,8 @@ export default function AddTransactionModal({ onClose }) {
               <p className="fm-warn"><span aria-hidden="true">⚠️</span>{unusualSel.ratio}× tu gasto medio en {selected}</p>
             )}
           </Section>
+
+          {tipo !== 'Ingreso' && <SplitSection total={amtOk ? amtNum : 0} shared={shared} onChange={setSplit} />}
 
           {showNewCat && (
             <NewCategorySheet tipo={tipo} existing={allCats}

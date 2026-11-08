@@ -10,6 +10,7 @@ import {
 import { useFocusTrap, Icon } from './FormKit'
 import TransactionEditModal from './TransactionEditModal'
 import Amt from './Amt'
+import { useShared } from '../../hooks/useShared'
 
 function money(n) {
   const v = Math.abs(n)
@@ -27,6 +28,7 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, year, 
   useLockBodyScroll()
   const { transactions, refresh } = useFinanceData()
   const { showToast } = useApp() || {}
+  const sharedByTx = useShared().state.por_transaccion
   const [overrides, setOverrides] = useState({})       // rowIndex → tx editada (hasta que llegue el refresh)
   const [deleted, setDeleted]     = useState(() => new Set())
   const [editing, setEditing]     = useState(null)     // tx que se está editando
@@ -215,6 +217,13 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, year, 
                                 <span className={`txlog-note${t.comentario ? '' : ' empty'}`}>
                                   {t.comentario || 'Sin nota'}
                                 </span>
+                                {sharedByTx[t.rowIndex] && (
+                                  <span className="txlog-shared" title="Gasto compartido">
+                                    👥 {sharedByTx[t.rowIndex].pagado_por_mi
+                                      ? `te deben ${money(sharedByTx[t.rowIndex].total - sharedByTx[t.rowIndex].mi_parte)}`
+                                      : 'tu parte'}
+                                  </span>
+                                )}
                                 <span className={`txlog-importe ${isIncome ? 'is-income' : ''}`}>{sign}{money(t.importe)}</span>
                                 <span className="txlog-chevron" aria-hidden="true"><Icon name="back" size={16} /></span>
                               </button>

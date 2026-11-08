@@ -416,10 +416,10 @@ export async function importTransactions(filas, confirmar = false) {
   return apiJson(res)
 }
 
-// ── Gastos compartidos (grupos) ─────────────────────────────────────────────
+// ── Gastos compartidos (integrados en los movimientos) ──────────────────────
 
-async function groupsCall(path, method = 'GET', body) {
-  const res = await fetch(`${BASE}/api/groups${path}`, {
+async function sharedCall(path, method = 'GET', body) {
+  const res = await fetch(`${BASE}/api/shared${path}`, {
     method,
     headers: { ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...authHeaders() },
     body:    body !== undefined ? JSON.stringify(body) : undefined,
@@ -428,26 +428,17 @@ async function groupsCall(path, method = 'GET', body) {
   return apiJson(res)
 }
 
-export const fetchGroups        = () => groupsCall('')
-export const fetchGroup         = id => groupsCall(`/${id}`)
-export const createGroup        = nombre => groupsCall('', 'POST', { nombre })
-export const deleteGroup        = id => groupsCall(`/${id}`, 'DELETE')
-export const inviteToGroup      = (id, email) => groupsCall(`/${id}/members`, 'POST', { email })
-// Personas sin cuenta: solo un nombre. Su `email` en el grupo es una clave 'invitado:<id>'.
-export const addGroupGuest      = (id, nombre) => groupsCall(`/${id}/guests`, 'POST', { nombre })
-export const deleteGroupGuest   = (id, guestId) => groupsCall(`/${id}/guests/${guestId}`, 'DELETE')
-// Usuarios con cuenta (nombre + email) para elegirlos al invitar.
-export const fetchUserDirectory = async () => {
-  const res = await fetch(`${BASE}/api/users/directory`, { headers: authHeaders(), signal: AbortSignal.timeout(15000) })
-  return apiJson(res)
-}
-// reparto: { modo: 'igual', participantes?: [email] } | { modo: 'importes', partes: { email: importe } }
-export const addGroupExpense    = (id, { concepto, importe, fecha, pagado_por, reparto }) =>
-  groupsCall(`/${id}/expenses`, 'POST', { concepto, importe, fecha, pagado_por, reparto })
-export const deleteGroupExpense = (id, expenseId) => groupsCall(`/${id}/expenses/${expenseId}`, 'DELETE')
-export const addGroupSettlement = (id, { de, a, importe, fecha }) =>
-  groupsCall(`/${id}/settlements`, 'POST', { de, a, importe, fecha })
-export const deleteGroupSettlement = (id, settlementId) => groupsCall(`/${id}/settlements/${settlementId}`, 'DELETE')
+export const fetchShared          = () => sharedCall('')
+export const addSharedPerson      = nombre => sharedCall('/people', 'POST', { nombre })
+export const deleteSharedPerson   = id => sharedCall(`/people/${id}`, 'DELETE')
+// reparto: { modo: 'igual', participantes: ['yo','p:3'] } | { modo: 'importes', partes: { yo: 10, 'p:3': 20 } }
+// Crea el movimiento propio y su reparto a la vez (mismo id_cliente = idempotente).
+export const postSharedExpense    = (body) => sharedCall('/expenses', 'POST', body)
+export const deleteSharedExpense  = id => sharedCall(`/expenses/${id}`, 'DELETE')
+// direccion: 'cobro' (te paga) | 'pago' (le pagas). No crea ingreso ni gasto.
+export const addSharedSettlement  = ({ persona_id, direccion, importe, fecha }) =>
+  sharedCall('/settlements', 'POST', { persona_id, direccion, importe, fecha })
+export const deleteSharedSettlement = id => sharedCall(`/settlements/${id}`, 'DELETE')
 
 // ── Captura de tickets con IA ───────────────────────────────────────────────
 export async function fetchTicketScanStatus() {

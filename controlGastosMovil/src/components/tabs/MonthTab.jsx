@@ -8,11 +8,13 @@ import { getMonthStats, mergeAnnualSplits, filterDataByYear, getTransactionYears
 import { MONTH_NAMES } from '../../data/mockData'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
+import { useShared } from '../../hooks/useShared'
 
 // Calendario, hoja de mes y detalle de movimientos: solo se bajan al usarlos.
 const CalendarView        = lazy(() => import('../ui/CalendarView'))
 const MonthYearSheet      = lazy(() => import('../ui/MonthYearSheet'))
 const TransactionLogModal = lazy(() => import('../ui/TransactionLogModal'))
+const CuentasScreen       = lazy(() => import('../ui/CuentasScreen'))
 
 const TIPOS = [
   { id: 'todo', label: 'Todo' },
@@ -30,6 +32,9 @@ export default function MonthTab() {
   const { data: finance } = useFinanceData()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [tipo, setTipo] = useState('todo')
+  const [cuentasOpen, setCuentasOpen] = useState(false)
+  const shared = useShared()
+  const debe = shared.state.saldo_total
   // El backend agrega por índice de mes (sin año): el año elegido se resuelve
   // aquí filtrando `transactions` (ver filterDataByYear).
   const rawData = filterDataByYear(finance, selectedYear)
@@ -121,6 +126,15 @@ export default function MonthTab() {
         </div>
       </div>
 
+      {/* Cuentas con personas (gastos compartidos) */}
+      <button type="button" className="month-cuentas" onClick={() => setCuentasOpen(true)}>
+        <span aria-hidden="true">👥</span>
+        <span className="month-cuentas-label">Cuentas</span>
+        <span className={`month-cuentas-value${debe > 0 ? ' grp-pos' : debe < 0 ? ' grp-neg' : ''}`}>
+          {debe > 0 ? `Te deben ${fmt(debe)}` : debe < 0 ? `Debes ${fmt(-debe)}` : shared.state.personas.length ? 'Al día' : ''}
+        </span>
+      </button>
+
       {/* Distribución */}
       <div className="s-segmented month-tipo-filter" role="group" aria-label="Filtrar gráficas por tipo de gasto">
         {TIPOS.map(t => (
@@ -180,6 +194,12 @@ export default function MonthTab() {
             year={selectedYear}
             onClose={() => setSelectedConcept(null)}
           />
+        </Suspense>
+      )}
+
+      {cuentasOpen && (
+        <Suspense fallback={<FormSkeleton />}>
+          <CuentasScreen shared={shared} onClose={() => setCuentasOpen(false)} />
         </Suspense>
       )}
 
