@@ -5,7 +5,7 @@ import { useHideAmounts } from '../../hooks/useHideAmounts'
 import { fmtAmount } from '../../utils/amounts'
 import { parseAmountInput, equalSplit, splitDifference, debtText } from '../../utils/groups'
 import {
-  fetchGroups, fetchGroup, createGroup, deleteGroup, inviteToGroup,
+  fetchGroups, fetchGroup, createGroup, deleteGroup, inviteToGroup, addGroupGuest, deleteGroupGuest, fetchUserDirectory,
   addGroupExpense, deleteGroupExpense, addGroupSettlement, deleteGroupSettlement,
 } from '../../services/api'
 import { Section, Row, Segmented } from './ui'
@@ -70,7 +70,10 @@ function GroupDetail({ id, onBack }) {
   const [g, setG] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState('')
+  const [directory, setDirectory] = useState(null)   // null = sin cargar
+  const [query, setQuery] = useState('')
+  const [guestName, setGuestName] = useState('')
+  const [adding, setAdding] = useState(false)
   const [form, setForm] = useState(false)
 
   useEffect(() => {
@@ -98,6 +101,15 @@ function GroupDetail({ id, onBack }) {
     if (!window.confirm('¿Borrar el grupo y todos sus gastos para todos los miembros?')) return
     if (await act(() => deleteGroup(id), 'Grupo borrado')) onBack()
   }
+
+  function openAdd() {
+    setAdding(true); setError('')
+    if (directory === null) fetchUserDirectory().then(setDirectory).catch(e => { setDirectory([]); setError(e.message || 'No se pudo cargar la lista de personas.') })
+  }
+  const enGrupo = new Set(g?.miembros.map(m => m.email))
+  const q = query.trim().toLowerCase()
+  const candidates = directory === null ? null
+    : directory.filter(u => !enGrupo.has(u.email) && (!q || u.nombre.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)))
 
   if (!g) {
     return (
@@ -179,15 +191,43 @@ function GroupDetail({ id, onBack }) {
       )}
 
       <Section title="Miembros">
-        {g.miembros.map(m => <Row key={m.email} icon="👤" label={`${m.nombre}${m.email === g.creado_por ? ' · creador' : ''}`} />)}
-        <form className="grp-form" onSubmit={async e => {
-          e.preventDefault()
-          if (inviteEmail.trim() && await act(() => inviteToGroup(id, inviteEmail.trim()), 'Si la cuenta existe, se ha añadido')) setInviteEmail('')
-        }}>
-          <input className="fm-input" type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="email@ejemplo.com" aria-label="Email de la persona a añadir" autoCapitalize="none" />
-          <button type="submit" className="s-action-btn s-touch" disabled={busy || !inviteEmail.trim()}>Añadir</button>
-        </form>
-        <p className="s-note">Solo personas que ya tengan cuenta en Mi Economía.</p>
+        {g.miembros.map(m => (
+          <Row key={m.email} icon={m.invitado ? '🙂' : '👤'} label={`${m.nombre}${m.email === g.creado_por ? ' · creador' : ''}${m.invitado ? ' · sin cuenta' : ''}`} wrap>
+            {m.invitado && (
+              <button type="button" className="s-action-btn" aria-label={`Quitar a ${m.nombre}`} disabled={busy}
+                onClick={() => act(() => deleteGroupGuest(id, m.email.split(':')[1]))}>Quitar</button>
+            )}
+          </Row>
+        ))}
+        {!adding ? (
+          <div className="grp-pad"><button type="button" className="s-action-btn s-touch" onClick={openAdd}>Añadir persona</button></div>
+        ) : (
+          <div className="grp-add">
+            <p className="grp-label">Personas con cuenta</p>
+            {directory === null && <p className="s-note" role="status">Cargando…</p>}
+            {candidates?.length === 0 && directory !== null && <p className="s-note">No hay más personas con cuenta{query ? ' que coincidan' : ''}.</p>}
+            {directory?.length > 6 && (
+              <input className="fm-input" value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar por nombre" aria-label="Buscar persona" />
+            )}
+            {candidates?.map(u => (
+              <div key={u.email} className="grp-part">
+                <span>{u.nombre}</span>
+                <button type="button" className="s-action-btn" aria-label={`Añadir a ${u.nombre}`} disabled={busy}
+                  onClick={async () => { if (await act(() => inviteToGroup(id, u.email), `${u.nombre} añadido`)) setAdding(false) }}>Añadir</button>
+              </div>
+            ))}
+            <p className="grp-label">¿No tiene cuenta? Solo pon un nombre</p>
+            <form className="grp-form grp-form--flush" onSubmit={async e => {
+              e.preventDefault()
+              if (guestName.trim() && await act(() => addGroupGuest(id, guestName.trim()), 'Persona añadida')) { setGuestName(''); setAdding(false) }
+            }}>
+              <input className="fm-input" value={guestName} onChange={e => setGuestName(e.target.value)} maxLength={60} placeholder="Nombre" aria-label="Nombre de la persona sin cuenta" />
+              <button type="submit" className="s-action-btn s-touch" disabled={busy || !guestName.trim()}>Añadir</button>
+            </form>
+            <p className="s-note">Quien no tiene cuenta no puede entrar a la app: sus gastos y pagos los apuntáis vosotros.</p>
+            <button type="button" className="s-action-btn s-touch" onClick={() => setAdding(false)}>Cerrar</button>
+          </div>
+        )}
       </Section>
 
       {soyCreador && (

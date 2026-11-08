@@ -433,6 +433,14 @@ export const fetchGroup         = id => groupsCall(`/${id}`)
 export const createGroup        = nombre => groupsCall('', 'POST', { nombre })
 export const deleteGroup        = id => groupsCall(`/${id}`, 'DELETE')
 export const inviteToGroup      = (id, email) => groupsCall(`/${id}/members`, 'POST', { email })
+// Personas sin cuenta: solo un nombre. Su `email` en el grupo es una clave 'invitado:<id>'.
+export const addGroupGuest      = (id, nombre) => groupsCall(`/${id}/guests`, 'POST', { nombre })
+export const deleteGroupGuest   = (id, guestId) => groupsCall(`/${id}/guests/${guestId}`, 'DELETE')
+// Usuarios con cuenta (nombre + email) para elegirlos al invitar.
+export const fetchUserDirectory = async () => {
+  const res = await fetch(`${BASE}/api/users/directory`, { headers: authHeaders(), signal: AbortSignal.timeout(15000) })
+  return apiJson(res)
+}
 // reparto: { modo: 'igual', participantes?: [email] } | { modo: 'importes', partes: { email: importe } }
 export const addGroupExpense    = (id, { concepto, importe, fecha, pagado_por, reparto }) =>
   groupsCall(`/${id}/expenses`, 'POST', { concepto, importe, fecha, pagado_por, reparto })

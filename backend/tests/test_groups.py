@@ -86,7 +86,8 @@ def test_simplificar_cuadra_siempre():
 
 RUTAS = [
     ("get", "/api/groups"), ("post", "/api/groups"), ("get", "/api/groups/1"), ("delete", "/api/groups/1"),
-    ("post", "/api/groups/1/members"), ("post", "/api/groups/1/expenses"),
+    ("post", "/api/groups/1/members"), ("post", "/api/groups/1/guests"), ("delete", "/api/groups/1/guests/1"),
+    ("get", "/api/users/directory"), ("post", "/api/groups/1/expenses"),
     ("delete", "/api/groups/1/expenses/1"), ("post", "/api/groups/1/settlements"),
     ("delete", "/api/groups/1/settlements/1"),
 ]
@@ -116,15 +117,30 @@ def test_rate_limit_invitaciones(client, auth_headers, monkeypatch):
         return {"id": gid}
     monkeypatch.setattr(groups, "invite", fake)
     codigos = [client.post("/api/groups/1/members", json={"email": "z@x.es"}, headers=auth_headers).status_code
-               for _ in range(11)]
-    assert codigos[:10] == [200] * 10 and codigos[10] == 429
+               for _ in range(31)]
+    assert codigos[:30] == [200] * 30 and codigos[30] == 429
+
+
+def test_invitado_valida_nombre(client, auth_headers):
+    assert client.post("/api/groups/1/guests", json={"nombre": "  "}, headers=auth_headers).status_code == 422
+    assert client.post("/api/groups/1/guests", json={"nombre": "x" * 61}, headers=auth_headers).status_code == 422
+
+
+def test_directorio_con_rate_limit(client, auth_headers, monkeypatch):
+    async def fake(email):
+        return [{"email": "b@x.es", "nombre": "Beto"}]
+    monkeypatch.setattr(groups, "list_directory", fake)
+    r = client.get("/api/users/directory", headers=auth_headers)
+    assert r.status_code == 200 and r.json() == [{"email": "b@x.es", "nombre": "Beto"}]
+    codigos = [client.get("/api/users/directory", headers=auth_headers).status_code for _ in range(30)]
+    assert codigos[-1] == 429
 
 
 # ── esquema ───────────────────────────────────────────────────────────────────
 
 def test_schema_incluye_las_tablas_nuevas_con_rls():
     sql = open(os.path.join(os.path.dirname(__file__), "..", "schema.sql"), encoding="utf-8").read()
-    for t in ("expense_groups", "expense_group_members", "group_expenses", "group_expense_shares", "group_settlements"):
+    for t in ("expense_groups", "expense_group_members", "group_guests", "group_expenses", "group_expense_shares", "group_settlements"):
         assert re.search(rf"CREATE TABLE IF NOT EXISTS {t}\b", sql), t
         assert re.search(rf"ALTER TABLE public\.{t}\s+ENABLE ROW LEVEL SECURITY", sql), t
     # importes y textos cifrados: ninguna columna en claro

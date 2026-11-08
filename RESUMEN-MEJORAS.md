@@ -12,7 +12,7 @@ Partiendo de `qa`. Sin merge, sin PR, sin tocar producción ni ejecutar SQL cont
 
 ## 3. Gastos compartidos — hecho (v1 mínima)
 - Diseño previo en `docs-diseno-gastos-compartidos.md` (commit aparte) y seguido tal cual.
-- **Backend:** `services/groups.py` + 9 endpoints `/api/groups…` en `main.py`. Grupos con miembros ya registrados (invitación por email con respuesta neutra), gastos con pagador y reparto igual o por importes (suma exacta, en céntimos), pagos entre miembros y saldo «quién debe a quién» (deudas simplificadas). Toda consulta filtra por pertenencia (no miembro = 404 idéntico a inexistente); nombre del grupo, concepto, importes y partes **cifrados**. Rate limits en escrituras, creación e invitaciones.
+- **Backend:** `services/groups.py` + 11 endpoints (`/api/groups…`, invitados y directorio) en `main.py`. Grupos con miembros elegidos del **directorio de usuarios de la app** (`GET /api/users/directory`) o, si no tienen cuenta, **añadidos solo con un nombre** (invitados, clave `invitado:<id>`, nombre cifrado), gastos con pagador y reparto igual o por importes (suma exacta, en céntimos), pagos entre miembros y saldo «quién debe a quién» (deudas simplificadas). Toda consulta filtra por pertenencia (no miembro = 404 idéntico a inexistente); nombre del grupo, concepto, importes y partes **cifrados**. Rate limits en escrituras, creación e invitaciones.
 - **App:** Ajustes → **Gastos compartidos** (`GroupsScreen.jsx`).
 - **Fuera de v1** (documentado en el diseño): editar un gasto, salir/expulsar miembros, otras monedas, porcentajes, convertir tu parte en movimiento propio.
 
@@ -27,10 +27,11 @@ Partiendo de `qa`. Sin merge, sin PR, sin tocar producción ni ejecutar SQL cont
 - No se ha probado con la API real de Anthropic (sin clave en este entorno) ni en un móvil real: la parte de cámara/IA está probada con dobles. Conviene una prueba manual en QA.
 
 ## A aplicar a mano en QA / producción
-1. **Esquema (gastos compartidos).** El backend crea las tablas al arrancar (`ensure_groups_tables`), pero si se prefiere aplicar a mano, es el bloque «Gastos compartidos en grupo» de `backend/schema.sql` (5 tablas `CREATE TABLE IF NOT EXISTS` + 3 índices) y estas líneas de RLS:
+1. **Esquema (gastos compartidos).** El backend crea las tablas al arrancar (`ensure_groups_tables`), pero si se prefiere aplicar a mano, es el bloque «Gastos compartidos en grupo» de `backend/schema.sql` (6 tablas `CREATE TABLE IF NOT EXISTS` (incluye `group_guests`) + 4 índices) y estas líneas de RLS:
    ```sql
    ALTER TABLE public.expense_groups        ENABLE ROW LEVEL SECURITY;
    ALTER TABLE public.expense_group_members ENABLE ROW LEVEL SECURITY;
+   ALTER TABLE public.group_guests          ENABLE ROW LEVEL SECURITY;
    ALTER TABLE public.group_expenses        ENABLE ROW LEVEL SECURITY;
    ALTER TABLE public.group_expense_shares  ENABLE ROW LEVEL SECURITY;
    ALTER TABLE public.group_settlements     ENABLE ROW LEVEL SECURITY;
@@ -42,3 +43,6 @@ Partiendo de `qa`. Sin merge, sin PR, sin tocar producción ni ejecutar SQL cont
 ## Pendiente / a decidir
 - Ningún bloque ha quedado en `PENDIENTE-*.md`. Decisiones abiertas menores: modelo de IA más barato para tickets; si los gastos compartidos deben poder salir de un grupo / generar un movimiento propio; si el importador debe asignar categoría por reglas (hoy todo entra como Gasto Variable).
 - Límite de coste de la IA: hoy solo por usuario (40 llamadas/día); no hay tope global.
+
+## Nota de privacidad (directorio de usuarios)
+Por decisión de producto, cualquier usuario autenticado puede ver el nombre y el email de **todos** los usuarios de la app (para invitarlos desde la propia aplicación). Es razonable para un uso familiar/entre conocidos; si la app se abre a desconocidos, conviene limitarlo (p. ej. solo contactos o búsqueda por email exacto). Tiene rate limit (30/min) y tope de 500 resultados.

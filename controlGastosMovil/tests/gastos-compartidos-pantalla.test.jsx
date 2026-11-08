@@ -3,7 +3,7 @@ import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/re
 
 const api = vi.hoisted(() => ({
   fetchGroups: vi.fn(), fetchGroup: vi.fn(), createGroup: vi.fn(), deleteGroup: vi.fn(), inviteToGroup: vi.fn(),
-  addGroupExpense: vi.fn(), deleteGroupExpense: vi.fn(), addGroupSettlement: vi.fn(), deleteGroupSettlement: vi.fn(),
+  addGroupExpense: vi.fn(), addGroupGuest: vi.fn(), fetchUserDirectory: vi.fn(), deleteGroupExpense: vi.fn(), addGroupSettlement: vi.fn(), deleteGroupSettlement: vi.fn(),
 }))
 vi.mock('../src/context/AuthContext', () => ({ useAuth: () => ({ user: { email: 'a@x.es' } }) }))
 vi.mock('../src/context/AppContext', () => ({ useApp: () => ({ showToast: vi.fn() }) }))
@@ -69,5 +69,33 @@ describe('GroupsScreen', () => {
     fireEvent.click(screen.getByText('Guardar gasto'))
     await screen.findByText('Escribe el concepto.')
     expect(api.addGroupExpense).not.toHaveBeenCalled()
+  })
+
+  it('invitar: elige de la lista de usuarios de la app (sin escribir emails)', async () => {
+    api.fetchGroups.mockResolvedValue([{ id: 1, nombre: 'Viaje', creado_por: 'a@x.es', miembros }])
+    api.fetchGroup.mockResolvedValue(grupo())
+    api.fetchUserDirectory.mockResolvedValue([{ email: 'b@x.es', nombre: 'Beto' }, { email: 'c@x.es', nombre: 'Cris' }])
+    api.inviteToGroup.mockResolvedValue(grupo())
+    render(<GroupsScreen />)
+    fireEvent.click(await screen.findByText('Viaje'))
+    fireEvent.click(await screen.findByText('Añadir persona'))
+    await screen.findByLabelText('Añadir a Cris')
+    expect(screen.queryByLabelText('Añadir a Beto')).toBeNull()      // Beto ya está en el grupo
+    fireEvent.click(screen.getByLabelText('Añadir a Cris'))
+    await waitFor(() => expect(api.inviteToGroup).toHaveBeenCalledWith(1, 'c@x.es'))
+  })
+
+  it('quien no tiene cuenta se añade solo con un nombre', async () => {
+    api.fetchGroups.mockResolvedValue([{ id: 1, nombre: 'Viaje', creado_por: 'a@x.es', miembros }])
+    api.fetchGroup.mockResolvedValue(grupo())
+    api.fetchUserDirectory.mockResolvedValue([])
+    api.addGroupGuest.mockResolvedValue(grupo())
+    render(<GroupsScreen />)
+    fireEvent.click(await screen.findByText('Viaje'))
+    fireEvent.click(await screen.findByText('Añadir persona'))
+    await screen.findByText(/No hay más personas con cuenta/)
+    fireEvent.change(screen.getByLabelText('Nombre de la persona sin cuenta'), { target: { value: 'Abuela' } })
+    fireEvent.click(screen.getAllByText('Añadir').at(-1))
+    await waitFor(() => expect(api.addGroupGuest).toHaveBeenCalledWith(1, 'Abuela'))
   })
 })

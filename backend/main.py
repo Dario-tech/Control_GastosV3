@@ -1281,6 +1281,10 @@ class GroupInviteIn(BaseModel):
     email: Txt = Field(max_length=254)
 
 
+class GroupGuestIn(BaseModel):
+    nombre: Txt = Field(max_length=200)
+
+
 class GroupExpenseIn(BaseModel):
     concepto:   Txt = Field(max_length=200)
     importe:    Any
@@ -1330,12 +1334,36 @@ async def delete_group_endpoint(group_id: int, email: str = Depends(get_current_
 
 @app.post("/api/groups/{group_id}/members")
 async def invite_group_member_endpoint(group_id: int, body: GroupInviteIn, email: str = Depends(get_current_user)):
-    # Como compartir una meta: cada invitación puede sondear si un email tiene cuenta.
-    enforce("group-invite-hour", [email], limit=10, window=3600, block=3600)
-    enforce("group-invite-day", [email], limit=30, window=86400, block=3600)
+    enforce("group-invite-hour", [email], limit=30, window=3600, block=3600)
+    enforce("group-invite-day", [email], limit=100, window=86400, block=3600)
     res = await groups.invite(group_id, email, body.email)
     await _broadcast()
     return res
+
+
+@app.post("/api/groups/{group_id}/guests", status_code=201)
+async def add_group_guest_endpoint(group_id: int, body: GroupGuestIn, email: str = Depends(get_current_user)):
+    """Añade a alguien SIN cuenta, solo con un nombre."""
+    _limit_group_writes(email)
+    res = await groups.add_guest(group_id, email, body.nombre)
+    await _broadcast()
+    return res
+
+
+@app.delete("/api/groups/{group_id}/guests/{guest_id}")
+async def delete_group_guest_endpoint(group_id: int, guest_id: int, email: str = Depends(get_current_user)):
+    _limit_group_writes(email)
+    res = await groups.delete_guest(group_id, guest_id, email)
+    await _broadcast()
+    return res
+
+
+@app.get("/api/users/directory")
+async def users_directory(email: str = Depends(get_current_user)):
+    """Personas con cuenta en la app (nombre + email), para elegirlas al invitar a un grupo.
+    Decisión de producto: el directorio es visible para cualquier usuario autenticado."""
+    enforce("directory-min", [email], limit=30, window=60, block=300)
+    return await groups.list_directory(email)
 
 
 @app.post("/api/groups/{group_id}/expenses", status_code=201)
