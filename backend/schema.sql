@@ -264,6 +264,20 @@ CREATE TABLE IF NOT EXISTS shared_settlements (
 CREATE INDEX IF NOT EXISTS idx_shared_people_user ON shared_people(user_email);
 CREATE INDEX IF NOT EXISTS idx_shared_expenses_user ON shared_expenses(user_email);
 CREATE INDEX IF NOT EXISTS idx_shared_settlements_user ON shared_settlements(user_email);
+-- Gastos fijos que se repiten cada mes hasta una fecha (el piso hasta dic-2027). Se
+-- proyectan en la app como gasto fijo previsto; concepto e importe CIFRADOS (AES-GCM).
+-- Aditivo e idempotente; el backend también lo crea al arrancar (ensure_fixed_recurring_table).
+CREATE TABLE IF NOT EXISTS fixed_recurring (
+    id           SERIAL PRIMARY KEY,
+    user_email   TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    concepto_enc BYTEA NOT NULL,
+    importe_enc  BYTEA NOT NULL,
+    dia          INTEGER NOT NULL DEFAULT 1 CHECK (dia BETWEEN 1 AND 31),
+    desde        DATE NOT NULL,   -- primer día del mes de inicio
+    hasta        DATE,            -- primer día del último mes; NULL = sin fecha de fin
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_fixed_recurring_user ON fixed_recurring(user_email);
 
 -- Row Level Security en todas las tablas de public, SIN políticas: bloquea el
 -- acceso por la API REST de Supabase (roles anon/authenticated) a estas tablas.
@@ -291,3 +305,4 @@ ALTER TABLE public.shared_people ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shared_expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shared_shares ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shared_settlements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fixed_recurring            ENABLE ROW LEVEL SECURITY;

@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
-import { postTransaction, postSharedExpense } from '../../services/api'
+import { postTransaction, postSharedExpense, createFixedRecurring } from '../../services/api'
+import { nextMonthOf } from '../../utils/fixedRecurring'
 import { TYPES, combineCategories, categoryKey } from '../../data/categories'
 import { isUnusualAmount, fmt, todayLocal, addDaysLocal } from '../../utils'
-import { FormScreen, Field, Section, AmountInput, Chips, PrimaryButton, Icon } from './FormKit'
+import { FormScreen, Field, Section, AmountInput, Chips, PrimaryButton, Icon, SwitchRow } from './FormKit'
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll'
 import { useCategories } from '../../hooks/useCategories'
 import { useApp } from '../../context/AppContext'
@@ -35,6 +36,11 @@ export default function AddTransactionModal({ onClose }) {
   const [split, setSplit] = useState(null)
   const shared = useShared()
 
+  // Gasto fijo que se repite cada mes: hasta qué mes (o sin fin). Solo para «Gasto Fijo».
+  const [repeat, setRepeat]       = useState(false)
+  const [sinFin, setSinFin]       = useState(false)
+  const [hasta, setHasta]         = useState(() => nextMonthOf(addDaysLocal(330)))
+
   // Hoja «Nueva categoría»
   const [showNewCat, setShowNewCat] = useState(false)
 
@@ -62,6 +68,18 @@ export default function AddTransactionModal({ onClose }) {
         })
       } else {
         await postTransaction(amt, tipo, concepto, fecha, comentario.trim() || null, clientId.current)
+        if (repeat && tipo === 'Gasto Fijo') {
+          // El movimiento ya está guardado: si la repetición falla, se avisa pero no se deshace nada.
+          try {
+            await createFixedRecurring({
+              concepto, importe: amt, dia: Number(fecha.slice(8, 10)) || 1,
+              desde: nextMonthOf(fecha), hasta: sinFin ? null : hasta,
+            })
+            window.dispatchEvent(new Event('fixed-recurring-changed'))
+          } catch {
+            showToast('Guardado, pero no se pudo programar la repetición. Prueba desde Planificación.')
+          }
+        }
       }
       refresh()
       onClose()
@@ -88,8 +106,10 @@ export default function AddTransactionModal({ onClose }) {
   const unusualSel = selected && amtOk ? isUnusualAmount(data, selected, amtNum) : null
   const tipoMeta = TYPES.find(t => t.id === tipo)
   const splitOk = !split || !!split.payload
-  const canSave = !!selected && amtOk && !loading && splitOk
-  const missing = !amtOk ? 'Escribe un importe para continuar' : !selected ? 'Elige una categoría para continuar' : 'Completa el reparto para continuar'
+  const hastaOk = !repeat || !!split || sinFin || (/^\d{4}-\d{2}$/.test(hasta) && hasta >= nextMonthOf(fecha))
+  const canSave = !!selected && amtOk && !loading && splitOk && hastaOk
+  const missing = !amtOk ? 'Escribe un importe para continuar' : !selected ? 'Elige una categoría para continuar'
+    : !splitOk ? 'Completa el reparto para continuar' : 'Elige un mes de fin posterior a este'
 
   function goBack() { setStep(1); setShowNewCat(false); setSelected(null); setError(null) }
 
@@ -187,6 +207,26 @@ export default function AddTransactionModal({ onClose }) {
           </Section>
 
           {tipo !== 'Ingreso' && <SplitSection total={amtOk ? amtNum : 0} shared={shared} onChange={setSplit} />}
+
+          {tipo === 'Gasto Fijo' && !split && (
+            <Section title="Repetición">
+              <SwitchRow checked={repeat} onChange={setRepeat} title="Repetir cada mes"
+                desc="Aparecerá solo en los meses siguientes con este importe. No lo actives si el importe cambia cada mes (la luz)." />
+              {repeat && (
+                <>
+                  <SwitchRow checked={sinFin} onChange={setSinFin} title="Sin fecha de fin" desc="Hasta que lo pares tú." />
+                  {!sinFin && (
+                    <Field label="Hasta el mes de" error={hastaOk ? '' : 'Elige un mes posterior al de este gasto'}>
+                      {({ id }) => (
+                        <input id={id} className="fm-input" type="month" value={hasta} min={nextMonthOf(fecha)}
+                          onChange={e => setHasta(e.target.value)} />
+                      )}
+                    </Field>
+                  )}
+                </>
+              )}
+            </Section>
+          )}
 
           {showNewCat && (
             <NewCategorySheet tipo={tipo} existing={allCats}

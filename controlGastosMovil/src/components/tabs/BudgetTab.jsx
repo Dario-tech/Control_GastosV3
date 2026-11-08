@@ -8,6 +8,7 @@ import TotalHero from '../ui/budget/TotalHero'
 import BudgetItem from '../ui/budget/BudgetItem'
 import SavingsGoals from '../ui/SavingsGoals'
 import AnnualExpenses from '../ui/AnnualExpenses'
+import FixedRecurring from '../ui/FixedRecurring'
 import { FormSkeleton } from '../ui/Skeleton'
 import { MONTH_NAMES } from '../../data/mockData'
 import { daysLeftInMonth } from '../../utils/budget'
@@ -139,6 +140,8 @@ export default function BudgetTab() {
       {/* Gastos fijos anuales: IBI, seguro del coche… — bloque independiente
           del presupuesto por categoría de arriba, separado visualmente para
           que no se lean como una sola cosa continua. */}
+      <div className="planning-section-divider" />
+      <FixedRecurring />
       <div className="planning-section-divider" />
       <AnnualExpenses />
 

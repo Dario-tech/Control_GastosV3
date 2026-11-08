@@ -9,6 +9,8 @@ import { useFinanceData } from '../../context/FinanceDataContext'
 import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
 import { useSubscriptionMarks } from '../../hooks/useSubscriptionMarks'
 import { groupSubscriptionsAsFixed } from '../../utils/subscriptions'
+import { useFixedRecurring } from '../../hooks/useFixedRecurring'
+import { mergeFixedRecurring } from '../../utils/fixedRecurring'
 
 // recharts pesa bastante: el gráfico se descarga aparte para que Año pinte antes.
 const IncomeExpenseChart = lazy(() => import('../charts/IncomeExpenseChart'))
@@ -18,7 +20,9 @@ export default function YearTab() {
   const { data: rawData } = useFinanceData()
   const { expenses: annualExpenses } = useAnnualExpenses()
   const { keys: subKeys } = useSubscriptionMarks()
-  const data = groupSubscriptionsAsFixed(mergeAnnualSplits(rawData, annualExpenses), subKeys)
+  const { rules: fixedRules } = useFixedRecurring()
+  const data = groupSubscriptionsAsFixed(
+    mergeAnnualSplits(mergeFixedRecurring(rawData, fixedRules, rawData?.year ?? new Date().getFullYear()), annualExpenses), subKeys)
   const { income, expenses, balance, savingsRate, avgIncome } = getYearStats(data)
   const activeMonths = getActiveMonths(data)
 

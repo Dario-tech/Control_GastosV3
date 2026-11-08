@@ -12,6 +12,8 @@ import { useShared } from '../../hooks/useShared'
 import { useSubscriptionMarks } from '../../hooks/useSubscriptionMarks'
 import { groupSubscriptionsAsFixed } from '../../utils/subscriptions'
 import SubscriptionsCard from '../ui/SubscriptionsCard'
+import { useFixedRecurring } from '../../hooks/useFixedRecurring'
+import { mergeFixedRecurring } from '../../utils/fixedRecurring'
 
 // Calendario, hoja de mes y detalle de movimientos: solo se bajan al usarlos.
 const CalendarView        = lazy(() => import('../ui/CalendarView'))
@@ -51,7 +53,10 @@ export default function MonthTab() {
   // donut, listado) los trata igual que cualquier otro gasto fijo.
   // Las categorías marcadas como suscripción cuentan como gasto fijo, en una fila «Suscripciones».
   const { keys: subKeys } = useSubscriptionMarks()
-  const data = groupSubscriptionsAsFixed(mergeAnnualSplits(rawData, annualExpenses), subKeys)
+  // Fijos que se repiten cada mes hasta una fecha: se proyectan como previstos.
+  const { rules: fixedRules } = useFixedRecurring()
+  const data = groupSubscriptionsAsFixed(
+    mergeAnnualSplits(mergeFixedRecurring(rawData, fixedRules, selectedYear), annualExpenses), subKeys)
   const [selectedConcept, setSelectedConcept] = useState(null)
   const [heatmapOpen, setHeatmapOpen] = useState(() => {
     try { return JSON.parse(localStorage.getItem('mi-economia-cal-open') ?? 'false') }
@@ -88,7 +93,7 @@ export default function MonthTab() {
     selectedYear === now.getFullYear() && selectedMonth === now.getMonth() && stats.income === 0
 
   function handleSelectConcept(item) {
-    if (!item.isAnnualSplit && !item.isSubscriptions) setSelectedConcept(item)
+    if (!item.isAnnualSplit && !item.isSubscriptions && !item.isProjected) setSelectedConcept(item)
   }
 
   return (

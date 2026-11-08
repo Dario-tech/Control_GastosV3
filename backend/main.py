@@ -51,6 +51,7 @@ from services.importes import IMPORTE_MAX, redondear_importe, validar_importe
 from services import import_csv
 from services import shared
 from services import ticket_scan
+from services import fixed_recurring
 from services.ai_categorize import suggest_emoji
 from services.email_report import send_monthly_report, send_monthly_reports_to_all
 from services.goals import (
@@ -75,6 +76,7 @@ async def lifespan(app: FastAPI):
     ensure_encrypted_columns()  # migración aditiva idempotente (concepto/importe/nota cifrados)
     backfill_comentarios()  # cifra las notas antiguas en claro; nunca rompe el arranque
     ensure_annual_expenses_table()  # migración aditiva idempotente (gastos fijos anuales)
+    fixed_recurring.ensure_fixed_recurring_table()  # migración aditiva idempotente (fijos que se repiten cada mes)
     ensure_id_cliente()  # migración aditiva idempotente (id_cliente: idempotencia del alta)
     ensure_search_index()  # migración aditiva idempotente (índice para paginar la búsqueda)
     ensure_wallet_schema()  # migración aditiva idempotente (Atajo de Cartera: comercio, reglas)
@@ -1432,6 +1434,45 @@ async def update_annual_expense_endpoint(expense_id: int, body: AnnualExpenseIn,
 @app.delete("/api/annual-expenses/{expense_id}")
 async def delete_annual_expense_endpoint(expense_id: int, email: str = Depends(get_current_user)):
     await delete_annual_expense(email, expense_id)
+    return {"status": "ok"}
+
+
+# ── Gastos fijos que se repiten cada mes hasta una fecha ─────────────────────
+
+class FixedRecurringIn(BaseModel):
+    concepto: Txt = Field(max_length=200)   # tope real (60) en fixed_recurring.validate
+    importe:  Any
+    dia:      Any = 1
+    desde:    Txt = Field(max_length=10)    # AAAA-MM
+    hasta:    Txt | None = Field(default=None, max_length=10)  # AAAA-MM; sin valor = sin fecha de fin
+
+
+@app.get("/api/fixed-recurring")
+async def list_fixed_recurring_endpoint(email: str = Depends(get_current_user)):
+    return await fixed_recurring.list_for_user(email)
+
+
+@app.post("/api/fixed-recurring", status_code=201)
+async def create_fixed_recurring_endpoint(body: FixedRecurringIn, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    res = await fixed_recurring.create(email, body.concepto, body.importe, body.dia, body.desde, body.hasta)
+    await _broadcast()
+    return res
+
+
+@app.patch("/api/fixed-recurring/{rule_id}")
+async def update_fixed_recurring_endpoint(rule_id: int, body: FixedRecurringIn, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    res = await fixed_recurring.update(email, rule_id, body.concepto, body.importe, body.dia, body.desde, body.hasta)
+    await _broadcast()
+    return res
+
+
+@app.delete("/api/fixed-recurring/{rule_id}")
+async def delete_fixed_recurring_endpoint(rule_id: int, email: str = Depends(get_current_user)):
+    _limit_user_writes(email)
+    await fixed_recurring.delete(email, rule_id)
+    await _broadcast()
     return {"status": "ok"}
 
 
