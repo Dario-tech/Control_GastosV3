@@ -8,9 +8,6 @@ import { getMonthStats, mergeAnnualSplits, filterDataByYear, getTransactionYears
 import { MONTH_NAMES } from '../../data/mockData'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
-import { useSubscriptionMarks } from '../../hooks/useSubscriptionMarks'
-import { groupSubscriptionsAsFixed } from '../../utils/subscriptions'
-import SubscriptionsCard from '../ui/SubscriptionsCard'
 import { useFixedRecurring } from '../../hooks/useFixedRecurring'
 import { mergeFixedRecurring } from '../../utils/fixedRecurring'
 
@@ -46,12 +43,9 @@ export default function MonthTab() {
   // Los repartos de gastos fijos anuales cuentan como gasto fijo del mes que
   // les toca — se fusionan aquí una vez y de ahí para abajo todo (saldo,
   // donut, listado) los trata igual que cualquier otro gasto fijo.
-  // Las categorías marcadas como suscripción cuentan como gasto fijo, en una fila «Suscripciones».
-  const { keys: subKeys } = useSubscriptionMarks()
   // Fijos que se repiten cada mes hasta una fecha: se proyectan como previstos.
   const { rules: fixedRules } = useFixedRecurring()
-  const data = groupSubscriptionsAsFixed(
-    mergeAnnualSplits(mergeFixedRecurring(rawData, fixedRules, selectedYear), annualExpenses), subKeys)
+  const data = mergeAnnualSplits(mergeFixedRecurring(rawData, fixedRules, selectedYear), annualExpenses)
   const [selectedConcept, setSelectedConcept] = useState(null)
   const [heatmapOpen, setHeatmapOpen] = useState(() => {
     try { return JSON.parse(localStorage.getItem('mi-economia-cal-open') ?? 'false') }
@@ -88,7 +82,7 @@ export default function MonthTab() {
     selectedYear === now.getFullYear() && selectedMonth === now.getMonth() && stats.income === 0
 
   function handleSelectConcept(item) {
-    if (!item.isAnnualSplit && !item.isSubscriptions && !item.isProjected) setSelectedConcept(item)
+    if (!item.isAnnualSplit && !item.isProjected) setSelectedConcept(item)
   }
 
   return (
@@ -165,7 +159,6 @@ export default function MonthTab() {
       <Card title="🏠 Gastos Fijos" noPad>
         <ConceptList items={data.fixedExpenses} monthIndex={selectedMonth} colorClass="expense-amt" onSelect={handleSelectConcept} />
       </Card>
-      <SubscriptionsCard transactions={finance?.transactions} />
       <Card title="💳 Gastos Variables" noPad>
         <ConceptList items={data.variableExpenses} monthIndex={selectedMonth} colorClass="expense-amt" onSelect={setSelectedConcept} />
       </Card>

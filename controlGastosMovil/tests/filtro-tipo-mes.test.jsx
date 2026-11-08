@@ -12,7 +12,6 @@ vi.mock('../src/context/FinanceDataContext', () => ({ useFinanceData: () => ({ d
 vi.mock('../src/context/AppContext', () => ({ useApp: () => ({ selectedMonth: 9, selectedYear: 2026, setSelectedMonth() {}, setSelectedYear() {} }) }))
 vi.mock('../src/hooks/useAnnualExpenses', () => ({ useAnnualExpenses: () => ({ expenses: [] }) }))
 vi.mock('../src/hooks/useHideAmounts', () => ({ useHideAmounts: () => false }))
-vi.mock('../src/hooks/useRecurring', () => ({ useRecurring: () => ({ items: [], status: 'ready' }) }))
 vi.mock('../src/hooks/useFixedRecurring', () => ({ useFixedRecurring: () => ({ rules: [], status: 'ready' }) }))
 
 import MonthTab from '../src/components/tabs/MonthTab'

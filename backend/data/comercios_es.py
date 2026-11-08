@@ -43,8 +43,8 @@ GF = "Gasto Fijo"
 
 # Categorías por defecto de la app (tipo -> nombres). Debe coincidir con categories.js.
 DEFAULT_CATEGORIES = {
-    GV: ("Ocio", "Comida", "Ropa", "Vuelos", "Gimnasio", "Suscripciones", "Variado"),
-    GF: ("Piso", "Luz", "Gas", "Agua", "Wifi", "Transporte", "Inversiones", "Cripto"),
+    GV: ("Ocio", "Comida", "Ropa", "Vuelos", "Gimnasio", "Variado"),
+    GF: ("Piso", "Luz", "Gas", "Agua", "Wifi", "Transporte", "Suscripciones", "Inversiones", "Cripto"),
 }
 
 # grupo -> (tipo preferido, categorías candidatas por orden de preferencia).
@@ -70,8 +70,8 @@ GRUPOS = {
     "optica":       (GV, ("Optica", "Salud", "Variado")),
     "belleza":      (GV, ("Belleza", "Cuidado personal", "Peluqueria", "Variado")),
     "peluqueria":   (GV, ("Peluqueria", "Belleza", "Cuidado personal", "Variado")),
-    "streaming":    (GV, ("Streaming", "Suscripciones")),
-    "suscripcion":  (GV, ("Suscripciones", "Suscripcion")),
+    "streaming":    (GF, ("Streaming", "Suscripciones")),
+    "suscripcion":  (GF, ("Suscripciones", "Suscripcion")),
     "telefonia":    (GF, ("Telefono", "Telefonia", "Movil", "Internet", "Wifi")),
     "luz":          (GF, ("Luz", "Electricidad")),
     "luz_gas":      (GF, ("Luz", "Electricidad", "Gas")),
