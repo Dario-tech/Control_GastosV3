@@ -222,6 +222,21 @@ CREATE INDEX IF NOT EXISTS idx_group_expenses_group ON group_expenses(group_id);
 CREATE INDEX IF NOT EXISTS idx_group_settlements_group ON group_settlements(group_id);
 CREATE INDEX IF NOT EXISTS idx_group_members_user ON expense_group_members(user_email);
 
+-- Gastos fijos que se repiten cada mes hasta una fecha (el piso hasta dic-2027). Se
+-- proyectan en la app como gasto fijo previsto; concepto e importe CIFRADOS (AES-GCM).
+-- Aditivo e idempotente; el backend también lo crea al arrancar (ensure_fixed_recurring_table).
+CREATE TABLE IF NOT EXISTS fixed_recurring (
+    id           SERIAL PRIMARY KEY,
+    user_email   TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    concepto_enc BYTEA NOT NULL,
+    importe_enc  BYTEA NOT NULL,
+    dia          INTEGER NOT NULL DEFAULT 1 CHECK (dia BETWEEN 1 AND 31),
+    desde        DATE NOT NULL,   -- primer día del mes de inicio
+    hasta        DATE,            -- primer día del último mes; NULL = sin fecha de fin
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_fixed_recurring_user ON fixed_recurring(user_email);
+
 -- Row Level Security en todas las tablas de public, SIN políticas: bloquea el
 -- acceso por la API REST de Supabase (roles anon/authenticated) a estas tablas.
 -- El backend se conecta como owner de las tablas, que no está sujeto a RLS
@@ -244,3 +259,4 @@ ALTER TABLE public.group_guests               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_expenses             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_expense_shares       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_settlements          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fixed_recurring            ENABLE ROW LEVEL SECURITY;
