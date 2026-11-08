@@ -29,6 +29,7 @@ from .wallet import parse_importe, parse_fecha, clean_comercio
 _log = logging.getLogger("uvicorn.error")
 
 MAX_IMAGE_BYTES = 1_000_000          # imagen ya decodificada
+MAX_LINEAS = 60
 MAX_B64_CHARS = 1_400_000            # base64 recibido (≈ 1,05 MB de imagen)
 TIMEOUT_S = 30
 # Modelo con visión y nivel gratuito; configurable por si Google lo renombra.
@@ -87,9 +88,15 @@ def decodificar_imagen(b64) -> tuple[bytes, str]:
     return data, tipo
 
 
+class _Linea(BaseModel):
+    descripcion: str | None = None
+    importe: float | None = None   # total de la línea (cantidad × precio), en euros
+
+
 class _Ticket(BaseModel):
     es_ticket: bool
     importe_total: float | None = None
+    lineas: list[_Linea] = []
     comercio: str | None = None
     fecha: str | None = None  # AAAA-MM-DD
 
@@ -110,6 +117,10 @@ _SCHEMA = {
         "importe_total": {"type": "NUMBER", "nullable": True},
         "comercio": {"type": "STRING", "nullable": True},
         "fecha": {"type": "STRING", "nullable": True},
+        "lineas": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {
+            "descripcion": {"type": "STRING", "nullable": True},
+            "importe": {"type": "NUMBER", "nullable": True},
+        }}},
     },
     "required": ["es_ticket"],
 }
@@ -127,8 +138,10 @@ def _post(payload: dict) -> dict:
 
 
 def normalizar(t: _Ticket) -> dict:
-    """Pasa la salida del modelo por los validadores de /api/pending; lo que no valga queda en None."""
+    """Pasa la salida del modelo por los validadores de /api/pending; lo que no valga queda en None
+    (y las líneas inválidas se descartan). `lineas`: [{descripcion, importe}] (≤ MAX_LINEAS)."""
     importe = comercio = fecha = None
+    lineas: list[dict] = []
     if t.es_ticket:
         try:
             importe = parse_importe(t.importe_total) if t.importe_total is not None else None
@@ -139,7 +152,14 @@ def normalizar(t: _Ticket) -> dict:
             fecha = parse_fecha(t.fecha).isoformat() if t.fecha else None
         except ValueError:
             fecha = None
-    return {"importe": importe, "comercio": comercio, "fecha": fecha}
+        for ln in t.lineas[:MAX_LINEAS]:
+            try:
+                imp = parse_importe(ln.importe)
+            except ValueError:
+                continue
+            desc = (clean_comercio(ln.descripcion) or "Línea")[:60]
+            lineas.append({"descripcion": desc, "importe": imp})
+    return {"importe": importe, "comercio": comercio, "fecha": fecha, "lineas": lineas}
 
 
 async def escanear_ticket(data: bytes, media_type: str) -> dict:
@@ -155,7 +175,7 @@ async def escanear_ticket(data: bytes, media_type: str) -> dict:
             {"text": _PROMPT},
         ]}],
         "generationConfig": {
-            "temperature": 0, "maxOutputTokens": 300,
+            "temperature": 0, "maxOutputTokens": 2000,
             "responseMimeType": "application/json", "responseSchema": _SCHEMA,
         },
     }
@@ -174,6 +194,6 @@ async def escanear_ticket(data: bytes, media_type: str) -> dict:
     if parsed is None:
         raise TicketScanError("No he podido leer el ticket")
     res = normalizar(parsed)
-    if res["importe"] is None and res["comercio"] is None and res["fecha"] is None:
+    if res["importe"] is None and res["comercio"] is None and res["fecha"] is None and not res["lineas"]:
         raise TicketScanError("No he podido leer un ticket en la imagen")
     return res

@@ -37,11 +37,11 @@ def test_imagenes_rechazadas(malo):
 
 def test_normalizar_valida_cada_campo():
     ok = ts.normalizar(ts._Ticket(es_ticket=True, importe_total=23.456, comercio="  Mercadona   S.A. ", fecha="2025-03-04"))
-    assert ok == {"importe": 23.46, "comercio": "Mercadona S.A.", "fecha": "2025-03-04"}
+    assert ok == {"importe": 23.46, "comercio": "Mercadona S.A.", "fecha": "2025-03-04", "lineas": []}
     malo = ts.normalizar(ts._Ticket(es_ticket=True, importe_total=-5, comercio=" ", fecha="04/03/2025"))
-    assert malo == {"importe": None, "comercio": None, "fecha": None}
+    assert malo == {"importe": None, "comercio": None, "fecha": None, "lineas": []}
     assert ts.normalizar(ts._Ticket(es_ticket=False, importe_total=10, comercio="X", fecha="2025-01-01")) == \
-        {"importe": None, "comercio": None, "fecha": None}
+        {"importe": None, "comercio": None, "fecha": None, "lineas": []}
     assert ts.normalizar(ts._Ticket(es_ticket=True, importe_total=10**9))["importe"] is None
 
 
@@ -54,7 +54,7 @@ def con_ia(monkeypatch):
 
     async def fake(data, media_type):
         llamadas.append((len(data), media_type))
-        return {"importe": 12.5, "comercio": "Bar Pepe", "fecha": "2025-03-04"}
+        return {"importe": 12.5, "comercio": "Bar Pepe", "fecha": "2025-03-04", "lineas": []}
     monkeypatch.setattr(ts, "escanear_ticket", fake)
     return llamadas
 
@@ -79,7 +79,7 @@ def test_propone_sin_guardar_nada(client, auth_headers, con_ia):
     assert client.get("/api/ticket-scan/status", headers=auth_headers).json() == {"disponible": True}
     r = post(client, auth_headers)
     assert r.status_code == 200
-    assert r.json() == {"importe": 12.5, "comercio": "Bar Pepe", "fecha": "2025-03-04"}
+    assert r.json() == {"importe": 12.5, "comercio": "Bar Pepe", "fecha": "2025-03-04", "lineas": []}
     assert con_ia == [(len(JPG), "image/jpeg")]
 
 
@@ -126,7 +126,7 @@ def test_llama_a_gemini_con_la_imagen_y_valida(monkeypatch):
     monkeypatch.setattr(ts, "_post", lambda p: vistos.append(p) or _respuesta(
         {"es_ticket": True, "importe_total": 9.99, "comercio": "Zara", "fecha": "2025-02-01"}))
     res = asyncio.run(ts.escanear_ticket(JPG, "image/jpeg"))
-    assert res == {"importe": 9.99, "comercio": "Zara", "fecha": "2025-02-01"}
+    assert res == {"importe": 9.99, "comercio": "Zara", "fecha": "2025-02-01", "lineas": []}
     parte = vistos[0]["contents"][0]["parts"][0]["inline_data"]
     assert parte["mime_type"] == "image/jpeg" and parte["data"] == b64(JPG)
     assert vistos[0]["generationConfig"]["responseMimeType"] == "application/json"
@@ -178,3 +178,26 @@ def test_logs_sin_imagen_ni_importes(monkeypatch, caplog):
     assert "RuntimeError" in caplog.text
     for secreto in ("77,77", "Mercadona", b64(JPG)[:20], "test-key"):
         assert secreto not in caplog.text
+
+
+def test_lineas_se_validan_una_a_una():
+    t = ts._Ticket(es_ticket=True, importe_total=30, lineas=[
+        ts._Linea(descripcion="  Caña ", importe=2.5), ts._Linea(descripcion="Tortilla", importe=9),
+        ts._Linea(descripcion="Descuento", importe=-3),      # negativa: se descarta
+        ts._Linea(descripcion="Sin precio", importe=None),   # sin precio: se descarta
+        ts._Linea(descripcion=None, importe=4),              # sin texto: «Línea»
+    ])
+    assert ts.normalizar(t)["lineas"] == [
+        {"descripcion": "Caña", "importe": 2.5}, {"descripcion": "Tortilla", "importe": 9.0}, {"descripcion": "Línea", "importe": 4.0}]
+
+
+def test_maximo_de_lineas():
+    t = ts._Ticket(es_ticket=True, lineas=[ts._Linea(descripcion=f"p{i}", importe=1) for i in range(ts.MAX_LINEAS + 20)])
+    assert len(ts.normalizar(t)["lineas"]) == ts.MAX_LINEAS
+
+
+def test_solo_lineas_ya_es_un_ticket_valido(monkeypatch):
+    import asyncio
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key-no-real")
+    monkeypatch.setattr(ts, "_post", lambda p: _respuesta({"es_ticket": True, "lineas": [{"descripcion": "Café", "importe": 1.2}]}))
+    assert asyncio.run(ts.escanear_ticket(JPG, "image/jpeg"))["lineas"] == [{"descripcion": "Café", "importe": 1.2}]
