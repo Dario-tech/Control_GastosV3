@@ -16,35 +16,54 @@ function enDias(n) {
 }
 const rec = (concepto, importe, ultima) => ({ concepto, importe, frecuencia: 'mensual', ultima, ocurrencias: 4, proxima: '' })
 
+const tx = (concepto, bucket = 'variableExpenses') => ({ fecha: '2026-10-05', concepto, importe: 10, bucket })
+
 describe('SubscriptionsCard', () => {
-  it('no pinta nada sin recurrentes ni cargando', () => {
+  it('se ve SIEMPRE, también sin nada detectado ni marcado, y explica qué es', () => {
     state.toggle = vi.fn()
-    const { container, rerender } = render(<SubscriptionsCard transactions={[]} />)
-    expect(container.innerHTML).toBe('')
-    state.rec = { items: [], status: 'loading' }
-    rerender(<SubscriptionsCard transactions={[]} />)
-    expect(container.innerHTML).toBe('')
+    render(<SubscriptionsCard transactions={[]} />)
+    expect(screen.getByText('🔁 Suscripciones')).toBeTruthy()
+    expect(screen.getByText(/Aquí verás tus suscripciones/)).toBeTruthy()
+    expect(screen.getByText('Añadir suscripción')).toBeTruthy()
   })
 
-  it('lista las marcadas con total y permite marcar una sugerida', () => {
+  it('también mientras carga lo detectado', () => {
+    state.toggle = vi.fn()
+    state.rec = { items: [], status: 'loading' }
+    render(<SubscriptionsCard transactions={[]} />)
+    expect(screen.getByText('🔁 Suscripciones')).toBeTruthy()
+  })
+
+  it('sin detección se puede marcar a mano una categoría que ya usas (no ingresos)', () => {
+    state.toggle = vi.fn()
+    render(<SubscriptionsCard transactions={[tx('Netflix'), tx('Nómina', 'income')]} />)
+    fireEvent.click(screen.getByText('Añadir suscripción'))
+    fireEvent.click(screen.getByLabelText('Marcar Netflix como suscripción'))
+    expect(state.toggle).toHaveBeenCalledWith('netflix')
+    expect(screen.queryByLabelText('Marcar Nómina como suscripción')).toBeNull()
+  })
+
+  it('una marcada sin patrón detectado se lista igualmente y se puede quitar', () => {
+    state.toggle = vi.fn()
+    state.keys = ['netflix']
+    render(<SubscriptionsCard transactions={[tx('Netflix')]} />)
+    expect(screen.getByText('Aún sin renovación detectada')).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('Quitar Netflix de suscripciones'))
+    expect(state.toggle).toHaveBeenCalledWith('netflix')
+  })
+
+  it('lista las detectadas marcadas con total y permite marcar una sugerida', () => {
     state.toggle = vi.fn()
     state.keys = ['netflix']
     state.rec = { status: 'ready', items: [rec('Netflix', 12.99, enDias(-10)), rec('HBO', 8.99, enDias(-5))] }
     render(<SubscriptionsCard transactions={[]} />)
     expect(screen.getByText('Netflix')).toBeTruthy()
     expect(screen.getByText('Al mes')).toBeTruthy()
-    expect(screen.queryByText('HBO')).toBeNull()                 // sugerida: plegada
-    fireEvent.click(screen.getByText(/Detectados que se repiten/))
+    expect(screen.queryByText('HBO')).toBeNull()                 // sugerida: dentro de «Añadir»
+    fireEvent.click(screen.getByText('Añadir suscripción'))
     fireEvent.click(screen.getByLabelText('Marcar HBO como suscripción'))
     expect(state.toggle).toHaveBeenCalledWith('hbo')
     fireEvent.click(screen.getByLabelText('Quitar Netflix de suscripciones'))
     expect(state.toggle).toHaveBeenCalledWith('netflix')
-  })
-
-  it('sin marcadas explica qué hacer', () => {
-    state.toggle = vi.fn()
-    state.rec = { status: 'ready', items: [rec('Netflix', 12.99, enDias(-10))] }
-    render(<SubscriptionsCard transactions={[]} />)
-    expect(screen.getByText(/Aún no has marcado ninguna/)).toBeTruthy()
   })
 })
