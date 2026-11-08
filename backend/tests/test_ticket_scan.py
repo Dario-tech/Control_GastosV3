@@ -49,7 +49,7 @@ def test_normalizar_valida_cada_campo():
 
 @pytest.fixture
 def con_ia(monkeypatch):
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key-no-real")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-no-real")
     llamadas = []
 
     async def fake(data, media_type):
@@ -69,7 +69,7 @@ def test_requiere_login(client):
 
 
 def test_sin_api_key_degrada_con_elegancia(client, auth_headers, monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     assert client.get("/api/ticket-scan/status", headers=auth_headers).json() == {"disponible": False}
     r = post(client, auth_headers)
     assert r.status_code == 503 and "no está disponible" in r.json()["detail"]
@@ -102,7 +102,7 @@ def test_rate_limit_por_usuario(client, auth_headers, con_ia):
 
 
 def test_fallo_de_la_ia_da_502_generico(client, auth_headers, monkeypatch):
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key-no-real")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-no-real")
 
     async def roto(data, media_type):
         raise ts.TicketReadError()
@@ -113,68 +113,49 @@ def test_fallo_de_la_ia_da_502_generico(client, auth_headers, monkeypatch):
 
 # ── servicio: llamada a la API simulada y privacidad en logs ──────────────────
 
-def _respuesta(ticket: dict | str):
-    import json
-    texto = ticket if isinstance(ticket, str) else json.dumps(ticket)
-    return {"candidates": [{"content": {"parts": [{"text": texto}]}}]}
+class _FakeClient:
+    def __init__(self, parsed=None, boom=None):
+        self.parsed, self.boom, self.kw = parsed, boom, None
+        self.messages = self
+
+    def with_options(self, **kw):
+        self.options = kw
+        return self
+
+    def parse(self, **kw):
+        self.kw = kw
+        if self.boom:
+            raise self.boom
+        return type("R", (), {"parsed_output": self.parsed})()
 
 
-def test_llama_a_gemini_con_la_imagen_y_valida(monkeypatch):
+def test_llama_a_claude_con_la_imagen_y_valida(monkeypatch):
     import asyncio
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key-no-real")
-    vistos = []
-    monkeypatch.setattr(ts, "_post", lambda p: vistos.append(p) or _respuesta(
-        {"es_ticket": True, "importe_total": 9.99, "comercio": "Zara", "fecha": "2025-02-01"}))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-no-real")
+    fake = _FakeClient(ts._Ticket(es_ticket=True, importe_total=9.99, comercio="Zara", fecha="2025-02-01"))
+    monkeypatch.setattr(ts, "_get_client", lambda: fake)
     res = asyncio.run(ts.escanear_ticket(JPG, "image/jpeg"))
     assert res == {"importe": 9.99, "comercio": "Zara", "fecha": "2025-02-01"}
-    parte = vistos[0]["contents"][0]["parts"][0]["inline_data"]
-    assert parte["mime_type"] == "image/jpeg" and parte["data"] == b64(JPG)
-    assert vistos[0]["generationConfig"]["responseMimeType"] == "application/json"
-
-
-def test_clave_en_cabecera_no_en_la_url(monkeypatch):
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key-no-real")
-    capt = {}
-
-    class R:
-        def raise_for_status(self): pass
-        def json(self): return {"ok": 1}
-
-    def fake_post(url, **kw):
-        capt.update(url=url, **kw)
-        return R()
-    monkeypatch.setattr(ts.httpx, "post", fake_post)
-    assert ts._post({"a": 1}) == {"ok": 1}
-    assert "test-key" not in capt["url"] and capt["headers"]["x-goog-api-key"] == "test-key-no-real"
-    assert capt["url"].startswith("https://generativelanguage.googleapis.com/")
+    bloque = fake.kw["messages"][0]["content"][0]
+    assert bloque["type"] == "image" and bloque["source"]["media_type"] == "image/jpeg"
+    assert fake.options["timeout"] == ts.TIMEOUT_S
 
 
 def test_no_ticket_es_un_error_de_usuario(monkeypatch):
     import asyncio
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key-no-real")
-    monkeypatch.setattr(ts, "_post", lambda p: _respuesta({"es_ticket": False}))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-no-real")
+    monkeypatch.setattr(ts, "_get_client", lambda: _FakeClient(ts._Ticket(es_ticket=False)))
     with pytest.raises(ts.TicketScanError):
-        asyncio.run(ts.escanear_ticket(JPG, "image/jpeg"))
-
-
-def test_respuesta_rara_de_gemini_es_fallo_del_servicio(monkeypatch):
-    import asyncio
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key-no-real")
-    monkeypatch.setattr(ts, "_post", lambda p: _respuesta("esto no es json"))
-    with pytest.raises(ts.TicketReadError):
         asyncio.run(ts.escanear_ticket(JPG, "image/jpeg"))
 
 
 def test_logs_sin_imagen_ni_importes(monkeypatch, caplog):
     import asyncio
-
-    def boom(p):
-        raise RuntimeError("detalle 77,77 € Mercadona " + b64(JPG))
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key-no-real")
-    monkeypatch.setattr(ts, "_post", boom)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-no-real")
+    monkeypatch.setattr(ts, "_get_client", lambda: _FakeClient(boom=RuntimeError("detalle 77,77 € Mercadona " + b64(JPG))))
     caplog.set_level(logging.DEBUG)
     with pytest.raises(ts.TicketReadError):
         asyncio.run(ts.escanear_ticket(JPG, "image/jpeg"))
     assert "RuntimeError" in caplog.text
-    for secreto in ("77,77", "Mercadona", b64(JPG)[:20], "test-key"):
+    for secreto in ("77,77", "Mercadona", b64(JPG)[:20]):
         assert secreto not in caplog.text

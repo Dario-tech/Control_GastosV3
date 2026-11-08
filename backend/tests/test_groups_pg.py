@@ -72,7 +72,7 @@ def test_esquema_idempotente(pg):
     with pg.db_cursor() as cur:
         cur.execute("SELECT relname, relrowsecurity FROM pg_class WHERE relnamespace = current_schema()::regnamespace AND relkind = 'r' AND relname ~ '^(expense_|group_)'")
         rows = {r["relname"]: r["relrowsecurity"] for r in cur.fetchall()}
-    assert len(rows) == 6 and all(rows.values())
+    assert len(rows) == 5 and all(rows.values())
 
 
 def test_flujo_gasto_igual_saldos_y_pago(pg):
@@ -114,8 +114,6 @@ def test_aislamiento_no_miembro_404_en_todo(pg):
         lambda gi: groups.get_group(gi, D),
         lambda gi: groups.delete_group(gi, D),
         lambda gi: groups.invite(gi, D, C),
-        lambda gi: groups.add_guest(gi, D, 'Nadie'),
-        lambda gi: groups.delete_guest(gi, 1, D),
         lambda gi: groups.add_expense(gi, D, "x", 1, None, None, {"modo": "igual"}),
         lambda gi: groups.delete_expense(gi, eid, D),
         lambda gi: groups.add_settlement(gi, D, D, A, 1, None),
@@ -171,48 +169,16 @@ def test_permisos_de_borrado(pg):
     assert err(groups.get_group(gid, A)) == 404
 
 
-def test_invitacion_desde_el_directorio_y_errores_claros(pg):
+def test_invitacion_neutra_y_limites(pg):
     from services import groups
     g = run(groups.create_group(A, "G"))
-    assert [d["nombre"] for d in run(groups.list_directory(A))] == ["Beto", "Cris", "Dani"]   # sin uno mismo
-    assert [m["email"] for m in run(groups.invite(g["id"], A, B))["miembros"]] == [A, B]
-    assert err(groups.invite(g["id"], A, "nadie@pg-test.invalid")) == 404
+    existe = run(groups.invite(g["id"], A, B))
+    no_existe = run(groups.invite(g["id"], A, "nadie@pg-test.invalid"))
+    assert existe["mensaje"] == no_existe["mensaje"] == groups.INVITE_MSG
+    assert [m["email"] for m in no_existe["miembros"]] == [A, B]
     assert err(groups.invite(g["id"], A, A)) == 422
-    assert err(groups.invite(g["id"], A, B)) == 422          # ya estaba
+    # repetir una invitación no duplica ni falla
+    assert len(run(groups.invite(g["id"], A, B))["miembros"]) == 2
     for i in range(groups.MAX_GRUPOS_CREADOS - 1):
         run(groups.create_group(A, f"g{i}"))
     assert err(groups.create_group(A, "uno más")) == 422
-
-
-def test_invitado_sin_cuenta_participa_en_gastos_y_saldos(pg):
-    from services import groups
-    gid = run(groups.create_group(A, "Piso"))["id"]
-    g = run(groups.add_guest(gid, A, "Abuela"))
-    clave = next(m["email"] for m in g["miembros"] if m["invitado"])
-    assert clave.startswith("invitado:") and [m["nombre"] for m in g["miembros"]] == ["Ana", "Abuela"]
-    assert err(groups.add_guest(gid, A, "abuela")) == 422        # nombre repetido
-    g = run(groups.add_expense(gid, A, "Comida", 20, None, None, {"modo": "igual"}))
-    assert g["saldos"] == {A: 10.0, clave: -10.0}
-    assert g["deudas"] == [{"de": clave, "a": A, "importe": 10.0}]
-    g = run(groups.add_expense(gid, A, "Regalo", 6, None, clave, {"modo": "igual", "participantes": [A]}))
-    assert g["saldos"][clave] == -4.0
-    # el invitado no se puede borrar con gastos; un miembro registra su pago
-    assert err(groups.delete_guest(gid, int(clave.split(":")[1]), A)) == 422
-    g = run(groups.add_settlement(gid, A, clave, A, 4, None))
-    assert g["saldos"][clave] == 0.0 and g["deudas"] == []
-    # nombre cifrado en reposo
-    with pg.db_cursor() as cur:
-        cur.execute("SELECT nombre_enc FROM group_guests")
-        assert b"Abuela" not in bytes(cur.fetchone()["nombre_enc"])
-
-
-def test_invitado_aislado_por_grupo_y_borrable_si_no_se_usa(pg):
-    from services import groups
-    gid = run(groups.create_group(A, "G1"))["id"]
-    otro = run(groups.create_group(D, "G2"))["id"]
-    gid_inv = int(next(m["email"] for m in run(groups.add_guest(otro, D, "Ajeno"))["miembros"] if m["invitado"]).split(":")[1])
-    assert err(groups.delete_guest(gid, gid_inv, A)) == 404        # invitado de otro grupo
-    assert err(groups.add_guest(otro, A, "Intruso")) == 404        # A no es miembro de `otro`
-    mio = int(next(m["email"] for m in run(groups.add_guest(gid, A, "Tío"))["miembros"] if m["invitado"]).split(":")[1])
-    assert [m["nombre"] for m in run(groups.delete_guest(gid, mio, A))["miembros"]] == ["Ana"]
-    assert err(groups.add_expense(gid, A, "x", 5, None, f"invitado:{gid_inv}", {"modo": "igual"})) == 422   # no es de este grupo

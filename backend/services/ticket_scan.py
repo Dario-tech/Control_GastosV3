@@ -1,7 +1,7 @@
-"""Lectura de tickets con IA (Gemini, de Google; visión).
+"""Lectura de tickets con IA (Claude, visión).
 
 Privacidad (ver el aviso que ve el usuario antes de usarlo):
-- La imagen se envía a la API de Gemini (Google) y SOLO vive en memoria durante la
+- La imagen se envía a la API de Anthropic y SOLO vive en memoria durante la
   petición: no se escribe en disco ni en la base de datos.
 - Nada de esto registra en logs la imagen, el comercio ni el importe; ante un
   fallo solo se anota el TIPO de excepción.
@@ -9,21 +9,18 @@ Privacidad (ver el aviso que ve el usuario antes de usarlo):
   nada: la app la enseña editable y solo al confirmar crea el pendiente por
   POST /api/pending (que vuelve a validarlo todo).
 
-Sin GEMINI_API_KEY la función se degrada con elegancia (`disponible()` es False
-y `escanear_ticket` lanza TicketScanUnavailable). Se usa el nivel GRATUITO de la API de
-Gemini (clave de Google AI Studio, sin facturación asociada): si se agota la cuota, falla
-(502) en vez de cobrar. Ojo: en el nivel gratuito Google puede usar el contenido enviado
-para mejorar sus productos; la app lo avisa antes de usarlo.
+Sin ANTHROPIC_API_KEY la función se degrada con elegancia (`disponible()` es False
+y `escanear_ticket` lanza TicketScanUnavailable) igual que la sugerencia de emojis.
 """
 import base64
 import binascii
 import logging
 import os
 
-import httpx
 from pydantic import BaseModel
 
 from .db import run_in_thread
+from .ai_categorize import _MODEL as _DEFAULT_MODEL, _get_client
 from .wallet import parse_importe, parse_fecha, clean_comercio
 
 _log = logging.getLogger("uvicorn.error")
@@ -31,17 +28,12 @@ _log = logging.getLogger("uvicorn.error")
 MAX_IMAGE_BYTES = 1_000_000          # imagen ya decodificada
 MAX_B64_CHARS = 1_400_000            # base64 recibido (≈ 1,05 MB de imagen)
 TIMEOUT_S = 30
-# Modelo con visión y nivel gratuito; configurable por si Google lo renombra.
-DEFAULT_MODEL = "gemini-2.5-flash"
-_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-
-
-def _model() -> str:
-    return os.getenv("GEMINI_MODEL", "").strip() or DEFAULT_MODEL
+# Mismo modelo que ai_categorize salvo que se indique otro (p. ej. uno más barato con visión).
+MODEL = os.getenv("TICKET_SCAN_MODEL", "").strip() or _DEFAULT_MODEL
 
 
 class TicketScanUnavailable(Exception):
-    """Sin GEMINI_API_KEY."""
+    """Sin ANTHROPIC_API_KEY."""
 
 
 class TicketScanError(Exception):
@@ -53,7 +45,7 @@ class TicketReadError(Exception):
 
 
 def disponible() -> bool:
-    return bool(os.getenv("GEMINI_API_KEY"))
+    return bool(os.getenv("ANTHROPIC_API_KEY"))
 
 
 def detectar_tipo(data: bytes) -> str | None:
@@ -103,29 +95,6 @@ _PROMPT = (
 )
 
 
-_SCHEMA = {
-    "type": "OBJECT",
-    "properties": {
-        "es_ticket": {"type": "BOOLEAN"},
-        "importe_total": {"type": "NUMBER", "nullable": True},
-        "comercio": {"type": "STRING", "nullable": True},
-        "fecha": {"type": "STRING", "nullable": True},
-    },
-    "required": ["es_ticket"],
-}
-
-
-def _post(payload: dict) -> dict:
-    """Llamada HTTP a Gemini. La clave va en cabecera (nunca en la URL, para que no acabe en logs)."""
-    r = httpx.post(
-        _ENDPOINT.format(model=_model()),
-        headers={"x-goog-api-key": os.environ["GEMINI_API_KEY"], "Content-Type": "application/json"},
-        json=payload, timeout=TIMEOUT_S,
-    )
-    r.raise_for_status()
-    return r.json()
-
-
 def normalizar(t: _Ticket) -> dict:
     """Pasa la salida del modelo por los validadores de /api/pending; lo que no valga queda en None."""
     importe = comercio = fecha = None
@@ -149,26 +118,25 @@ async def escanear_ticket(data: bytes, media_type: str) -> dict:
         raise TicketScanUnavailable()
     b64 = base64.standard_b64encode(data).decode("ascii")
 
-    payload = {
-        "contents": [{"parts": [
-            {"inline_data": {"mime_type": media_type, "data": b64}},
-            {"text": _PROMPT},
-        ]}],
-        "generationConfig": {
-            "temperature": 0, "maxOutputTokens": 300,
-            "responseMimeType": "application/json", "responseSchema": _SCHEMA,
-        },
-    }
-
     def _call():
-        body = _post(payload)
-        texto = body["candidates"][0]["content"]["parts"][0]["text"]
-        return _Ticket.model_validate_json(texto)
+        client = _get_client().with_options(timeout=TIMEOUT_S, max_retries=1)
+        resp = client.messages.parse(
+            model=MODEL,
+            max_tokens=300,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64}},
+                    {"type": "text", "text": _PROMPT},
+                ],
+            }],
+            output_format=_Ticket,
+        )
+        return resp.parsed_output
 
     try:
         parsed = await run_in_thread(_call)
     except Exception as e:  # red, cuota, modelo no disponible…: solo el tipo, nunca el contenido
-        # Solo el TIPO (un httpx.HTTPStatusError incluye la URL, no la imagen ni la clave: va en cabecera).
         _log.warning("Fallo al leer un ticket con IA (%s)", type(e).__name__)
         raise TicketReadError()
     if parsed is None:

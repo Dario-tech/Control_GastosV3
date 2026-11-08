@@ -24,7 +24,7 @@ MAX_MIEMBROS = 20
 MAX_GRUPOS_CREADOS = 20
 MAX_GASTOS = 2000
 MAX_PAGOS = 2000
-GUEST_PREFIX = "invitado:"
+INVITE_MSG = "Si la cuenta existe, se ha añadido al grupo"
 NOT_FOUND = "Grupo no encontrado"
 
 
@@ -46,18 +46,10 @@ def ensure_groups_tables():
                 PRIMARY KEY (group_id, user_email)
             )""")
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS group_guests (
-                id         SERIAL PRIMARY KEY,
-                group_id   INTEGER NOT NULL REFERENCES expense_groups(id) ON DELETE CASCADE,
-                nombre_enc BYTEA NOT NULL,
-                created_by TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-            )""")
-        cur.execute("""
             CREATE TABLE IF NOT EXISTS group_expenses (
                 id           SERIAL PRIMARY KEY,
                 group_id     INTEGER NOT NULL REFERENCES expense_groups(id) ON DELETE CASCADE,
-                paid_by      TEXT NOT NULL,  -- email de un miembro o 'invitado:<id>'
+                paid_by      TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
                 concepto_enc BYTEA NOT NULL,
                 importe_enc  BYTEA NOT NULL,
                 fecha        DATE NOT NULL,
@@ -68,7 +60,7 @@ def ensure_groups_tables():
         cur.execute("""
             CREATE TABLE IF NOT EXISTS group_expense_shares (
                 expense_id INTEGER NOT NULL REFERENCES group_expenses(id) ON DELETE CASCADE,
-                user_email TEXT NOT NULL,  -- email de un miembro o 'invitado:<id>'
+                user_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
                 share_enc  BYTEA NOT NULL,
                 PRIMARY KEY (expense_id, user_email)
             )""")
@@ -76,18 +68,17 @@ def ensure_groups_tables():
             CREATE TABLE IF NOT EXISTS group_settlements (
                 id          SERIAL PRIMARY KEY,
                 group_id    INTEGER NOT NULL REFERENCES expense_groups(id) ON DELETE CASCADE,
-                from_email  TEXT NOT NULL,  -- email de un miembro o 'invitado:<id>'
-                to_email    TEXT NOT NULL,
+                from_email  TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+                to_email    TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
                 importe_enc BYTEA NOT NULL,
                 fecha       DATE NOT NULL,
                 created_by  TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
                 created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
             )""")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_group_guests_group ON group_guests(group_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_group_expenses_group ON group_expenses(group_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_group_settlements_group ON group_settlements(group_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_group_members_user ON expense_group_members(user_email)")
-        for t in ("expense_groups", "expense_group_members", "group_guests", "group_expenses", "group_expense_shares", "group_settlements"):
+        for t in ("expense_groups", "expense_group_members", "group_expenses", "group_expense_shares", "group_settlements"):
             cur.execute(f"ALTER TABLE {t} ENABLE ROW LEVEL SECURITY")
 
 
@@ -231,27 +222,12 @@ def _miembros(cur, gid: int, email: str) -> list[str]:
     emails = [r["user_email"] for r in cur.fetchall()]
     if email not in emails:
         raise HTTPException(status_code=404, detail=NOT_FOUND)
-    cur.execute("SELECT id FROM group_guests WHERE group_id = %s ORDER BY id", (gid,))
-    return emails + [f"{GUEST_PREFIX}{r['id']}" for r in cur.fetchall()]
+    return emails
 
 
-def es_invitado(clave: str) -> bool:
-    return clave.startswith(GUEST_PREFIX)
-
-
-def _nombres(cur, claves: list[str]) -> dict[str, str]:
-    """Nombre visible de cada miembro: el de su cuenta o, para un invitado sin cuenta, el que se le puso."""
-    reales = [c for c in claves if not es_invitado(c)]
-    out: dict[str, str] = {}
-    if reales:
-        cur.execute("SELECT email, COALESCE(NULLIF(name, ''), email) AS name FROM users WHERE email = ANY(%s)", (reales,))
-        out = {r["email"]: r["name"] for r in cur.fetchall()}
-    ids = [int(c[len(GUEST_PREFIX):]) for c in claves if es_invitado(c)]
-    if ids:
-        cur.execute("SELECT id, nombre_enc FROM group_guests WHERE id = ANY(%s)", (ids,))
-        for r in cur.fetchall():
-            out[f"{GUEST_PREFIX}{r['id']}"] = _dec_str(r["nombre_enc"], "invitado", r["id"]) or "Invitado"
-    return out
+def _nombres(cur, emails: list[str]) -> dict[str, str]:
+    cur.execute("SELECT email, COALESCE(NULLIF(name, ''), email) AS name FROM users WHERE email = ANY(%s)", (emails,))
+    return {r["email"]: r["name"] for r in cur.fetchall()}
 
 
 def _detalle(cur, gid: int, email: str) -> dict:
@@ -315,7 +291,7 @@ def _detalle(cur, gid: int, email: str) -> dict:
         x.pop("_total")
     return {
         "id": gid, "nombre": nombre, "creado_por": g["created_by"],
-        "miembros": [{"email": m, "nombre": nombres.get(m, m), "invitado": es_invitado(m)} for m in miembros],
+        "miembros": [{"email": m, "nombre": nombres.get(m, m)} for m in miembros],
         "gastos": gastos, "pagos": pagos,
         "saldos": {m: de_centimos(c) for m, c in net.items()},
         "deudas": simplificar_deudas(net),
@@ -344,12 +320,7 @@ async def list_groups(email: str) -> list[dict]:
             )
             by_group: dict[int, list[dict]] = {i: [] for i in ids}
             for r in cur.fetchall():
-                by_group[r["group_id"]].append({"email": r["user_email"], "nombre": r["name"], "invitado": False})
-            cur.execute("SELECT group_id, id, nombre_enc FROM group_guests WHERE group_id = ANY(%s) ORDER BY id", (ids,))
-            for r in cur.fetchall():
-                by_group[r["group_id"]].append({
-                    "email": f"{GUEST_PREFIX}{r['id']}", "invitado": True,
-                    "nombre": _dec_str(r["nombre_enc"], "invitado", r["id"]) or "Invitado"})
+                by_group[r["group_id"]].append({"email": r["user_email"], "nombre": r["name"]})
             return [{
                 "id": g["id"], "nombre": _dec_str(g["nombre_enc"], "grupo", g["id"]) or "Grupo",
                 "creado_por": g["created_by"], "miembros": by_group[g["id"]],
@@ -395,7 +366,7 @@ async def delete_group(gid: int, email: str) -> None:
 
 
 async def invite(gid: int, email: str, invite_email) -> dict:
-    """Añade a un usuario YA registrado (se elige del directorio de la app). 404 si no hay cuenta."""
+    """Añade a un usuario YA registrado. Respuesta neutra exista o no la cuenta."""
     if not isinstance(invite_email, str) or not invite_email.strip() or len(invite_email) > 254:
         raise HTTPException(status_code=422, detail="Email inválido")
     invite_email = invite_email.strip().lower()
@@ -404,74 +375,17 @@ async def invite(gid: int, email: str, invite_email) -> dict:
     def _q():
         with db_cursor() as cur:
             miembros = _miembros(cur, gid, email)
-            if invite_email == email or invite_email in miembros:
-                raise HTTPException(status_code=422, detail="Esa persona ya está en el grupo")
-            if not exists:
-                raise HTTPException(status_code=404, detail="No hay ninguna cuenta con ese email")
-            if len(miembros) >= MAX_MIEMBROS:
-                raise HTTPException(status_code=422, detail=f"Máximo {MAX_MIEMBROS} miembros por grupo")
-            cur.execute(
-                "INSERT INTO expense_group_members (group_id, user_email) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                (gid, invite_email),
-            )
+            if invite_email == email:
+                raise HTTPException(status_code=422, detail="Ya eres miembro de este grupo")
+            if exists and invite_email not in miembros:
+                if len(miembros) >= MAX_MIEMBROS:
+                    raise HTTPException(status_code=422, detail=f"Máximo {MAX_MIEMBROS} miembros por grupo")
+                cur.execute(
+                    "INSERT INTO expense_group_members (group_id, user_email) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                    (gid, invite_email),
+                )
             return _detalle(cur, gid, email)
-    return await run_in_thread(_q)
-
-
-async def list_directory(email: str) -> list[dict]:
-    """Todos los usuarios de la app salvo quien pregunta, por nombre (máx. 500)."""
-    def _q():
-        with db_cursor() as cur:
-            cur.execute(
-                """SELECT email, COALESCE(NULLIF(name, ''), email) AS name FROM users
-                   WHERE email <> %s ORDER BY lower(COALESCE(NULLIF(name, ''), email)), email LIMIT 500""",
-                (email,),
-            )
-            return [{"email": r["email"], "nombre": r["name"]} for r in cur.fetchall()]
-    return await run_in_thread(_q)
-
-
-async def add_guest(gid: int, email: str, nombre) -> dict:
-    """Añade a alguien SIN cuenta, solo con un nombre. No puede entrar a la app: los gastos
-    que le afectan los registran los miembros. Su clave es 'invitado:<id>'."""
-    nombre = _texto(nombre, NOMBRE_MAX, "El nombre no puede estar vacío")
-
-    def _q():
-        with db_cursor() as cur:
-            miembros = _miembros(cur, gid, email)
-            if len(miembros) >= MAX_MIEMBROS:
-                raise HTTPException(status_code=422, detail=f"Máximo {MAX_MIEMBROS} miembros por grupo")
-            nombres = _nombres(cur, miembros)
-            if nombre.casefold() in {n.casefold() for n in nombres.values()}:
-                raise HTTPException(status_code=422, detail="Ya hay alguien con ese nombre en el grupo")
-            cur.execute("INSERT INTO group_guests (group_id, nombre_enc, created_by) VALUES (%s, %s, %s)",
-                        (gid, encrypt_str(nombre), email))
-            return _detalle(cur, gid, email)
-    return await run_in_thread(_q)
-
-
-async def delete_guest(gid: int, guest_id: int, email: str) -> dict:
-    """Quita a un invitado solo si no tiene gastos ni pagos (para no falsear saldos)."""
-    clave = f"{GUEST_PREFIX}{guest_id}"
-
-    def _q():
-        with db_cursor() as cur:
-            miembros = _miembros(cur, gid, email)
-            if clave not in miembros:
-                raise HTTPException(status_code=404, detail="Invitado no encontrado")
-            cur.execute(
-                """SELECT 1 FROM group_expenses WHERE group_id = %s AND paid_by = %s
-                   UNION ALL SELECT 1 FROM group_expense_shares s JOIN group_expenses e ON e.id = s.expense_id
-                             WHERE e.group_id = %s AND s.user_email = %s
-                   UNION ALL SELECT 1 FROM group_settlements WHERE group_id = %s AND (from_email = %s OR to_email = %s)
-                   LIMIT 1""",
-                (gid, clave, gid, clave, gid, clave, clave),
-            )
-            if cur.fetchone():
-                raise HTTPException(status_code=422, detail="Tiene gastos o pagos asociados: bórralos antes")
-            cur.execute("DELETE FROM group_guests WHERE id = %s AND group_id = %s", (guest_id, gid))
-            return _detalle(cur, gid, email)
-    return await run_in_thread(_q)
+    return {**(await run_in_thread(_q)), "mensaje": INVITE_MSG}
 
 
 async def add_expense(gid: int, email: str, concepto, importe, fecha, pagado_por, reparto) -> dict:
@@ -542,8 +456,7 @@ async def add_settlement(gid: int, email: str, de, a, importe, fecha) -> dict:
             miembros = _miembros(cur, gid, email)
             if de == a or de not in miembros or a not in miembros:
                 raise HTTPException(status_code=422, detail="El pago debe ser entre dos miembros distintos")
-            # Un invitado no tiene cuenta: si la otra parte (o ambas) son invitados, lo registra un miembro.
-            if email not in (de, a) and not (es_invitado(de) and es_invitado(a)):
+            if email not in (de, a):
                 raise HTTPException(status_code=403, detail="Solo quien paga o quien cobra puede registrar el pago")
             cur.execute("SELECT count(*) AS n FROM group_settlements WHERE group_id = %s", (gid,))
             if cur.fetchone()["n"] >= MAX_PAGOS:
