@@ -37,3 +37,41 @@ describe('suscripciones', () => {
     expect([renewalText(0), renewalText(1), renewalText(5)]).toEqual(['Hoy', 'Mañana', 'En 5 días'])
   })
 })
+
+import { splitSubscriptions, groupSubscriptionsAsFixed } from '../src/utils/subscriptions'
+
+describe('suscripciones marcadas', () => {
+  const recurring = [
+    rec('Netflix', 12.99, 'mensual', '2025-04-12'),
+    rec('HBO', 8.99, 'mensual', '2025-04-20'),
+    rec('Piso', 700, 'mensual', '2025-04-30'),
+  ]
+  it('separa marcadas y sugerencias; el calendario solo cuenta las marcadas', () => {
+    const r = splitSubscriptions({ recurring, bucketOf: new Map(), keys: ['netflix'], now })
+    expect(r.marked.items.map(i => i.key)).toEqual(['netflix'])
+    expect(r.marked.totalMensual).toBe(12.99)
+    expect(r.suggestions.map(i => i.key).sort()).toEqual(['hbo', 'piso'])
+  })
+  it('sin marcadas no hay totales', () => {
+    expect(splitSubscriptions({ recurring, bucketOf: new Map(), keys: [], now }).marked).toEqual({ items: [], totalMensual: 0, totalAnual: 0 })
+  })
+
+  const item = (concept, v) => ({ concept, emoji: 'x', amounts: Array(12).fill(0).map((_, i) => (i < 2 ? v : 0)) })
+  const data = { income: [item('Nómina', 1000)], fixedExpenses: [item('Piso', 700), item('Netflix', 13)],
+    variableExpenses: [item('HBO', 9), item('Ocio', 50)], activeMonths: [true, true] }
+
+  it('las marcadas pasan a gasto fijo, agrupadas en «Suscripciones»', () => {
+    const d = groupSubscriptionsAsFixed(data, ['netflix', 'hbo'])
+    expect(d.fixedExpenses.map(i => i.concept)).toEqual(['Piso', 'Suscripciones'])
+    expect(d.fixedExpenses[1].amounts[0]).toBe(22)          // 13 + 9
+    expect(d.fixedExpenses[1].isSubscriptions).toBe(true)
+    expect(d.variableExpenses.map(i => i.concept)).toEqual(['Ocio'])
+    // el total de gastos no cambia: solo se reclasifica
+    const tot = x => x.fixedExpenses.concat(x.variableExpenses).reduce((s, i) => s + i.amounts[0], 0)
+    expect(tot(d)).toBe(tot(data))
+  })
+  it('sin marcadas o sin coincidencias devuelve los mismos datos', () => {
+    expect(groupSubscriptionsAsFixed(data, [])).toBe(data)
+    expect(groupSubscriptionsAsFixed(data, ['nada'])).toBe(data)
+  })
+})
