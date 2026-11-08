@@ -49,3 +49,9 @@ Partiendo de `qa`. Sin merge, sin PR, sin tocar producción ni ejecutar SQL cont
 
 ## Nota de privacidad (directorio de usuarios)
 Por decisión de producto, cualquier usuario autenticado puede ver el nombre y el email de **todos** los usuarios de la app (para invitarlos desde la propia aplicación). Es razonable para un uso familiar/entre conocidos; si la app se abre a desconocidos, conviene limitarlo (p. ej. solo contactos o búsqueda por email exacto). Tiene rate limit (30/min) y tope de 500 resultados.
+
+## 5. Gastos fijos que se repiten cada mes hasta una fecha (rama `feat/gastos-fijos-recurrentes`)
+- Al apuntar un **Gasto Fijo** hay «Repetir cada mes» + «Hasta el mes de» (o «Sin fecha de fin»). Se guarda una regla (`fixed_recurring`: concepto e importe **cifrados**, día, mes de inicio y de fin) y desde el mes siguiente se **proyecta sola** como gasto fijo previsto en Mes y Año (sin crear movimientos). Si ese mes se apunta el real, sustituye al previsto.
+- Para fijos con importe distinto cada mes (la luz) no se activa: se apuntan cuando llegan.
+- Planificación → «🔁 Fijos que se repiten»: ver hasta cuándo dura cada uno, cambiar la fecha de fin o pararlo.
+- **Esquema nuevo:** tabla `fixed_recurring` (+ índice y RLS sin políticas) en `backend/schema.sql`; el backend la crea al arrancar (`ensure_fixed_recurring_table`). Endpoints `/api/fixed-recurring` (GET/POST/PATCH/DELETE), filtrados por usuario.
