@@ -416,31 +416,6 @@ export async function importTransactions(filas, confirmar = false) {
   return apiJson(res)
 }
 
-// ── Gastos compartidos (grupos) ─────────────────────────────────────────────
-
-async function groupsCall(path, method = 'GET', body) {
-  const res = await fetch(`${BASE}/api/groups${path}`, {
-    method,
-    headers: { ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...authHeaders() },
-    body:    body !== undefined ? JSON.stringify(body) : undefined,
-    signal:  AbortSignal.timeout(method === 'GET' ? 15000 : WRITE_TIMEOUT_MS),
-  })
-  return apiJson(res)
-}
-
-export const fetchGroups        = () => groupsCall('')
-export const fetchGroup         = id => groupsCall(`/${id}`)
-export const createGroup        = nombre => groupsCall('', 'POST', { nombre })
-export const deleteGroup        = id => groupsCall(`/${id}`, 'DELETE')
-export const inviteToGroup      = (id, email) => groupsCall(`/${id}/members`, 'POST', { email })
-// reparto: { modo: 'igual', participantes?: [email] } | { modo: 'importes', partes: { email: importe } }
-export const addGroupExpense    = (id, { concepto, importe, fecha, pagado_por, reparto }) =>
-  groupsCall(`/${id}/expenses`, 'POST', { concepto, importe, fecha, pagado_por, reparto })
-export const deleteGroupExpense = (id, expenseId) => groupsCall(`/${id}/expenses/${expenseId}`, 'DELETE')
-export const addGroupSettlement = (id, { de, a, importe, fecha }) =>
-  groupsCall(`/${id}/settlements`, 'POST', { de, a, importe, fecha })
-export const deleteGroupSettlement = (id, settlementId) => groupsCall(`/${id}/settlements/${settlementId}`, 'DELETE')
-
 // ── Gastos fijos que se repiten cada mes hasta una fecha ────────────────────
 // Regla: { id, concepto, importe, dia, desde: 'AAAA-MM', hasta: 'AAAA-MM' | null (sin fin) }.
 // Se proyectan en la app como gasto fijo previsto; no crean movimientos reales.
