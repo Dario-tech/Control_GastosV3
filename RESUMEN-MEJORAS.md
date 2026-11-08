@@ -1,6 +1,6 @@
 # Resumen de mejoras (rama `feat/mejoras-csv-compartidos-suscripciones-tickets`)
 
-Partiendo de `qa`. Sin merge, sin PR, sin tocar producción ni ejecutar SQL contra ninguna BD remota. Un commit por funcionalidad.
+Partiendo de `qa`. Sin merge, sin PR, sin tocar producción ni ejecutar SQL contra ninguna BD remota. Un commit por funcionalidad. *(Actualizado: tickets y gastos compartidos se retiraron de `qa`.)*
 
 ## 1. Importar extractos del banco en CSV — hecho
 - **App:** Ajustes → Datos y exportar → «Importar extracto del banco (CSV)» (`CsvImportScreen.jsx`, `utils/csvImport.js`). Elegir fichero, separador (autodetectado), formato de fecha, cabeceras sí/no, mapear fecha/concepto/importe, «por el signo» (negativo = gasto, positivo = ingreso) o «todo gastos», vista previa, **revisión con duplicados** y confirmación. Límites: 1 MB y 5.000 filas (se envía en trozos de 400).
@@ -13,45 +13,17 @@ Partiendo de `qa`. Sin merge, sin PR, sin tocar producción ni ejecutar SQL cont
 - Las marcas se guardan en los ajustes del usuario (`settings.subscriptions`), sin cambios de esquema ni de backend.
 - Limitación: el servicio es el nombre de la categoría del gasto (Netflix, HBO…); si varios van bajo una misma categoría «Suscripciones» se verán por importe.
 
-## 3. Gastos compartidos — hecho (v1 mínima)
-- Diseño previo en `docs-diseno-gastos-compartidos.md` (commit aparte) y seguido tal cual.
-- **Backend:** `services/groups.py` + 11 endpoints (`/api/groups…`, invitados y directorio) en `main.py`. Grupos con miembros elegidos del **directorio de usuarios de la app** (`GET /api/users/directory`) o, si no tienen cuenta, **añadidos solo con un nombre** (invitados, clave `invitado:<id>`, nombre cifrado), gastos con pagador y reparto igual o por importes (suma exacta, en céntimos), pagos entre miembros y saldo «quién debe a quién» (deudas simplificadas). Toda consulta filtra por pertenencia (no miembro = 404 idéntico a inexistente); nombre del grupo, concepto, importes y partes **cifrados**. Rate limits en escrituras, creación e invitaciones.
-- **App:** Ajustes → **Gastos compartidos** (`GroupsScreen.jsx`).
-- **Fuera de v1** (documentado en el diseño): editar un gasto, salir/expulsar miembros, otras monedas, porcentajes, convertir tu parte en movimiento propio.
-
-## 4. Captura de tickets con IA — hecho
-- **Backend:** `POST /api/ticket-scan` (`services/ticket_scan.py`) y `GET /api/ticket-scan/status`. Imagen en base64 (JPG/PNG/WebP, tipo comprobado por los primeros bytes, ≤ ~1 MB, cuerpo ≤ 1,5 MB) → **Gemini (Google), nivel gratuito**, con salida JSON estructurada → importe/comercio/fecha pasados por `parse_importe`/`clean_comercio`/`parse_fecha`. **No guarda nada**: ni la imagen (solo en memoria) ni el resultado; los logs solo llevan el tipo de excepción. Rate limit 3/min, 15/h y 40/día por usuario. Sin `GEMINI_API_KEY` responde 503 y la app lo explica sin ofrecer subir nada.
-- **App:** Ajustes → **Escanear ticket**: pantalla de aviso («la foto se envía a un servicio externo, la API de Gemini, de Google») **antes** de poder elegir foto → foto reducida a JPEG en el móvil (quita EXIF/ubicación) → propuesta editable → solo al pulsar «Crear pendiente» se llama a `POST /api/pending` (reutilizado); luego se categoriza con el flujo de pendientes de siempre.
-- **IA gratuita:** se usa la API de Gemini con una clave de Google AI Studio **sin facturación asociada**, así que no se puede cobrar nada: si se agota la cuota gratuita, la lectura falla (502) y se puede añadir el gasto a mano. Modelo por defecto `gemini-2.5-flash` (cambiable con `GEMINI_MODEL`). La app avisa de que en el nivel gratuito Google puede usar el contenido enviado para mejorar sus productos. La clave va en cabecera HTTP, nunca en la URL ni en logs.
+## 3 y 4. Gastos compartidos y tickets con IA — retirados de `qa`
+Por decisión del usuario **no van a PROD**: se quitaron de `qa` (reversión) y siguen en las ramas feature `feat/tickets-por-lineas` (tickets con Gemini + lectura por líneas + gastos compartidos v2 integrados) y `feat/gastos-compartidos-integrados`. Las tablas antiguas de grupos (`expense_groups`, `expense_group_members`, `group_guests`, `group_expenses`, `group_expense_shares`, `group_settlements`) pueden existir en la BD de QA con datos de prueba: ya no las usa nadie y se pueden borrar con `DROP TABLE … CASCADE` cuando quieras.
 
 ## Tests ejecutados
-- Backend (`pytest`): `test_import_csv`, `test_groups`, `test_ticket_scan`, `test_seed_y_schema`, `test_goals`, `test_hardening_api`, `test_api`, `test_seguridad_bloque_a`, `test_mejoras_revision`, `test_ratelimit` → todos pasan. `test_groups_pg` y `test_goals_pg` (9 + los de metas) contra un **Postgres 16 local desechable**: pasan; además `schema.sql` se aplicó dos veces seguidas en una BD local sin errores (idempotente) y las 5 tablas nuevas quedan con RLS.
-- Frontend (`vitest`, solo los relacionados): `csv-import`, `csv-import-pantalla`, `suscripciones`, `suscripciones-pantalla`, `gastos-compartidos`, `gastos-compartidos-pantalla`, `ticket-ia`, `ticket-imagen`, `perfil-panel`, `ajustes-*` (4), `exportar-datos` → todos pasan. `npm run build` correcto.
-- No se ha probado con la API real de Gemini (sin clave en este entorno) ni en un móvil real: la parte de cámara/IA está probada con dobles. Conviene una prueba manual en QA.
+- Backend (`pytest`): importar CSV, fijos que se repiten (también contra Postgres local), esquema/RLS, hardening, API. Frontend (`vitest`, los relacionados con lo tocado) y `npm run build`.
+- No probado en un móvil real.
 
 ## A aplicar a mano en QA / producción
-1. **Esquema (gastos compartidos).** El backend crea las tablas al arrancar (`ensure_groups_tables`), pero si se prefiere aplicar a mano, es el bloque «Gastos compartidos en grupo» de `backend/schema.sql` (6 tablas `CREATE TABLE IF NOT EXISTS` (incluye `group_guests`) + 4 índices) y estas líneas de RLS:
-   ```sql
-   ALTER TABLE public.expense_groups        ENABLE ROW LEVEL SECURITY;
-   ALTER TABLE public.expense_group_members ENABLE ROW LEVEL SECURITY;
-   ALTER TABLE public.group_guests          ENABLE ROW LEVEL SECURITY;
-   ALTER TABLE public.group_expenses        ENABLE ROW LEVEL SECURITY;
-   ALTER TABLE public.group_expense_shares  ENABLE ROW LEVEL SECURITY;
-   ALTER TABLE public.group_settlements     ENABLE ROW LEVEL SECURITY;
-   ```
-   Importar CSV, suscripciones y tickets **no** cambian el esquema.
-2. **Variables de entorno:** ninguna obligatoria. **`GEMINI_API_KEY`** (clave gratuita de https://aistudio.google.com/apikey, en Render) activa la lectura de tickets; `GEMINI_MODEL` (opcional) fija el modelo. `ANTHROPIC_API_KEY` ya no interviene en los tickets (solo en los emojis de categorías).
-3. Recordar que `DB_ENCRYPTION_KEY` debe ser la misma en QA/PROD de cada entorno: los gastos compartidos se cifran con ella.
+1. **Esquema:** solo los fijos que se repiten añaden una tabla (`fixed_recurring`, con RLS sin políticas); el backend la crea al arrancar y está en `backend/schema.sql`. Importar CSV y suscripciones no cambian el esquema.
+2. **Variables de entorno:** ninguna.
+3. `DB_ENCRYPTION_KEY` debe ser la de cada entorno: los fijos que se repiten se cifran con ella.
 
 ## Pendiente / a decidir
-- Ningún bloque ha quedado en `PENDIENTE-*.md`. Decisiones abiertas menores: si los gastos compartidos deben poder salir de un grupo / generar un movimiento propio; si el importador debe asignar categoría por reglas (hoy todo entra como Gasto Variable).
-- IA de tickets: límite por usuario (3/min, 15/h, 40/día) para no agotar la cuota gratuita; sin tope global.
-
-## Nota de privacidad (directorio de usuarios)
-Por decisión de producto, cualquier usuario autenticado puede ver el nombre y el email de **todos** los usuarios de la app (para invitarlos desde la propia aplicación). Es razonable para un uso familiar/entre conocidos; si la app se abre a desconocidos, conviene limitarlo (p. ej. solo contactos o búsqueda por email exacto). Tiene rate limit (30/min) y tope de 500 resultados.
-
-## 5. Gastos fijos que se repiten cada mes hasta una fecha (rama `feat/gastos-fijos-recurrentes`)
-- Al apuntar un **Gasto Fijo** hay «Repetir cada mes» + «Hasta el mes de» (o «Sin fecha de fin»). Se guarda una regla (`fixed_recurring`: concepto e importe **cifrados**, día, mes de inicio y de fin) y desde el mes siguiente se **proyecta sola** como gasto fijo previsto en Mes y Año (sin crear movimientos). Si ese mes se apunta el real, sustituye al previsto.
-- Para fijos con importe distinto cada mes (la luz) no se activa: se apuntan cuando llegan.
-- Planificación → «🔁 Fijos que se repiten»: ver hasta cuándo dura cada uno, cambiar la fecha de fin o pararlo.
-- **Esquema nuevo:** tabla `fixed_recurring` (+ índice y RLS sin políticas) en `backend/schema.sql`; el backend la crea al arrancar (`ensure_fixed_recurring_table`). Endpoints `/api/fixed-recurring` (GET/POST/PATCH/DELETE), filtrados por usuario.
+- Si el importador debe asignar categoría por reglas (hoy todo entra como Gasto Variable).
