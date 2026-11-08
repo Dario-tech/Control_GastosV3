@@ -10,6 +10,8 @@ import {
 import { useFocusTrap, Icon } from './FormKit'
 import TransactionEditModal from './TransactionEditModal'
 import Amt from './Amt'
+import ServiceLogo from './ServiceLogo'
+import { isSubscriptionCategory, groupByService } from '../../data/services'
 
 function money(n) {
   const v = Math.abs(n)
@@ -75,6 +77,8 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, year, 
   )
   const groups = useMemo(() => groupByDay(rows), [rows])
   const sum    = summarize(rows, prevRows)
+  // «Suscripciones»: desglose por servicio (Netflix, HBO…) según la nota de cada movimiento.
+  const byService = useMemo(() => (isSubscriptionCategory(concept) ? groupByService(rows) : []), [concept, rows])
   const today  = localISODate()
 
   // Ingresos en verde y con "+"; gastos en rojo y con "−". La categoría es
@@ -188,6 +192,21 @@ export default function TransactionLogModal({ concept, emoji, monthIndex, year, 
                 </div>
               </div>
             </section>
+
+            {byService.length > 0 && (
+              <section aria-label="Por suscripción">
+                <p className="txlog-tip">Por suscripción</p>
+                <ul className="svc-break">
+                  {byService.map(g => (
+                    <li key={g.nombre}>
+                      <ServiceLogo nombre={g.unnamed ? '?' : g.nombre} size={32} />
+                      <span className="svc-break-name">{g.nombre}{g.count > 1 && <span className="svc-break-count"> · {g.count} movimientos</span>}</span>
+                      <span className="svc-break-total"><Amt>{sign}{money(g.total)}</Amt></span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             {rows.length === 0 ? (
               <div className="txlog-empty">No hay movimientos en {monthName.toLowerCase()}</div>

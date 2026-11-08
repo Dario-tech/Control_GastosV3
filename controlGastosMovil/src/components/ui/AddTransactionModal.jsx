@@ -3,6 +3,8 @@ import { useFinanceData } from '../../context/FinanceDataContext'
 import { useSettings } from '../../context/SettingsContext'
 import { postTransaction, createFixedRecurring } from '../../services/api'
 import { nextMonthOf } from '../../utils/fixedRecurring'
+import { SERVICES, isSubscriptionCategory, composeNote } from '../../data/services'
+import ServiceLogo from './ServiceLogo'
 import { TYPES, combineCategories, categoryKey } from '../../data/categories'
 import { isUnusualAmount, fmt, todayLocal, addDaysLocal } from '../../utils'
 import { FormScreen, Field, Section, AmountInput, Chips, PrimaryButton, Icon, SwitchRow } from './FormKit'
@@ -27,6 +29,9 @@ export default function AddTransactionModal({ onClose }) {
   const [importe, setImporte]   = useState('')
   const [fecha, setFecha]       = useState(todayLocal())
   const [comentario, setComentario] = useState('')
+  // Solo para la categoría «Suscripciones»: qué servicio es (Netflix, HBO…). Opcional.
+  const [servicio, setServicio] = useState('')
+  const [otroServicio, setOtroServicio] = useState('')
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState(null)
 
@@ -51,10 +56,12 @@ export default function AddTransactionModal({ onClose }) {
   async function handleSubmit(concepto) {
     const amt = parseFloat(String(importe).replace(',', '.'))
     if (!amt || amt <= 0) { setError('Introduce un importe válido'); return }
+    // Nota final: «Netflix» o «Netflix · nota» si es una suscripción con servicio elegido.
+    const nota = composeNote(isSubscriptionCategory(concepto) ? (servicio === '__otro' ? otroServicio : servicio) : '', comentario)
     setLoading(true)
     setError(null)
     try {
-      await postTransaction(amt, tipo, concepto, fecha, comentario.trim() || null, clientId.current)
+      await postTransaction(amt, tipo, concepto, fecha, nota || null, clientId.current)
       if (repeat && tipo === 'Gasto Fijo') {
         // El movimiento ya está guardado: si la repetición falla, se avisa pero no se deshace nada.
         try {
@@ -73,7 +80,7 @@ export default function AddTransactionModal({ onClose }) {
       if (classifyTxError(err) === 'offline') {
         // Red / timeout / servidor dormido: se guarda en la cola con el mismo
         // id y se reenvía solo al volver la conexión (sin duplicar).
-        enqueueTx({ id: clientId.current, importe: amt, tipo, concepto, fecha, comentario: comentario.trim() || null })
+        enqueueTx({ id: clientId.current, importe: amt, tipo, concepto, fecha, comentario: nota || null })
         showToast(MSG_OFFLINE)
         onClose()
         return
@@ -190,6 +197,32 @@ export default function AddTransactionModal({ onClose }) {
               <p className="fm-warn"><span aria-hidden="true">⚠️</span>{unusualSel.ratio}× tu gasto medio en {selected}</p>
             )}
           </Section>
+
+          {selected && isSubscriptionCategory(selected) && (
+            <Section title="¿Qué suscripción es?">
+              <div className="svc-picker" role="radiogroup" aria-label="Servicio">
+                {SERVICES.map(sv => (
+                  <button key={sv.id} type="button" role="radio" aria-checked={servicio === sv.nombre}
+                    className={`svc-chip${servicio === sv.nombre ? ' selected' : ''}`}
+                    onClick={() => setServicio(servicio === sv.nombre ? '' : sv.nombre)}>
+                    <ServiceLogo nombre={sv.nombre} size={36} />
+                    <span className="svc-chip-name">{sv.nombre}</span>
+                  </button>
+                ))}
+                <button type="button" role="radio" aria-checked={servicio === '__otro'}
+                  className={`svc-chip${servicio === '__otro' ? ' selected' : ''}`}
+                  onClick={() => setServicio(servicio === '__otro' ? '' : '__otro')}>
+                  <span className="svc-logo" style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--surface2)', color: 'var(--text)' }} aria-hidden="true">+</span>
+                  <span className="svc-chip-name">Otra</span>
+                </button>
+              </div>
+              {servicio === '__otro' && (
+                <input className="fm-input" value={otroServicio} maxLength={40} placeholder="Nombre de la suscripción"
+                  aria-label="Nombre de la suscripción" onChange={e => setOtroServicio(e.target.value)} autoComplete="off" />
+              )}
+              <p className="fm-hint">Opcional: así verás cuánto gastas en cada una.</p>
+            </Section>
+          )}
 
           {tipo === 'Gasto Fijo' && (
             <Section title="Repetición">

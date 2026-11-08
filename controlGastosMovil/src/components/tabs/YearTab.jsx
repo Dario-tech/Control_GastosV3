@@ -7,8 +7,6 @@ import { MONTH_NAMES } from '../../data/mockData'
 import { useApp } from '../../context/AppContext'
 import { useFinanceData } from '../../context/FinanceDataContext'
 import { useAnnualExpenses } from '../../hooks/useAnnualExpenses'
-import { useSubscriptionMarks } from '../../hooks/useSubscriptionMarks'
-import { groupSubscriptionsAsFixed } from '../../utils/subscriptions'
 import { useFixedRecurring } from '../../hooks/useFixedRecurring'
 import { mergeFixedRecurring } from '../../utils/fixedRecurring'
 
@@ -19,10 +17,8 @@ export default function YearTab() {
   const { goToMonth } = useApp()
   const { data: rawData } = useFinanceData()
   const { expenses: annualExpenses } = useAnnualExpenses()
-  const { keys: subKeys } = useSubscriptionMarks()
   const { rules: fixedRules } = useFixedRecurring()
-  const data = groupSubscriptionsAsFixed(
-    mergeAnnualSplits(mergeFixedRecurring(rawData, fixedRules, rawData?.year ?? new Date().getFullYear()), annualExpenses), subKeys)
+  const data = mergeAnnualSplits(mergeFixedRecurring(rawData, fixedRules, rawData?.year ?? new Date().getFullYear()), annualExpenses)
   const { income, expenses, balance, savingsRate, avgIncome } = getYearStats(data)
   const activeMonths = getActiveMonths(data)
 
