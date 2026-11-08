@@ -54,15 +54,15 @@ export default function FixedRecurring() {
         ))}
       </ul>
       {editing && (
-        <div className="grp-add">
-          <p className="grp-label">{editing.rule.concepto}: ¿hasta cuándo?</p>
+        <div className="fr-edit">
+          <p className="fr-label">{editing.rule.concepto}: ¿hasta cuándo?</p>
           <label><input type="checkbox" checked={editing.sinFin} onChange={e => setEditing({ ...editing, sinFin: e.target.checked })} /> Sin fecha de fin</label>
           {!editing.sinFin && (
             <input className="fm-input" type="month" aria-label="Último mes" min={editing.rule.desde} value={editing.hasta}
               onChange={e => setEditing({ ...editing, hasta: e.target.value })} />
           )}
           {error && <p className="s-note s-note--error" role="alert">{error}</p>}
-          <div className="grp-actions">
+          <div className="fr-actions">
             <button type="button" className="s-action-btn s-touch" onClick={() => setEditing(null)}>Cancelar</button>
             <button type="button" className="s-action-btn s-touch" onClick={save}>Guardar</button>
           </div>
