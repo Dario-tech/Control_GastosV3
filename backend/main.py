@@ -1062,13 +1062,13 @@ async def ticket_scan_status(email: str = Depends(get_current_user)):
 
 @app.post("/api/ticket-scan")
 async def ticket_scan_endpoint(request: Request, email: str = Depends(get_current_user)):
-    """Propone importe, comercio y fecha a partir de la foto de un ticket (Claude).
+    """Propone importe, comercio y fecha a partir de la foto de un ticket (Gemini).
 
     Body: {imagen: <base64 de un JPG/PNG/WebP, con o sin prefijo data:>}. NO guarda nada:
-    ni la imagen (solo en memoria, se manda a la API de Anthropic) ni el resultado; la app
+    ni la imagen (solo en memoria, se manda a la API de Gemini, nivel gratuito) ni el resultado; la app
     lo enseña editable y, solo si el usuario confirma, crea el pendiente con POST /api/pending.
     Cada llamada cuesta dinero: 3/min, 15/hora y 40/día por usuario. Nunca se registra la
-    imagen ni los importes. 503 si no hay ANTHROPIC_API_KEY.
+    imagen ni los importes. 503 si no hay GEMINI_API_KEY.
     """
     if not ticket_scan.disponible():
         raise HTTPException(status_code=503, detail="El análisis de tickets no está disponible")

@@ -25,7 +25,8 @@ describe('TicketScanScreen', () => {
   it('el aviso de privacidad va ANTES de poder subir la foto', async () => {
     api.fetchTicketScanStatus.mockResolvedValue({ disponible: true })
     render(<TicketScanScreen />)
-    await screen.findByText(/se envía a un servicio externo/)
+    await screen.findByText(/se envía a un servicio externo \(la API de Gemini, de Google\)/)
+    expect(screen.getByText(/nivel gratuito de Gemini/)).toBeTruthy()
     expect(screen.queryByLabelText('Elegir imagen del ticket')).toBeNull()
     fireEvent.click(screen.getByText('Entiendo, continuar'))
     expect(screen.getByLabelText('Elegir imagen del ticket')).toBeTruthy()

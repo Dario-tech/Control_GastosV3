@@ -68,8 +68,8 @@ export default function TicketScanScreen({ onDone }) {
       {step === 'aviso' && (
         <Section title="Antes de empezar">
           <div className="tk-pad">
-            <p className="tk-text">Para leer el ticket, <strong>la foto se envía a un servicio externo (la API de Claude, de Anthropic)</strong>. Nuestro servidor no la guarda ni en disco ni en la base de datos, y la foto se reduce y se le quitan los metadatos (como la ubicación) antes de enviarla.</p>
-            <p className="tk-text">Evita fotos donde salgan datos que no quieras compartir (tarjetas, nombres, direcciones). El resultado es solo una propuesta: tú la revisas y confirmas antes de crear nada.</p>
+            <p className="tk-text">Para leer el ticket, <strong>la foto se envía a un servicio externo (la API de Gemini, de Google)</strong>. Nuestro servidor no la guarda ni en disco ni en la base de datos, y la foto se reduce y se le quitan los metadatos (como la ubicación) antes de enviarla.</p>
+            <p className="tk-text">Se usa el nivel gratuito de Gemini, en el que Google puede utilizar el contenido enviado para mejorar sus productos. Evita fotos donde salgan datos que no quieras compartir (tarjetas, nombres, direcciones). El resultado es solo una propuesta: tú la revisas y confirmas antes de crear nada.</p>
             <button type="button" className="s-action-btn s-touch" onClick={() => setStep('foto')}>Entiendo, continuar</button>
           </div>
         </Section>
