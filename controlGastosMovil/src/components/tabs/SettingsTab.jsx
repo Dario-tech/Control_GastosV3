@@ -6,7 +6,6 @@ import CategoriesScreen from '../profile/CategoriesScreen'
 import BudgetAlertsScreen from '../profile/BudgetAlertsScreen'
 import DataScreen from '../profile/DataScreen'
 import HelpScreen from '../profile/HelpScreen'
-import SubscriptionsScreen from '../profile/SubscriptionsScreen'
 import TicketScanScreen from '../profile/TicketScanScreen'
 
 /* «Perfil y ajustes» al estilo de los Ajustes de iOS: una pantalla principal
@@ -18,7 +17,6 @@ export const SCREENS = {
   appearance: { title: 'Apariencia' },
   categories: { title: 'Categorías' },
   budget:     { title: 'Presupuestos y alertas' },
-  subscriptions: { title: 'Suscripciones' },
   ticket:     { title: 'Escanear ticket' },
   data:       { title: 'Datos y exportar' },
   help:       { title: 'Ayuda' },
@@ -35,7 +33,6 @@ export default function SettingsTab({
   if (screen === 'appearance') return <div className="tab-panel pf-screen"><AppearanceScreen /></div>
   if (screen === 'categories') return <div className="tab-panel pf-screen"><CategoriesScreen /></div>
   if (screen === 'budget')     return <div className="tab-panel pf-screen"><BudgetAlertsScreen /></div>
-  if (screen === 'subscriptions') return <div className="tab-panel pf-screen"><SubscriptionsScreen /></div>
   if (screen === 'ticket')     return <div className="tab-panel pf-screen"><TicketScanScreen onDone={() => go('home')} /></div>
   if (screen === 'data')       return <div className="tab-panel pf-screen"><DataScreen /></div>
   if (screen === 'help')       return <div className="tab-panel pf-screen"><HelpScreen onShowGuide={onShowGuide} /></div>
@@ -62,7 +59,6 @@ function Home({ go, onOpenShortcut, onLogout }) {
           <NavRow id="shortcut" icon="📲" label="Pagos automáticos" value="Apple Pay · Google Pay" onClick={onOpenShortcut} />
         )}
         <NavRow id="ticket" icon="🧾" label="Escanear ticket" value="IA" onClick={() => go('ticket')} />
-        <NavRow id="subscriptions" icon="🔁" label="Suscripciones" value="Calendario" onClick={() => go('subscriptions')} />
         <NavRow id="data" icon="📤" label="Datos y exportar" onClick={() => go('data')} />
         <NavRow id="help" icon="❓" label="Ayuda" onClick={() => go('help')} last />
       </Section>
