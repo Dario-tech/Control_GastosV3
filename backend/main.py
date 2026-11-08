@@ -49,7 +49,7 @@ from services.wallet import (
 from services.recurring import get_recurring
 from services.importes import IMPORTE_MAX, redondear_importe, validar_importe
 from services import import_csv
-from services import groups
+from services import shared
 from services import ticket_scan
 from services.ai_categorize import suggest_emoji
 from services.email_report import send_monthly_report, send_monthly_reports_to_all
@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI):
     ensure_password_column()  # migración aditiva idempotente (columna password_hash)
     ensure_revoked_sessions_table()  # migración aditiva idempotente (sesiones revocadas) + carga en memoria
     ensure_goals_tables()     # migración aditiva idempotente (metas de ahorro compartidas)
-    groups.ensure_groups_tables()  # migración aditiva idempotente (gastos compartidos en grupo)
+    shared.ensure_shared_tables()  # migración aditiva idempotente (gastos compartidos integrados)
     ensure_comentario_column()  # migración aditiva idempotente (comentario libre en transacciones)
     ensure_encrypted_columns()  # migración aditiva idempotente (concepto/importe/nota cifrados)
     backfill_comentarios()  # cifra las notas antiguas en claro; nunca rompe el arranque
@@ -1269,131 +1269,100 @@ async def share_goal_endpoint(goal_id: int, body: ShareIn, email: str = Depends(
     return await share_goal(goal_id, email, body.email)
 
 
-# ── Gastos compartidos (grupos) ───────────────────────────────────────────────
-# Diseño y permisos: docs-diseno-gastos-compartidos.md. Cada servicio filtra por
-# pertenencia al grupo (no miembro = 404 idéntico a "no existe").
+# ── Gastos compartidos integrados en los movimientos ─────────────────────────
+# Diseño: docs-diseno-gastos-compartidos-v2.md. Las personas son contactos del propio
+# usuario (sin cuenta); toda consulta filtra por user_email.
 
-class GroupIn(BaseModel):
+class SharedPersonIn(BaseModel):
     nombre: Txt = Field(max_length=200)
 
 
-class GroupInviteIn(BaseModel):
-    email: Txt = Field(max_length=254)
-
-
-class GroupGuestIn(BaseModel):
-    nombre: Txt = Field(max_length=200)
-
-
-class GroupExpenseIn(BaseModel):
-    concepto:   Txt = Field(max_length=200)
+class SharedExpenseIn(BaseModel):
     importe:    Any
+    tipo:       str
+    concepto:   Txt = Field(max_length=200)
     fecha:      Txt | None = Field(default=None, max_length=40)
-    pagado_por: Txt | None = Field(default=None, max_length=254)
+    comentario: Txt | None = Field(default=None, max_length=2000)
+    id_cliente: str | None = Field(default=None, max_length=64)
+    pagado_por: Txt | None = Field(default=None, max_length=20)
+    etiqueta:   Txt | None = Field(default=None, max_length=200)
     reparto:    dict[str, Any]
 
 
-class GroupSettlementIn(BaseModel):
-    de:      Txt = Field(max_length=254)
-    a:       Txt = Field(max_length=254)
-    importe: Any
-    fecha:   Txt | None = Field(default=None, max_length=40)
+class SharedSettlementIn(BaseModel):
+    persona_id: int
+    direccion:  Txt = Field(max_length=10)
+    importe:    Any
+    fecha:      Txt | None = Field(default=None, max_length=40)
 
 
-def _limit_group_writes(email: str):
-    enforce("groups-min", [email], limit=60, window=60, block=300)
-    enforce("groups-day", [email], limit=1000, window=86400, block=3600)
+def _limit_shared_writes(email: str):
+    enforce("shared-min", [email], limit=60, window=60, block=300)
+    enforce("shared-day", [email], limit=1000, window=86400, block=3600)
 
 
-@app.get("/api/groups")
-async def list_groups_endpoint(email: str = Depends(get_current_user)):
-    return await groups.list_groups(email)
+@app.get("/api/shared")
+async def shared_state_endpoint(email: str = Depends(get_current_user)):
+    return await shared.get_state(email)
 
 
-@app.post("/api/groups", status_code=201)
-async def create_group_endpoint(body: GroupIn, email: str = Depends(get_current_user)):
-    _limit_group_writes(email)
-    enforce("groups-create", [email], limit=10, window=3600, block=3600)
-    res = await groups.create_group(email, body.nombre)
+@app.post("/api/shared/people", status_code=201)
+async def shared_add_person_endpoint(body: SharedPersonIn, email: str = Depends(get_current_user)):
+    _limit_shared_writes(email)
+    res = await shared.add_person(email, body.nombre)
     await _broadcast()
     return res
 
 
-@app.get("/api/groups/{group_id}")
-async def get_group_endpoint(group_id: int, email: str = Depends(get_current_user)):
-    return await groups.get_group(group_id, email)
-
-
-@app.delete("/api/groups/{group_id}")
-async def delete_group_endpoint(group_id: int, email: str = Depends(get_current_user)):
-    _limit_group_writes(email)
-    await groups.delete_group(group_id, email)
-    await _broadcast()
-    return {"status": "ok"}
-
-
-@app.post("/api/groups/{group_id}/members")
-async def invite_group_member_endpoint(group_id: int, body: GroupInviteIn, email: str = Depends(get_current_user)):
-    enforce("group-invite-hour", [email], limit=30, window=3600, block=3600)
-    enforce("group-invite-day", [email], limit=100, window=86400, block=3600)
-    res = await groups.invite(group_id, email, body.email)
+@app.delete("/api/shared/people/{person_id}")
+async def shared_delete_person_endpoint(person_id: int, email: str = Depends(get_current_user)):
+    _limit_shared_writes(email)
+    res = await shared.delete_person(email, person_id)
     await _broadcast()
     return res
 
 
-@app.post("/api/groups/{group_id}/guests", status_code=201)
-async def add_group_guest_endpoint(group_id: int, body: GroupGuestIn, email: str = Depends(get_current_user)):
-    """Añade a alguien SIN cuenta, solo con un nombre."""
-    _limit_group_writes(email)
-    res = await groups.add_guest(group_id, email, body.nombre)
+@app.post("/api/shared/expenses", status_code=201)
+async def shared_add_expense_endpoint(body: SharedExpenseIn, email: str = Depends(get_current_user)):
+    """Crea el movimiento propio y su reparto de una vez (mismas validaciones que /api/transaction)."""
+    _limit_shared_writes(email)
+    if isinstance(body.importe, bool) or not isinstance(body.importe, (int, float)):
+        _err422("El importe debe ser un número")
+    campos = {"tipo": body.tipo, "concepto": body.concepto, "importe": body.importe}
+    if body.fecha is not None:
+        campos["fecha"] = body.fecha
+    if body.comentario is not None:
+        campos["comentario"] = body.comentario
+    ok = _validate_tx_patch(campos)
+    if body.id_cliente is not None and not _ID_CLIENTE_RE.match(body.id_cliente):
+        _err422("id_cliente inválido")
+    res = await shared.add_expense(
+        email, body.importe, ok["tipo"], ok["concepto"], ok.get("fecha"), ok.get("comentario") or None,
+        body.id_cliente, body.pagado_por, body.reparto, body.etiqueta)
     await _broadcast()
     return res
 
 
-@app.delete("/api/groups/{group_id}/guests/{guest_id}")
-async def delete_group_guest_endpoint(group_id: int, guest_id: int, email: str = Depends(get_current_user)):
-    _limit_group_writes(email)
-    res = await groups.delete_guest(group_id, guest_id, email)
+@app.delete("/api/shared/expenses/{expense_id}")
+async def shared_delete_expense_endpoint(expense_id: int, email: str = Depends(get_current_user)):
+    _limit_shared_writes(email)
+    res = await shared.delete_expense(email, expense_id)
     await _broadcast()
     return res
 
 
-@app.get("/api/users/directory")
-async def users_directory(email: str = Depends(get_current_user)):
-    """Personas con cuenta en la app (nombre + email), para elegirlas al invitar a un grupo.
-    Decisión de producto: el directorio es visible para cualquier usuario autenticado."""
-    enforce("directory-min", [email], limit=30, window=60, block=300)
-    return await groups.list_directory(email)
-
-
-@app.post("/api/groups/{group_id}/expenses", status_code=201)
-async def add_group_expense_endpoint(group_id: int, body: GroupExpenseIn, email: str = Depends(get_current_user)):
-    _limit_group_writes(email)
-    res = await groups.add_expense(group_id, email, body.concepto, body.importe, body.fecha, body.pagado_por, body.reparto)
+@app.post("/api/shared/settlements", status_code=201)
+async def shared_add_settlement_endpoint(body: SharedSettlementIn, email: str = Depends(get_current_user)):
+    _limit_shared_writes(email)
+    res = await shared.add_settlement(email, body.persona_id, body.direccion, body.importe, body.fecha)
     await _broadcast()
     return res
 
 
-@app.delete("/api/groups/{group_id}/expenses/{expense_id}")
-async def delete_group_expense_endpoint(group_id: int, expense_id: int, email: str = Depends(get_current_user)):
-    _limit_group_writes(email)
-    res = await groups.delete_expense(group_id, expense_id, email)
-    await _broadcast()
-    return res
-
-
-@app.post("/api/groups/{group_id}/settlements", status_code=201)
-async def add_group_settlement_endpoint(group_id: int, body: GroupSettlementIn, email: str = Depends(get_current_user)):
-    _limit_group_writes(email)
-    res = await groups.add_settlement(group_id, email, body.de, body.a, body.importe, body.fecha)
-    await _broadcast()
-    return res
-
-
-@app.delete("/api/groups/{group_id}/settlements/{settlement_id}")
-async def delete_group_settlement_endpoint(group_id: int, settlement_id: int, email: str = Depends(get_current_user)):
-    _limit_group_writes(email)
-    res = await groups.delete_settlement(group_id, settlement_id, email)
+@app.delete("/api/shared/settlements/{settlement_id}")
+async def shared_delete_settlement_endpoint(settlement_id: int, email: str = Depends(get_current_user)):
+    _limit_shared_writes(email)
+    res = await shared.delete_settlement(email, settlement_id)
     await _broadcast()
     return res
 

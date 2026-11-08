@@ -1,4 +1,4 @@
-"""Gastos compartidos: lógica de reparto/saldos (pura), validación de endpoints y esquema (sin BD real)."""
+"""Reparto y saldos en céntimos (funciones puras de services/groups.py que reutiliza shared.py)."""
 import os
 import re
 
@@ -80,69 +80,3 @@ def test_simplificar_cuadra_siempre():
     deudas = groups.simplificar_deudas(net)
     cobrado = sum(int(round(d["importe"] * 100)) for d in deudas)
     assert cobrado == 700 and all(d["a"] == A for d in deudas)
-
-
-# ── endpoints (validación, sin BD) ────────────────────────────────────────────
-
-RUTAS = [
-    ("get", "/api/groups"), ("post", "/api/groups"), ("get", "/api/groups/1"), ("delete", "/api/groups/1"),
-    ("post", "/api/groups/1/members"), ("post", "/api/groups/1/guests"), ("delete", "/api/groups/1/guests/1"),
-    ("get", "/api/users/directory"), ("post", "/api/groups/1/expenses"),
-    ("delete", "/api/groups/1/expenses/1"), ("post", "/api/groups/1/settlements"),
-    ("delete", "/api/groups/1/settlements/1"),
-]
-
-
-@pytest.mark.parametrize("metodo,ruta", RUTAS)
-def test_todas_las_rutas_exigen_login(client, metodo, ruta):
-    assert getattr(client, metodo)(ruta).status_code == 401
-
-
-def test_validacion_de_entrada(client, auth_headers):
-    h = auth_headers
-    assert client.post("/api/groups", json={"nombre": "   "}, headers=h).status_code == 422
-    assert client.post("/api/groups", json={"nombre": "x" * 61}, headers=h).status_code == 422
-    assert client.post("/api/groups", json={"nombre": "mal\x00"}, headers=h).status_code == 422
-    bad = {"concepto": "Cena", "reparto": {"modo": "igual"}}
-    for imp in (0, -3, "12", True, None, 2_000_000):
-        r = client.post("/api/groups/1/expenses", json={**bad, "importe": imp}, headers=h)
-        assert r.status_code == 422, imp
-    r = client.post("/api/groups/1/expenses", json={"concepto": "Cena", "importe": 10, "fecha": "ayer", "reparto": {"modo": "igual"}}, headers=h)
-    assert r.status_code == 422
-    assert client.post("/api/groups/1/settlements", json={"de": A, "a": B, "importe": 0}, headers=h).status_code == 422
-
-
-def test_rate_limit_invitaciones(client, auth_headers, monkeypatch):
-    async def fake(gid, email, inv):
-        return {"id": gid}
-    monkeypatch.setattr(groups, "invite", fake)
-    codigos = [client.post("/api/groups/1/members", json={"email": "z@x.es"}, headers=auth_headers).status_code
-               for _ in range(31)]
-    assert codigos[:30] == [200] * 30 and codigos[30] == 429
-
-
-def test_invitado_valida_nombre(client, auth_headers):
-    assert client.post("/api/groups/1/guests", json={"nombre": "  "}, headers=auth_headers).status_code == 422
-    assert client.post("/api/groups/1/guests", json={"nombre": "x" * 61}, headers=auth_headers).status_code == 422
-
-
-def test_directorio_con_rate_limit(client, auth_headers, monkeypatch):
-    async def fake(email):
-        return [{"email": "b@x.es", "nombre": "Beto"}]
-    monkeypatch.setattr(groups, "list_directory", fake)
-    r = client.get("/api/users/directory", headers=auth_headers)
-    assert r.status_code == 200 and r.json() == [{"email": "b@x.es", "nombre": "Beto"}]
-    codigos = [client.get("/api/users/directory", headers=auth_headers).status_code for _ in range(30)]
-    assert codigos[-1] == 429
-
-
-# ── esquema ───────────────────────────────────────────────────────────────────
-
-def test_schema_incluye_las_tablas_nuevas_con_rls():
-    sql = open(os.path.join(os.path.dirname(__file__), "..", "schema.sql"), encoding="utf-8").read()
-    for t in ("expense_groups", "expense_group_members", "group_guests", "group_expenses", "group_expense_shares", "group_settlements"):
-        assert re.search(rf"CREATE TABLE IF NOT EXISTS {t}\b", sql), t
-        assert re.search(rf"ALTER TABLE public\.{t}\s+ENABLE ROW LEVEL SECURITY", sql), t
-    # importes y textos cifrados: ninguna columna en claro
-    assert "importe_enc" in sql and "share_enc" in sql and "concepto_enc" in sql and "nombre_enc" in sql
-    assert not re.search(r"group_expenses \([^;]*\bimporte\s+NUMERIC", sql, re.S)

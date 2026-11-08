@@ -222,6 +222,49 @@ CREATE INDEX IF NOT EXISTS idx_group_expenses_group ON group_expenses(group_id);
 CREATE INDEX IF NOT EXISTS idx_group_settlements_group ON group_settlements(group_id);
 CREATE INDEX IF NOT EXISTS idx_group_members_user ON expense_group_members(user_email);
 
+-- Gastos compartidos INTEGRADOS en los movimientos (ver docs-diseno-gastos-compartidos-v2.md).
+-- Las tablas expense_group*/group_* de arriba ya no se usan (se conservan sin tocar).
+-- Personas = contactos del propio usuario, sin cuenta. Nombres, totales y partes CIFRADOS.
+-- Aditivo e idempotente; el backend también lo crea al arrancar (ensure_shared_tables).
+CREATE TABLE IF NOT EXISTS shared_people (
+    id         SERIAL PRIMARY KEY,
+    user_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    nombre_enc BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS shared_expenses (
+    id             SERIAL PRIMARY KEY,
+    user_email     TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    transaction_id INTEGER UNIQUE REFERENCES transactions(id) ON DELETE CASCADE,
+    paid_by        TEXT NOT NULL,  -- 'yo' o 'p:<id>'
+    total_enc      BYTEA NOT NULL,
+    fecha          DATE NOT NULL,
+    etiqueta_enc   BYTEA,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS shared_shares (
+    expense_id INTEGER NOT NULL REFERENCES shared_expenses(id) ON DELETE CASCADE,
+    party      TEXT NOT NULL,  -- 'yo' o 'p:<id>'
+    share_enc  BYTEA NOT NULL,
+    PRIMARY KEY (expense_id, party)
+);
+
+CREATE TABLE IF NOT EXISTS shared_settlements (
+    id          SERIAL PRIMARY KEY,
+    user_email  TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    from_party  TEXT NOT NULL,
+    to_party    TEXT NOT NULL,
+    importe_enc BYTEA NOT NULL,
+    fecha       DATE NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_shared_people_user ON shared_people(user_email);
+CREATE INDEX IF NOT EXISTS idx_shared_expenses_user ON shared_expenses(user_email);
+CREATE INDEX IF NOT EXISTS idx_shared_settlements_user ON shared_settlements(user_email);
+
 -- Row Level Security en todas las tablas de public, SIN políticas: bloquea el
 -- acceso por la API REST de Supabase (roles anon/authenticated) a estas tablas.
 -- El backend se conecta como owner de las tablas, que no está sujeto a RLS
@@ -244,3 +287,7 @@ ALTER TABLE public.group_guests               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_expenses             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_expense_shares       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.group_settlements          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.shared_people ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.shared_expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.shared_shares ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.shared_settlements ENABLE ROW LEVEL SECURITY;

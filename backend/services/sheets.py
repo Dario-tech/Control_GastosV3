@@ -457,14 +457,12 @@ async def delete_transaction(row_index: int, email: str = "") -> dict:
     return {"status": "ok", "deleted": row_index}
 
 
-async def post_transaction(
-    importe: float, tipo: str, concepto: str, email: str = "", source: str = "shortcut",
-    fecha: str | None = None, comentario: str | None = None,
-    id_cliente: str | None = None,
-) -> dict:
-    """Crea un movimiento. Si se pasa `id_cliente` el alta es idempotente por
-    (usuario, id_cliente): un reintento devuelve el movimiento ya creado, con
-    {"status": "ok", "id", "fecha", "duplicada": True}, sin insertar otra fila."""
+def insert_transaction_sync(
+    cur, importe: float, tipo: str, concepto: str, email: str,
+    fecha: str | None = None, comentario: str | None = None, id_cliente: str | None = None,
+):
+    """INSERT de un movimiento con un cursor ya abierto (para poder hacerlo en la misma
+    transacción de BD que otras escrituras). Devuelve (fila {id, fecha}, duplicada)."""
     # Céntimos (ROUND_HALF_UP) ANTES de cifrar: lo cifrado y lo escrito en claro
     # (B2) son el mismo valor. El tope lo valida main.py.
     importe      = redondear_importe(importe)
@@ -490,22 +488,32 @@ async def post_transaction(
         params += [concepto, importe]
 
     conflict = " ON CONFLICT (user_email, id_cliente) WHERE id_cliente IS NOT NULL DO NOTHING" if id_cliente else ""
+    cur.execute(
+        f"""INSERT INTO transactions ({', '.join(cols)})
+            VALUES ({', '.join(vals)}){conflict} RETURNING id, fecha::text""",
+        params,
+    )
+    row = cur.fetchone()
+    if row is None and id_cliente:  # reintento: ya existía
+        cur.execute(
+            "SELECT id, fecha::text FROM transactions WHERE user_email = %s AND id_cliente = %s",
+            (email, id_cliente),
+        )
+        return cur.fetchone(), True
+    return row, False
 
+
+async def post_transaction(
+    importe: float, tipo: str, concepto: str, email: str = "", source: str = "shortcut",
+    fecha: str | None = None, comentario: str | None = None,
+    id_cliente: str | None = None,
+) -> dict:
+    """Crea un movimiento. Si se pasa `id_cliente` el alta es idempotente por
+    (usuario, id_cliente): un reintento devuelve el movimiento ya creado, con
+    {"status": "ok", "id", "fecha", "duplicada": True}, sin insertar otra fila."""
     def _q():
         with db_cursor() as cur:
-            cur.execute(
-                f"""INSERT INTO transactions ({', '.join(cols)})
-                    VALUES ({', '.join(vals)}){conflict} RETURNING id, fecha::text""",
-                params,
-            )
-            row = cur.fetchone()
-            if row is None and id_cliente:  # reintento: ya existía
-                cur.execute(
-                    "SELECT id, fecha::text FROM transactions WHERE user_email = %s AND id_cliente = %s",
-                    (email, id_cliente),
-                )
-                return cur.fetchone(), True
-            return row, False
+            return insert_transaction_sync(cur, importe, tipo, concepto, email, fecha, comentario, id_cliente)
 
     row, duplicada = await run_in_thread(_q)
     out = {"status": "ok", "id": row["id"], "fecha": row["fecha"]}
