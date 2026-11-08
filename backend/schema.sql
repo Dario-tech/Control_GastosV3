@@ -161,6 +161,67 @@ CREATE TABLE IF NOT EXISTS revoked_sessions (
     exp TIMESTAMPTZ NOT NULL
 );
 
+-- Gastos compartidos en grupo (ver docs-diseno-gastos-compartidos.md). Nombre del
+-- grupo, concepto, importes y partes van CIFRADOS (AES-GCM, services/crypto.py).
+-- Aditivo e idempotente; el backend también lo crea al arrancar (ensure_groups_tables).
+CREATE TABLE IF NOT EXISTS expense_groups (
+    id         SERIAL PRIMARY KEY,
+    nombre_enc BYTEA NOT NULL,
+    created_by TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS expense_group_members (
+    group_id   INTEGER NOT NULL REFERENCES expense_groups(id) ON DELETE CASCADE,
+    user_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    joined_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (group_id, user_email)
+);
+
+-- Personas SIN cuenta, solo con un nombre (cifrado). Su clave de participante es 'invitado:<id>'.
+CREATE TABLE IF NOT EXISTS group_guests (
+    id         SERIAL PRIMARY KEY,
+    group_id   INTEGER NOT NULL REFERENCES expense_groups(id) ON DELETE CASCADE,
+    nombre_enc BYTEA NOT NULL,
+    created_by TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS group_expenses (
+    id           SERIAL PRIMARY KEY,
+    group_id     INTEGER NOT NULL REFERENCES expense_groups(id) ON DELETE CASCADE,
+    paid_by      TEXT NOT NULL,  -- email de un miembro o 'invitado:<id>'
+    concepto_enc BYTEA NOT NULL,
+    importe_enc  BYTEA NOT NULL,
+    fecha        DATE NOT NULL,
+    modo         TEXT NOT NULL CHECK (modo IN ('igual', 'importes')),
+    created_by   TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS group_expense_shares (
+    expense_id INTEGER NOT NULL REFERENCES group_expenses(id) ON DELETE CASCADE,
+    user_email TEXT NOT NULL,  -- email de un miembro o 'invitado:<id>'
+    share_enc  BYTEA NOT NULL,
+    PRIMARY KEY (expense_id, user_email)
+);
+
+CREATE TABLE IF NOT EXISTS group_settlements (
+    id          SERIAL PRIMARY KEY,
+    group_id    INTEGER NOT NULL REFERENCES expense_groups(id) ON DELETE CASCADE,
+    from_email  TEXT NOT NULL,  -- email de un miembro o 'invitado:<id>'
+    to_email    TEXT NOT NULL,
+    importe_enc BYTEA NOT NULL,
+    fecha       DATE NOT NULL,
+    created_by  TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_guests_group ON group_guests(group_id);
+CREATE INDEX IF NOT EXISTS idx_group_expenses_group ON group_expenses(group_id);
+CREATE INDEX IF NOT EXISTS idx_group_settlements_group ON group_settlements(group_id);
+CREATE INDEX IF NOT EXISTS idx_group_members_user ON expense_group_members(user_email);
+
 -- Row Level Security en todas las tablas de public, SIN políticas: bloquea el
 -- acceso por la API REST de Supabase (roles anon/authenticated) a estas tablas.
 -- El backend se conecta como owner de las tablas, que no está sujeto a RLS
@@ -177,3 +238,9 @@ ALTER TABLE public.merchant_rules             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_categories           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_prefs                 ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.revoked_sessions           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.expense_groups             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.expense_group_members      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_guests               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_expenses             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_expense_shares       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_settlements          ENABLE ROW LEVEL SECURITY;

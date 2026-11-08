@@ -4483,3 +4483,45 @@ html.pastel {
 
 /* Selector iPhone / Android de «Pagos automáticos»: dos botones (el de modo tiene tres). */
 .sc-modes.sc-platform { grid-template-columns: 1fr 1fr; }
+
+/* Calendario de suscripciones (Ajustes → Suscripciones) */
+.sub-totals { display: flex; gap: 12px; padding: 14px 16px; }
+.sub-total { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sub-total-label { font-size: var(--fs-xs); color: var(--text2); }
+.sub-total-value { font-size: var(--fs-xl, 22px); color: var(--text); font-variant-numeric: tabular-nums; }
+.sub-list { list-style: none; margin: 0; padding: 0; }
+.sub-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); min-height: 56px; }
+.sub-item:last-child { border-bottom: none; }
+.sub-date { display: flex; flex-direction: column; width: 84px; flex-shrink: 0; }
+.sub-date-day { font-size: var(--fs-sm); color: var(--text); font-weight: 600; text-transform: capitalize; }
+.sub-date-rel { font-size: var(--fs-xs); color: var(--accent-fg, var(--accent)); }
+.sub-name { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.sub-concept { font-size: var(--fs-md); color: var(--text); overflow-wrap: anywhere; }
+.sub-freq { font-size: var(--fs-xs); color: var(--text2); }
+.sub-amount { font-size: var(--fs-md); color: var(--text); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+/* Gastos compartidos (Ajustes → Gastos compartidos) */
+.grp-form { display: flex; gap: 10px; padding: 12px 16px; align-items: center; }
+.grp-form .fm-input { flex: 1 1 auto; min-width: 0; }
+.grp-head { display: flex; align-items: center; gap: 12px; padding: 4px 0 8px; }
+.grp-title { margin: 0; font-size: var(--fs-lg); color: var(--text); min-width: 0; overflow-wrap: anywhere; }
+.grp-pad { padding: 12px 16px; }
+.grp-balances { list-style: none; margin: 0; padding: 4px 16px 12px; display: flex; flex-direction: column; gap: 6px; }
+.grp-balances li { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-sm); color: var(--text2); font-variant-numeric: tabular-nums; }
+.grp-pos { color: var(--green); font-weight: 600; }
+.grp-neg { color: var(--red); font-weight: 600; }
+.grp-expense { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; }
+.grp-label { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-xs); color: var(--text2); }
+.grp-part { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; font-size: var(--fs-md); color: var(--text); }
+.grp-part-input { width: 110px; flex: 0 0 auto; text-align: right; }
+.grp-share { font-size: var(--fs-sm); color: var(--text2); font-variant-numeric: tabular-nums; }
+.grp-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* Escanear ticket (Ajustes → Escanear ticket) */
+.tk-pad { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; }
+.tk-text { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--text2); }
+.tk-pick { position: relative; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.tk-pick.disabled { opacity: 0.45; pointer-events: none; }
+.tk-file { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.grp-add { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; }
+.grp-form--flush { padding: 0; }
