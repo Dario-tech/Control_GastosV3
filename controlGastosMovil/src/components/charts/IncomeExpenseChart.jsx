@@ -57,7 +57,7 @@ export default function IncomeExpenseChart({ data: financeData }) {
         <Tooltip content={<CustomTooltip hide={hide} />} cursor={{ fill: cursor }} />
         <Legend
           wrapperStyle={{ fontSize: 12, color: tick, paddingTop: 8 }}
-          formatter={(value) => value === 'income' ? 'Ingresos' : 'Gastos'}
+          formatter={(value) => <span style={{ color: 'var(--text2)' }}>{value === 'income' ? 'Ingresos' : 'Gastos'}</span>}
         />
         <Bar dataKey="income"   name="income"   fill="url(#incomeGrad)" stroke={incomeColor} strokeOpacity={0.5} radius={[4,4,0,0]} maxBarSize={28} style={{ filter: `drop-shadow(0 0 5px ${incomeColor})` }} />
         <Bar dataKey="expenses" name="expenses" fill="url(#expenseGrad)" stroke={expenseColor} strokeOpacity={0.5} radius={[4,4,0,0]} maxBarSize={28} style={{ filter: `drop-shadow(0 0 5px ${expenseColor})` }} />

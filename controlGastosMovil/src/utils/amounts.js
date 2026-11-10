@@ -17,5 +17,7 @@ export function maskAmount(text, hide) {
 
 /** Formateador de eje Y compacto (1k, 2k…) o vacío si `hide`. */
 export function axisTick(hide) {
-  return hide ? () => '' : v => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)
+  // Un decimal solo si hace falta (2400 -> "2,4k"): con toFixed(0) dos marcas
+  // distintas (1600 y 2400) se pintaban ambas como "2k".
+  return hide ? () => '' : v => (v >= 1000 ? `${String(Math.round(v / 100) / 10).replace('.', ',')}k` : v)
 }

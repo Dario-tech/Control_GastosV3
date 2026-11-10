@@ -50,6 +50,9 @@ export default function DonutChart({ fixed, variable, tipo = 'todo', items, mont
   if (byConcept && rows.length === 0) {
     return <p className="donut-empty">{tipo === 'fijo' ? 'Sin gastos fijos este mes.' : 'Sin gastos variables este mes.'}</p>
   }
+  if (!byConcept && !(total > 0)) {
+    return <p className="donut-empty">Sin gastos este mes.</p>
+  }
   // Tramos a 0 no se dibujan: con paddingAngle dejan una rendija en el anillo
   const slices = data.map((d, i) => ({ ...d, i })).filter(d => d.value > 0)
 

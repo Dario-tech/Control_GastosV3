@@ -21,7 +21,7 @@ export default function FixedRecurring() {
   if (!rules.length) {
     return (
       <section className="card" aria-labelledby="fr-title">
-        <h2 id="fr-title" className="card-title">🔁 Fijos que se repiten</h2>
+        <div className="card-header"><h2 id="fr-title" className="card-title">🔁 Fijos que se repiten</h2></div>
         <p className="s-note">Al apuntar un Gasto Fijo (el piso…) activa «Repetir cada mes» e indica hasta cuándo: aparecerá solo en los meses siguientes.</p>
       </section>
     )
@@ -38,7 +38,7 @@ export default function FixedRecurring() {
 
   return (
     <section className="card" aria-labelledby="fr-title">
-      <h2 id="fr-title" className="card-title">🔁 Fijos que se repiten</h2>
+      <div className="card-header"><h2 id="fr-title" className="card-title">🔁 Fijos que se repiten</h2></div>
       <ul className="sub-list">
         {rules.map(r => (
           <li key={r.id} className="sub-item">

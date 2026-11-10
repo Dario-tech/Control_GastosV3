@@ -26,6 +26,8 @@ describe('formateadores con máscara', () => {
     expect(axisTick(true)(5000)).toBe('')
     expect(axisTick(false)(5000)).toBe('5k')
     expect(axisTick(false)(500)).toBe(500)
+    expect(axisTick(false)(2400)).toBe('2,4k')
+    expect(axisTick(false)(1600)).toBe('1,6k')
   })
 })
 

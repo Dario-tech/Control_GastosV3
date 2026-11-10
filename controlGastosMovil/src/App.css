@@ -203,9 +203,9 @@ html, body, #root {
 /* ===== ZONA TÁCTIL >= 44px ===== */
 /* Botones de 36px o menos: se amplía el área pulsable con un ::after
    transparente, sin cambiar el aspecto visual ni el layout. */
-.avatar-btn, .profile-back-btn, .add-tx-btn, .pending-btn, .search-close, .s-action-btn { position: relative; }
+.avatar-btn, .profile-back-btn, .add-tx-btn, .pending-btn, .search-btn, .search-close, .s-action-btn { position: relative; }
 .avatar-btn::after, .profile-back-btn::after, .add-tx-btn::after,
-.pending-btn::after, .search-close::after, .s-action-btn::after {
+.pending-btn::after, .search-btn::after, .search-close::after, .s-action-btn::after {
   content: ''; position: absolute; top: 50%; left: 50%;
   min-width: 44px; min-height: 44px; width: 100%; height: 100%;
   transform: translate(-50%, -50%);
@@ -1335,7 +1335,7 @@ html.light .s-action-btn  { background: var(--surface2); color: var(--text2); bo
 .search-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
 .search-group-head {
   position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-  padding: 8px 2px; background: var(--card, var(--bg)); border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
+  padding: 8px 2px; background: var(--surface); border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
 }
 .search-group-title { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
 .search-group-meta { font-size: var(--fs-xs); color: var(--text2); font-variant-numeric: tabular-nums; }
@@ -4519,3 +4519,6 @@ html.pastel {
 .svc-break-name { flex: 1 1 auto; min-width: 0; font-size: var(--fs-md); color: var(--text); overflow-wrap: anywhere; }
 .svc-break-count { font-size: var(--fs-xs); color: var(--text2); }
 .svc-break-total { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
+
+/* Título h2 dentro de la cabecera de tarjeta: sin el margen por defecto del h2 */
+.card-header h2.card-title { margin: 0; }
