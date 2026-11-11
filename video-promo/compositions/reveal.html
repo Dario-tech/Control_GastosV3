@@ -1,0 +1,32 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "League Gothic", sans-serif; }
+    #rv-bg { position: absolute; inset: 0; background: var(--color-brand, #5b7cff); }
+    #rv-name { position: absolute; left: 0; right: 0; top: 200px; text-align: center; font-size: 230px; line-height: 1; color: #fff; }
+    #rv-name span { display: inline-block; }
+    #rv-sub { position: absolute; left: 0; right: 0; top: 440px; text-align: center; font: 800 54px Inter, sans-serif; color: var(--color-ink, #1a1238); }
+    #rv-phone { position: absolute; left: 260px; top: 560px; width: 560px; height: 1212px; }
+    #rv-body { width: 100%; height: 100%; border-radius: 84px; background: #05040d; padding: 16px; box-shadow: 0 40px 0 rgba(26, 18, 56, 0.35); }
+    #rv-body img { display: block; width: 100%; height: 100%; border-radius: 68px; object-fit: cover; }
+  </style>
+  <div id="root" data-composition-id="reveal" data-width="1080" data-height="1920">
+    <div id="rv-bg"></div>
+    <div id="rv-name" class="clip" data-start="0" data-duration="3" data-track-index="1"><span>M</span><span>i</span>&nbsp;<span>E</span><span>c</span><span>o</span><span>n</span><span>o</span><span>m</span><span>í</span><span>a</span></div>
+    <div id="rv-sub" class="clip" data-start="0.7" data-duration="2.3" data-track-index="2" data-var-text="reveal-line">Todo tu mes en una pantalla</div>
+    <div id="rv-phone" class="clip" data-start="0" data-duration="3" data-track-index="3" data-layout-allow-overflow>
+      <div id="rv-body"><img src="assets/screen-mes.png" alt="" /></div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#rv-name span", { opacity: 0, y: 60, filter: "blur(8px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.3, stagger: 0.035, ease: "expo.out" }, 0.05);
+      tl.fromTo("#rv-sub", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 0.75);
+      tl.fromTo("#rv-body", { y: 1500, rotation: -7 }, { y: 0, rotation: 0, duration: 0.95, ease: "expo.out" }, 0.25);
+      // dive into the phone: the balance card becomes the next shot
+      tl.to(["#rv-name", "#rv-sub"], { opacity: 0, filter: "blur(12px)", duration: 0.2, ease: "power3.in" }, 2.45);
+      tl.to("#rv-body", { scale: 2.3, y: 260, filter: "blur(10px)", duration: 0.5, ease: "power3.in", transformOrigin: "50% 16%" }, 2.5);
+      window.__timelines["reveal"] = tl;
+    })();
+  </script>
+</template>

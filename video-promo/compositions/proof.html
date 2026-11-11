@@ -1,0 +1,95 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "League Gothic", sans-serif; }
+    #pf-bg { position: absolute; inset: 0; background: #3b2fb3; }
+    .pf-title { position: absolute; left: 70px; right: 70px; top: 190px; text-align: center; font-size: 150px; line-height: 0.98; color: #fff; text-transform: uppercase; }
+    .pf-title span { display: inline-block; }
+    .pf-stage { position: absolute; inset: 0; }
+    .pf-card { position: absolute; left: 70px; width: 940px; border-radius: 62px; overflow: hidden; box-shadow: 0 26px 0 rgba(10, 6, 30, 0.32); }
+    .pf-card img { display: block; width: 100%; }
+    #pf-saldo { top: 540px; }
+    #pf-donut { top: 1270px; }
+    #pf-donde { top: 540px; height: 953px; background: #17152b; }
+    .pf-row { position: absolute; left: 0; width: 940px; background-image: url(assets/donde.png); background-size: 940px auto; background-repeat: no-repeat; }
+    #pf-ocio { top: 540px; }
+    #pf-ropa { top: 906px; }
+    #pf-comida { top: 1272px; }
+    #pf-meta { left: 190px; width: 700px; top: 540px; border-radius: 76px; -webkit-mask-image: conic-gradient(from 0deg at 50% 29%, #000 var(--p, 0%), transparent var(--p, 0%)); mask-image: conic-gradient(from 0deg at 50% 29%, #000 var(--p, 0%), transparent var(--p, 0%)); }
+  </style>
+  <div id="root" data-composition-id="proof" data-width="1080" data-height="1920">
+    <div id="pf-bg"></div>
+
+    <div id="pf-ta" class="pf-title clip" data-start="0" data-duration="2.8" data-track-index="1"><span>Cuánto</span> <span>entra</span><br /><span>Cuánto</span> <span>sale</span></div>
+    <div id="pf-a" class="pf-stage clip" data-start="0" data-duration="2.8" data-track-index="2" data-layout-allow-overflow>
+      <div class="pf-card" id="pf-saldo"><img src="assets/saldo.png" alt="" /></div>
+      <div class="pf-card" id="pf-donut"><img src="assets/donut.png" alt="" /></div>
+    </div>
+
+    <div id="pf-tb" class="pf-title clip" data-start="2.8" data-duration="2.8" data-track-index="1"><span>Y</span> <span>en</span> <span>qué</span><br /><span>se</span> <span>te</span> <span>va</span></div>
+    <div id="pf-b" class="pf-stage clip" data-start="2.8" data-duration="2.8" data-track-index="2" data-layout-allow-overflow>
+      <div class="pf-card" id="pf-donde">
+        <div class="pf-row" style="top:0.0px;height:100.8px;background-position:0 -0.0px"></div>
+        <div class="pf-row" style="top:99.8px;height:119.2px;background-position:0 -99.8px"></div>
+        <div class="pf-row" style="top:217.9px;height:119.2px;background-position:0 -217.9px"></div>
+        <div class="pf-row" style="top:336.1px;height:119.2px;background-position:0 -336.1px"></div>
+        <div class="pf-row" style="top:454.2px;height:119.2px;background-position:0 -454.2px"></div>
+        <div class="pf-row" style="top:572.4px;height:119.2px;background-position:0 -572.4px"></div>
+        <div class="pf-row" style="top:690.6px;height:119.2px;background-position:0 -690.6px"></div>
+        <div class="pf-row" style="top:808.7px;height:145.4px;background-position:0 -808.7px"></div>
+      </div>
+    </div>
+
+    <div id="pf-tc" class="pf-title clip" data-start="5.6" data-duration="2.8" data-track-index="1"><span>Un</span> <span>límite</span><br /><span>para</span> <span>cada</span> <span>cosa</span></div>
+    <div id="pf-c" class="pf-stage clip" data-start="5.6" data-duration="2.8" data-track-index="2" data-layout-allow-overflow>
+      <div class="pf-card" id="pf-ocio"><img src="assets/ocio.png" alt="" /></div>
+      <div class="pf-card" id="pf-ropa"><img src="assets/ropa.png" alt="" /></div>
+      <div class="pf-card" id="pf-comida"><img src="assets/comida.png" alt="" /></div>
+    </div>
+
+    <div id="pf-td" class="pf-title clip" data-start="8.4" data-duration="2.8" data-track-index="1"><span>Y</span> <span>ahorra</span> <span>para</span><br /><span>lo</span> <span>que</span> <span>quieres</span></div>
+    <div id="pf-d" class="pf-stage clip" data-start="8.4" data-duration="2.8" data-track-index="2" data-layout-allow-overflow>
+      <div class="pf-card" id="pf-meta"><img src="assets/meta.png" alt="" /></div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      const words = (sel, at) => tl.fromTo(sel + " span", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, stagger: 0.07, ease: "power4.out" }, at);
+      const out = (sel, at) => tl.to(sel, { opacity: 0, filter: "blur(12px)", duration: 0.18, ease: "power3.in" }, at);
+
+      // a. balance + split
+      tl.fromTo("#pf-saldo", { scale: 1.5, filter: "blur(10px)" }, { scale: 1, filter: "blur(0px)", duration: 0.55, ease: "expo.out" }, 0);
+      words("#pf-ta", 0.15);
+      tl.fromTo("#pf-donut", { y: 900 }, { y: 0, duration: 0.7, ease: "expo.out" }, 0.45);
+      tl.fromTo("#pf-donut img", { clipPath: "circle(0% at 50% 45%)" }, { clipPath: "circle(120% at 50% 45%)", duration: 0.9, ease: "power2.inOut" }, 0.55);
+      out("#pf-ta", 2.45);
+      tl.to(["#pf-saldo", "#pf-donut"], { y: -2200, filter: "blur(14px)", duration: 0.32, stagger: 0.04, ease: "power3.in" }, 2.47);
+      tl.to("#pf-bg", { backgroundColor: "#7c3aed", duration: 0.4, ease: "power2.inOut" }, 2.55);
+
+      // b. where it goes: rows populate, then punch in on the row that grew most
+      words("#pf-tb", 2.9);
+      tl.fromTo("#pf-donde", { y: 1500 }, { y: 0, duration: 0.6, ease: "expo.out" }, 2.85);
+      tl.fromTo(".pf-row", { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.4, stagger: 0.06, ease: "power3.out" }, 3.1);
+      tl.to("#pf-donde", { scale: 1.1, duration: 0.5, ease: "power2.inOut", transformOrigin: "50% 0%" }, 4.35);
+      out("#pf-tb", 5.25);
+      tl.to("#pf-donde", { x: -1400, filter: "blur(14px)", duration: 0.3, ease: "power3.in" }, 5.28);
+      tl.to("#pf-bg", { backgroundColor: "#ea4335", duration: 0.4, ease: "power2.inOut" }, 5.35);
+
+      // c. budgets
+      words("#pf-tc", 5.7);
+      tl.fromTo(["#pf-ocio", "#pf-ropa", "#pf-comida"], { x: 1300, filter: "blur(12px)" }, { x: 0, filter: "blur(0px)", duration: 0.6, stagger: 0.13, ease: "expo.out" }, 5.65);
+      tl.to("#pf-ocio", { scale: 1.07, duration: 0.16, ease: "power2.out" }, 6.85);
+      tl.to("#pf-ocio", { scale: 1, duration: 0.5, ease: "elastic.out(1, 0.45)" }, 7.01);
+      out("#pf-tc", 8.05);
+      tl.to(["#pf-ocio", "#pf-ropa", "#pf-comida"], { y: -2000, filter: "blur(14px)", duration: 0.3, stagger: 0.03, ease: "power3.in" }, 8.07);
+      tl.to("#pf-bg", { backgroundColor: "#0ea371", duration: 0.4, ease: "power2.inOut" }, 8.15);
+
+      // d. savings goal draws itself like its own ring
+      words("#pf-td", 8.5);
+      tl.fromTo("#pf-meta", { "--p": "0%", scale: 0.86 }, { "--p": "100%", scale: 1, duration: 0.9, ease: "power2.inOut" }, 8.5);
+      out("#pf-td", 10.85);
+      tl.to("#pf-meta", { scale: 0.5, opacity: 0, filter: "blur(10px)", duration: 0.28, ease: "power3.in" }, 10.88);
+      window.__timelines["proof"] = tl;
+    })();
+  </script>
+</template>

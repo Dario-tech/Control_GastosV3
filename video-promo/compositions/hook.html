@@ -1,0 +1,78 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "League Gothic", sans-serif; }
+    #hk-bg { position: absolute; inset: 0; background: var(--color-alert, #ea4335); }
+    #hk-day { position: absolute; left: 0; right: 0; top: 190px; text-align: center; font-size: 600px; line-height: 0.9; color: var(--color-ink, #1a1238); letter-spacing: -0.01em; }
+    #hk-q { position: absolute; left: 90px; right: 90px; top: 730px; text-align: center; font-size: 132px; line-height: 1; color: #fff; text-transform: uppercase; }
+    #hk-q span { display: inline-block; }
+    #hk-lab { position: absolute; left: 0; right: 0; top: 250px; text-align: center; font: 900 46px Inter, sans-serif; letter-spacing: 0.08em; color: var(--color-ink, #1a1238); }
+    #hk-num { position: absolute; left: 0; right: 0; top: 310px; text-align: center; font-size: 430px; line-height: 1; color: var(--color-ink, #1a1238); font-variant-numeric: tabular-nums; }
+    #hk-idea { position: absolute; left: 90px; right: 90px; top: 770px; text-align: center; font-size: 132px; line-height: 1; color: #fff; text-transform: uppercase; }
+    #hk-idea span { display: inline-block; }
+    #hk-pile { position: absolute; inset: 0; }
+    .hk-t { position: absolute; width: 330px; filter: drop-shadow(0 14px 0 rgba(26,18,56,0.28)); }
+    .hk-p { background: #fffdf8; padding: 30px 30px 54px; clip-path: polygon(0 0,100% 0,100% 94%,95% 100%,90% 94%,85% 100%,80% 94%,75% 100%,70% 94%,65% 100%,60% 94%,55% 100%,50% 94%,45% 100%,40% 94%,35% 100%,30% 94%,25% 100%,20% 94%,15% 100%,10% 94%,5% 100%,0 94%); font-family: "Space Mono", monospace; color: #1a1238; }
+    .hk-p b { display: block; font-size: 38px; line-height: 1.1; }
+    .hk-p i { display: block; border-top: 4px dashed #1a1238; margin: 18px 0 14px; }
+    .hk-p span { display: block; font-size: 28px; }
+    .hk-p em { display: block; font-style: normal; font-weight: 700; font-size: 58px; line-height: 1.1; }
+    #hk-flood { position: absolute; left: 390px; top: 750px; width: 300px; height: 300px; border-radius: 66px; background: var(--color-brand, #5b7cff); }
+    #hk-icon { position: absolute; left: 390px; top: 750px; width: 300px; height: 300px; border-radius: 66px; }
+  </style>
+  <div id="root" data-composition-id="hook" data-width="1080" data-height="1920">
+    <div id="hk-bg"></div>
+    <div id="hk-day" class="clip" data-start="0" data-duration="3.6" data-track-index="1" data-var-text="hook-day">DÍA 28</div>
+    <div id="hk-q" class="clip" data-start="0" data-duration="3.6" data-track-index="2"><span>¿Dónde</span> <span>se</span> <span>ha</span> <span>ido</span><br /><span>mi</span> <span>sueldo?</span></div>
+    <div id="hk-lab" class="clip" data-start="3.4" data-duration="2.6" data-track-index="1">ESTE MES HAS GASTADO</div>
+    <div id="hk-num" class="clip" data-start="3.4" data-duration="2.6" data-track-index="2">0 €</div>
+    <div id="hk-idea" class="clip" data-start="3.95" data-duration="2.05" data-track-index="3"><span>y</span> <span>ni</span> <span>idea</span><br /><span>de</span> <span>en</span> <span>qué</span></div>
+    <div id="hk-pile" class="clip" data-layout-allow-occlusion data-start="0" data-duration="6.8" data-track-index="4" data-layout-allow-overflow data-layout-allow-overlap>
+      <div class="hk-t" id="hk-t0" style="left:40px;top:1120px" data-rot="-14"><div class="hk-p"><b>COMIDA</b><i></i><span>TOTAL</span><em>68,40 €</em></div></div>
+      <div class="hk-t" id="hk-t1" style="left:380px;top:1090px" data-rot="9"><div class="hk-p"><b>ROPA</b><i></i><span>TOTAL</span><em>89,90 €</em></div></div>
+      <div class="hk-t" id="hk-t2" style="left:700px;top:1150px" data-rot="-6"><div class="hk-p"><b>OCIO</b><i></i><span>TOTAL</span><em>58,00 €</em></div></div>
+      <div class="hk-t" id="hk-t3" style="left:180px;top:1330px" data-rot="17"><div class="hk-p"><b>TRANSPORTE</b><i></i><span>TOTAL</span><em>40,00 €</em></div></div>
+      <div class="hk-t" id="hk-t4" style="left:560px;top:1310px" data-rot="-19"><div class="hk-p"><b>NETFLIX</b><i></i><span>TOTAL</span><em>12,99 €</em></div></div>
+      <div class="hk-t" id="hk-t5" style="left:-30px;top:1520px" data-rot="8"><div class="hk-p"><b>LUZ</b><i></i><span>TOTAL</span><em>64,30 €</em></div></div>
+      <div class="hk-t" id="hk-t6" style="left:330px;top:1540px" data-rot="-9"><div class="hk-p"><b>COMIDA</b><i></i><span>TOTAL</span><em>72,30 €</em></div></div>
+      <div class="hk-t" id="hk-t7" style="left:690px;top:1500px" data-rot="13"><div class="hk-p"><b>GIMNASIO</b><i></i><span>TOTAL</span><em>34,90 €</em></div></div>
+      <div class="hk-t" id="hk-t8" style="left:120px;top:1230px" data-rot="5"><div class="hk-p"><b>OCIO</b><i></i><span>TOTAL</span><em>64,50 €</em></div></div>
+      <div class="hk-t" id="hk-t9" style="left:500px;top:1200px" data-rot="-11"><div class="hk-p"><b>MASCOTAS</b><i></i><span>TOTAL</span><em>45,00 €</em></div></div>
+      <div class="hk-t" id="hk-t10" style="left:230px;top:1690px" data-rot="-4"><div class="hk-p"><b>INTERNET</b><i></i><span>TOTAL</span><em>39,90 €</em></div></div>
+      <div class="hk-t" id="hk-t11" style="left:610px;top:1700px" data-rot="10"><div class="hk-p"><b>ROPA</b><i></i><span>TOTAL</span><em>49,90 €</em></div></div>
+    </div>
+    <div id="hk-flood" class="clip" data-start="5.9" data-duration="0.9" data-track-index="5" data-layout-allow-overflow></div>
+    <img id="hk-icon" class="clip" data-start="5.9" data-duration="0.9" data-track-index="6" src="assets/icon.png" alt="" />
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " €";
+      // question arrives word by word; DÍA 28 is on screen from frame 0
+      tl.fromTo("#hk-q span", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16, stagger: 0.08, ease: "power4.out" }, 0.35);
+      // tickets rain and pile up
+      document.querySelectorAll(".hk-t").forEach((el, i) => {
+        const r = Number(el.dataset.rot);
+        tl.fromTo(el, { y: -2300, rotation: r * 4 }, { y: 0, rotation: r, duration: 0.62, ease: "power2.in" }, 1.2 + i * 0.17);
+        tl.fromTo(el, { scaleY: 0.93 }, { scaleY: 1, duration: 0.25, ease: "back.out(3)" }, 1.82 + i * 0.17);
+        const cx = 540 - (parseFloat(el.style.left) + 165), cy = 900 - (parseFloat(el.style.top) + 120);
+        tl.to(el, { x: cx, y: cy, scale: 0.12, rotation: r + 220, duration: 0.42, ease: "power3.in" }, 5.55 + i * 0.018);
+        tl.to(el, { opacity: 0, duration: 0.05 }, 5.97 + i * 0.018);
+      });
+      // first lines leave, the number counts up
+      tl.to("#hk-day", { opacity: 0, filter: "blur(14px)", scale: 1.08, duration: 0.2, ease: "power3.in" }, 3.2);
+      tl.to("#hk-q", { opacity: 0, filter: "blur(10px)", duration: 0.18, ease: "power3.in" }, 3.2);
+      tl.fromTo("#hk-lab", { opacity: 0 }, { opacity: 1, duration: 0.15 }, 3.4);
+      const c = { v: 0 };
+      const num = document.querySelector("#hk-num");
+      tl.fromTo("#hk-num", { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.25, ease: "power4.out" }, 3.4);
+      tl.fromTo(c, { v: 0 }, { v: 1802, duration: 1.0, ease: "power3.out", onUpdate: () => (num.textContent = fmt(c.v)) }, 3.42);
+      tl.fromTo("#hk-idea span", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.14, stagger: 0.07, ease: "power4.out" }, 3.95);
+      tl.to(["#hk-lab", "#hk-num", "#hk-idea"], { opacity: 0, filter: "blur(12px)", duration: 0.2, ease: "power3.in" }, 5.6);
+      // the app icon swallows the tickets, then becomes the next world
+      tl.fromTo(["#hk-flood", "#hk-icon"], { scale: 0 }, { scale: 1, duration: 0.34, ease: "back.out(1.8)" }, 5.95);
+      tl.to("#hk-flood", { scale: 9, borderRadius: 0, duration: 0.34, ease: "power3.in" }, 6.44);
+      tl.to("#hk-icon", { scale: 5, opacity: 0, duration: 0.3, ease: "power3.in" }, 6.44);
+      window.__timelines["hook"] = tl;
+    })();
+  </script>
+</template>

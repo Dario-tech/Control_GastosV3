@@ -1,0 +1,31 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "League Gothic", sans-serif; }
+    #py-bg { position: absolute; inset: 0; background: #0ea371; }
+    #py-title { position: absolute; left: 70px; right: 70px; top: 190px; text-align: center; font-size: 150px; line-height: 0.98; color: var(--color-ink, #1a1238); text-transform: uppercase; }
+    #py-title span { display: inline-block; }
+    #py-stage { position: absolute; inset: 0; }
+    #py-card { position: absolute; left: 70px; top: 540px; width: 940px; border-radius: 62px; overflow: hidden; box-shadow: 0 26px 0 rgba(10, 6, 30, 0.32); }
+    #py-card img { display: block; width: 100%; }
+  </style>
+  <div id="root" data-composition-id="payoff" data-width="1080" data-height="1920">
+    <div id="py-bg"></div>
+    <div id="py-title" class="clip" data-start="0" data-duration="3.4" data-track-index="1"><span>Y</span> <span>te</span> <span>dice</span> <span>cómo</span><br /><span>acabarás</span> <span>el</span> <span>mes</span></div>
+    <div id="py-stage" class="clip" data-start="0" data-duration="3.4" data-track-index="2" data-layout-allow-overflow>
+      <div id="py-card"><img src="assets/cierre.png" alt="" /></div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#py-bg", { backgroundColor: "#0ea371" }, { backgroundColor: "#4ade80", duration: 0.4, ease: "power2.inOut" }, 0);
+      tl.fromTo("#py-title span", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, stagger: 0.06, ease: "power4.out" }, 0.1);
+      tl.fromTo("#py-card", { y: 1500, rotation: 5 }, { y: 0, rotation: 0, duration: 0.75, ease: "expo.out" }, 0.1);
+      // hold, then punch in on the number
+      tl.to("#py-card", { scale: 1.1, duration: 0.5, ease: "power2.inOut", transformOrigin: "50% 0%" }, 1.45);
+      tl.to("#py-title", { opacity: 0, filter: "blur(12px)", duration: 0.18, ease: "power3.in" }, 3.05);
+      tl.to("#py-card", { y: 2300, filter: "blur(14px)", duration: 0.3, ease: "power3.in" }, 3.08);
+      window.__timelines["payoff"] = tl;
+    })();
+  </script>
+</template>

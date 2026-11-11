@@ -1,0 +1,30 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "League Gothic", sans-serif; }
+    #ec-bg { position: absolute; inset: 0; background: #4ade80; }
+    #ec-icon { position: absolute; left: 370px; top: 300px; width: 340px; height: 340px; border-radius: 76px; box-shadow: 0 22px 0 rgba(0, 0, 0, 0.35); }
+    #ec-name { position: absolute; left: 0; right: 0; top: 700px; text-align: center; font-size: 250px; line-height: 1; color: #fff; }
+    #ec-claim { position: absolute; left: 0; right: 0; top: 965px; text-align: center; font: 800 64px Inter, sans-serif; color: #fff; }
+    #ec-claim span { display: inline-block; }
+    #ec-claim b { color: #4ade80; font-weight: 800; }
+    #ec-url { position: absolute; left: 150px; width: 780px; top: 1120px; height: 104px; border-radius: 18px; background: #fff; color: var(--color-ink, #1a1238); font: 700 42px/104px Inter, sans-serif; text-align: center; }
+  </style>
+  <div id="root" data-composition-id="endcard" data-width="1080" data-height="1920">
+    <div id="ec-bg"></div>
+    <img id="ec-icon" class="clip" data-start="0.15" data-duration="3.45" data-track-index="1" src="assets/icon.png" alt="" />
+    <div id="ec-name" class="clip" data-start="0.5" data-duration="3.1" data-track-index="2">Mi Economía</div>
+    <div id="ec-claim" class="clip" data-start="0.95" data-duration="2.65" data-track-index="3"><span>Tu</span> <span>sueldo,</span> <span><b>bajo</b></span> <span><b>control</b></span></div>
+    <div id="ec-url" class="clip" data-start="1.35" data-duration="2.25" data-track-index="4" data-var-text="cta-url">control-gastos-v3.vercel.app</div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#ec-bg", { backgroundColor: "#4ade80" }, { backgroundColor: "#12102b", duration: 0.4, ease: "power2.inOut" }, 0);
+      tl.fromTo("#ec-icon", { scale: 0, rotation: -25 }, { scale: 1, rotation: 0, duration: 0.6, ease: "elastic.out(1, 0.6)" }, 0.15);
+      tl.fromTo("#ec-name", { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.5, ease: "power3.out" }, 0.5);
+      tl.fromTo("#ec-claim span", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, stagger: 0.08, ease: "power4.out" }, 0.95);
+      tl.fromTo("#ec-url", { clipPath: "inset(0% 50% 0% 50%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.4, ease: "expo.out" }, 1.35);
+      window.__timelines["endcard"] = tl;
+    })();
+  </script>
+</template>
